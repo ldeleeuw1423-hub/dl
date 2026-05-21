@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Numeric, Integer, text
+from sqlalchemy import Column, String, DateTime, Numeric, Integer, ForeignKey, text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 from app.database import Base
 
 
@@ -27,6 +29,8 @@ class HistoricalProject(Base):
     num_revisions = Column(Integer, nullable=True)
     risks_count = Column(Integer, nullable=True)
     issues_count = Column(Integer, nullable=True)
-    # embedding stored as text for portability; vector operations done via raw SQL
-    embedding = Column(String, nullable=True)
+    # pgvector embedding for OpenAI text-embedding-3-small (1536 dims)
+    embedding = Column(Vector(1536), nullable=True)
+    # Multi-tenancy: organization this historical project belongs to
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("now()"))

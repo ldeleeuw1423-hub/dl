@@ -1,10 +1,14 @@
 import json
+import math
 import logging
 from typing import Optional, Dict, Any, List
 from openai import AsyncOpenAI, OpenAIError
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+EMBEDDING_MODEL = "text-embedding-3-small"
+EMBEDDING_DIMS = 1536
 
 
 class AIService:
@@ -151,6 +155,57 @@ Geef 3-6 relevante risico's. Alleen de JSON array, geen andere tekst."""
         except (OpenAIError, json.JSONDecodeError) as e:
             logger.warning(f"AI risk detection error: {e}")
         return None
+
+    async def generate_project_embedding(self, project_data: Dict[str, Any]) -> List[float]:
+        """Generate a 1536-dim embedding for a project using OpenAI text-embedding-3-small.
+
+        Falls back to a rule-based feature vector if OpenAI is unavailable.
+        """
+        if self.is_available:
+            text = (
+                f"discipline:{project_data.get('discipline', 'onbekend')} "
+                f"locatie:{project_data.get('location_type', 'urban')} "
+                f"tracé:{project_data.get('trace_length_m', 0)}m "
+                f"kruisingen:{project_data.get('num_crossings', 0)} "
+                f"vergunningen:{project_data.get('num_permits', 0)} "
+                f"stakeholders:{project_data.get('num_stakeholders', 0)}"
+            )
+            try:
+                response = await self.client.embeddings.create(
+                    model=EMBEDDING_MODEL,
+                    input=text,
+                )
+                return response.data[0].embedding
+            except OpenAIError as e:
+                logger.warning(f"OpenAI embedding error, using fallback: {e}")
+
+        return self._rule_based_embedding(project_data)
+
+    def _rule_based_embedding(self, project_data: Dict[str, Any]) -> List[float]:
+        """Return a zero-padded feature vector when OpenAI is unavailable.
+
+        Key fields are normalised and placed in the first positions so cosine
+        similarity still reflects real project similarity.
+        """
+        DISCIPLINE_MAP = {"Gas": 0.1, "Elektra": 0.3, "LS_MS": 0.6, "Stations": 0.9}
+        LOCATION_MAP = {"rural": 0.1, "mixed": 0.5, "urban": 0.9}
+
+        trace = float(project_data.get("trace_length_m") or 0)
+        crossings = float(project_data.get("num_crossings") or 0)
+        permits = float(project_data.get("num_permits") or 0)
+        stakeholders = float(project_data.get("num_stakeholders") or 0)
+
+        vec = [0.0] * EMBEDDING_DIMS
+        vec[0] = DISCIPLINE_MAP.get(project_data.get("discipline", ""), 0.5)
+        vec[1] = LOCATION_MAP.get(project_data.get("location_type", "urban"), 0.5)
+        vec[2] = min(1.0, trace / 5000.0)
+        vec[3] = min(1.0, crossings / 20.0)
+        vec[4] = min(1.0, permits / 10.0)
+        vec[5] = min(1.0, stakeholders / 15.0)
+
+        # Normalise
+        magnitude = math.sqrt(sum(v * v for v in vec)) or 1.0
+        return [v / magnitude for v in vec]
 
     async def detect_permits(self, project_context: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
         if not self.is_available:

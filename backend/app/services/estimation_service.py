@@ -1,6 +1,7 @@
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from decimal import Decimal
 
 from app.models.estimation import Estimation
@@ -104,6 +105,54 @@ class EstimationService:
             )
         return query.limit(5).all()
 
+    async def find_similar_projects(
+        self,
+        project_data: Dict[str, Any],
+        top_k: int = 5,
+    ) -> List[Tuple[HistoricalProject, float]]:
+        """Find the top_k most similar historical projects using pgvector cosine similarity.
+
+        Returns a list of (HistoricalProject, similarity_score) tuples ordered by
+        descending similarity. Falls back to rule-based filter when no embeddings
+        are stored.
+        """
+        embedding = await self.ai_service.generate_project_embedding(project_data)
+        embedding_str = "[" + ",".join(str(v) for v in embedding) + "]"
+
+        try:
+            rows = self.db.execute(
+                text(
+                    """
+                    SELECT id, 1 - (embedding <=> CAST(:emb AS vector)) AS similarity
+                    FROM historical_projects
+                    WHERE embedding IS NOT NULL
+                    ORDER BY embedding <=> CAST(:emb AS vector)
+                    LIMIT :k
+                    """
+                ),
+                {"emb": embedding_str, "k": top_k},
+            ).fetchall()
+
+            if rows:
+                ids = [str(row[0]) for row in rows]
+                similarity_map = {str(row[0]): float(row[1]) for row in rows}
+                projects = self.db.query(HistoricalProject).filter(
+                    HistoricalProject.id.in_(ids)
+                ).all()
+                result = [(p, similarity_map.get(str(p.id), 0.0)) for p in projects]
+                result.sort(key=lambda x: x[1], reverse=True)
+                return result
+        except Exception as exc:
+            logger.warning(f"pgvector similarity search failed, using rule-based: {exc}")
+
+        # Fallback: rule-based filter
+        fallback = self._find_similar_projects(
+            project_data.get("discipline", "Elektra"),
+            project_data.get("location_type"),
+            project_data.get("trace_length_m"),
+        )
+        return [(p, 0.75) for p in fallback]
+
     def _rule_based_estimation(
         self,
         project: Project,
@@ -185,24 +234,32 @@ class EstimationService:
         request: EstimationGenerateRequest,
     ) -> Estimation:
         discipline = request.discipline or project.discipline
-        similar_projects = self._find_similar_projects(
-            discipline,
-            request.location_type,
-            request.trace_length_m,
-        )
+
+        project_lookup = {
+            "discipline": discipline,
+            "location_type": request.location_type or "urban",
+            "trace_length_m": float(request.trace_length_m or 0),
+            "num_crossings": request.num_crossings or 0,
+            "num_permits": request.num_permits or 0,
+            "num_stakeholders": request.num_stakeholders or 0,
+        }
+        similar_with_scores = await self.find_similar_projects(project_lookup, top_k=5)
 
         similar_projects_data = []
-        for sp in similar_projects:
+        for sp, sim_score in similar_with_scores:
             similar_projects_data.append({
                 "reference_number": sp.reference_number,
                 "name": sp.name,
                 "discipline": sp.discipline,
                 "location_type": sp.location_type,
+                "trace_length_m": float(sp.trace_length_m) if sp.trace_length_m else None,
+                "duration_days": sp.duration_days,
                 "hours_engineering": float(sp.hours_engineering) if sp.hours_engineering else None,
                 "hours_pm": float(sp.hours_pm) if sp.hours_pm else None,
+                "hours_om": float(sp.hours_om) if sp.hours_om else None,
                 "hours_workprep": float(sp.hours_workprep) if sp.hours_workprep else None,
                 "cost_total": float(sp.cost_total) if sp.cost_total else None,
-                "similarity_score": 0.85,
+                "similarity_score": round(sim_score, 4),
             })
 
         project_context = {

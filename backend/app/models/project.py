@@ -26,11 +26,13 @@ class Project(Base):
     budget_actual = Column(Numeric(14, 2), nullable=True)
     hours_estimated = Column(Numeric(10, 2), nullable=True)
     hours_actual = Column(Numeric(10, 2), nullable=True)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("now()"))
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("now()"), onupdate=datetime.utcnow)
 
     creator = relationship("User", back_populates="projects", foreign_keys=[created_by])
+    organization = relationship("Organization", back_populates="projects", foreign_keys=[organization_id])
     risks = relationship("Risk", back_populates="project", cascade="all, delete-orphan")
     estimations = relationship("Estimation", back_populates="project", cascade="all, delete-orphan")
     permits = relationship("Permit", back_populates="project", cascade="all, delete-orphan")
