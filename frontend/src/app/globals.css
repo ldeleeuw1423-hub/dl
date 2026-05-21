@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-inter: "Inter", system-ui, sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply text-gray-900 bg-gray-50;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply flex-1 overflow-y-auto px-6 py-5;
+  }
+
+  .section-title {
+    @apply text-base font-semibold text-gray-900;
+  }
+
+  .tab-button {
+    @apply px-4 py-2 text-sm font-medium border-b-2 transition-colors;
+  }
+
+  .tab-button-active {
+    @apply text-navy-800 border-navy-800;
+  }
+
+  .tab-button-inactive {
+    @apply text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300;
+  }
+}
+
+@layer utilities {
+  .text-2xs {
+    font-size: 0.625rem;
+    line-height: 1rem;
+  }
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  font-family: var(--font-inter);
+}
+
+.leaflet-control-zoom {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important;
+  overflow: hidden;
+}

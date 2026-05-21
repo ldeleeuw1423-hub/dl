@@ -1,0 +1,47 @@
+{
+  "name": "infra-estimation-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.2.3",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "5.4.5",
+    "@types/node": "20.12.12",
+    "@types/react": "18.3.2",
+    "@types/react-dom": "18.3.0",
+    "tailwindcss": "3.4.3",
+    "autoprefixer": "10.4.19",
+    "postcss": "8.4.38",
+    "leaflet": "1.9.4",
+    "react-leaflet": "4.2.1",
+    "@types/leaflet": "1.9.12",
+    "leaflet-draw": "1.0.4",
+    "@types/leaflet-draw": "1.0.11",
+    "recharts": "2.12.7",
+    "react-hook-form": "7.51.5",
+    "zod": "3.23.8",
+    "@hookform/resolvers": "3.4.2",
+    "date-fns": "3.6.0",
+    "clsx": "2.1.1",
+    "tailwind-merge": "2.3.0",
+    "lucide-react": "0.379.0",
+    "axios": "1.7.2",
+    "js-cookie": "3.0.5",
+    "@types/js-cookie": "3.0.6",
+    "react-hot-toast": "2.4.1"
+  },
+  "devDependencies": {
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.3",
+    "@typescript-eslint/eslint-plugin": "7.10.0",
+    "@typescript-eslint/parser": "7.10.0"
+  }
+}
