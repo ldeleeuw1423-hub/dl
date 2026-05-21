@@ -40,6 +40,23 @@ def get_current_user(
     return user
 
 
+def get_current_organization(current_user: User = Depends(get_current_user)):
+    """Return the organization of the current user.
+
+    Raises 404 when the user has no organization assigned.  Routers that want
+    to enforce organisation-scoped data should declare this as a dependency.
+    """
+    from app.models.organization import Organization
+    # Organisation is loaded via the user relationship; we return the id so
+    # callers can filter queries with it directly.
+    if current_user.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gebruiker heeft geen organisatie",
+        )
+    return current_user.organization_id
+
+
 def require_role(*roles: str):
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in roles:

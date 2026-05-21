@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from app.config import settings
-from app.routers import auth, projects, estimations, risks, permits, gis, historical, files
+from app.routers import auth, projects, estimations, risks, permits, gis, historical, files, exports, organizations
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -35,6 +35,8 @@ app.include_router(permits.router, prefix=f"{settings.API_V1_STR}/projects", tag
 app.include_router(files.router, prefix=f"{settings.API_V1_STR}/projects", tags=["files"])
 app.include_router(gis.router, prefix=f"{settings.API_V1_STR}/gis", tags=["gis"])
 app.include_router(historical.router, prefix=f"{settings.API_V1_STR}/historical", tags=["historical"])
+app.include_router(exports.router, prefix=f"{settings.API_V1_STR}/projects", tags=["exports"])
+app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["organizations"])
 
 
 @app.get("/health")

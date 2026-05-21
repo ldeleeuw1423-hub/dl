@@ -11,6 +11,7 @@ import { ProjectStatusBadge } from "@/components/projects/ProjectStatusBadge";
 import { Modal } from "@/components/ui/Modal";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 import { useProject } from "@/hooks/useProjects";
+import { ExportButton } from "@/components/ui/ExportButton";
 import {
   formatCurrency,
   formatDate,
@@ -104,14 +105,18 @@ export default function ProjectDetailPage() {
               </p>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            icon={<Pencil className="h-3.5 w-3.5" />}
-            onClick={() => setEditOpen(true)}
-          >
-            Bewerken
-          </Button>
+          <div className="flex items-center gap-2">
+            <ExportButton projectId={id} format="excel" />
+            <ExportButton projectId={id} format="pdf" />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Pencil className="h-3.5 w-3.5" />}
+              onClick={() => setEditOpen(true)}
+            >
+              Bewerken
+            </Button>
+          </div>
         </div>
 
         {/* KPIs */}

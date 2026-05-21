@@ -62,11 +62,38 @@ def analyze_area(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Local geometry analysis — no external API calls."""
     geometry = body.get("geometry")
     if not geometry:
         raise HTTPException(status_code=400, detail="geometry is required")
     service = GISService(db)
     analysis = service.analyze_geometry(geometry)
+    return analysis
+
+
+@router.post("/analyze-pdok")
+async def analyze_with_pdok(
+    body: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Full PDOK live API analysis for a GeoJSON geometry.
+
+    Accepts a body with a ``geometry`` key containing a GeoJSON geometry object.
+    Runs:
+    - Local length / area estimation
+    - PDOK bestuurlijke grenzen — gemeente lookup
+    - PDOK Natura 2000 proximity check (500m buffer)
+    - PDOK BAG address density near trace
+    - PDOK BGT / NWB crossing analysis (waterways, roads, railways, cycle paths)
+
+    Returns structured analysis used for automatic risk and permit detection.
+    """
+    geometry = body.get("geometry")
+    if not geometry:
+        raise HTTPException(status_code=400, detail="geometry is required")
+    service = GISService(db)
+    analysis = await service.analyze_with_pdok(geometry)
     return analysis
 
 

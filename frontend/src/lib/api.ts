@@ -6,6 +6,11 @@ import {
   EstimationGenerateRequest,
   GISLayer,
   HistoricalProject,
+  InviteRequest,
+  Organization,
+  OrganizationUpdate,
+  OrgStats,
+  PDOKAnalysisResult,
   Permit,
   PermitCreate,
   Project,
@@ -204,6 +209,11 @@ class APIClient {
     return data;
   }
 
+  async analyzeGeometryPDOK(geometry: object): Promise<PDOKAnalysisResult> {
+    const { data } = await this.client.post<PDOKAnalysisResult>("/gis/analyze-pdok", { geometry });
+    return data;
+  }
+
   // Historical
   async getHistoricalProjects(params?: {
     discipline?: string;
@@ -215,12 +225,66 @@ class APIClient {
   }
 
   async getSimilarProjects(params: {
+    project_id?: string;
     discipline?: string;
     location_type?: string;
     trace_length_m?: number;
-    limit?: number;
+    top_k?: number;
   }): Promise<HistoricalProject[]> {
     const { data } = await this.client.get<HistoricalProject[]>("/historical/similar", { params });
+    return data;
+  }
+
+  // Export
+  getExportExcelUrl(projectId: string): string {
+    return `${BASE_URL}${API_PREFIX}/projects/${projectId}/export/excel`;
+  }
+
+  getExportPdfUrl(projectId: string): string {
+    return `${BASE_URL}${API_PREFIX}/projects/${projectId}/export/pdf`;
+  }
+
+  async downloadExcel(projectId: string): Promise<Blob> {
+    const token = Cookies.get("access_token");
+    const { data } = await this.client.get(`/projects/${projectId}/export/excel`, {
+      responseType: "blob",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return data;
+  }
+
+  async downloadPdf(projectId: string): Promise<Blob> {
+    const token = Cookies.get("access_token");
+    const { data } = await this.client.get(`/projects/${projectId}/export/pdf`, {
+      responseType: "blob",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return data;
+  }
+
+  // Organizations
+  async getMyOrganization(): Promise<Organization> {
+    const { data } = await this.client.get<Organization>("/organizations/me");
+    return data;
+  }
+
+  async updateMyOrganization(payload: OrganizationUpdate): Promise<Organization> {
+    const { data } = await this.client.put<Organization>("/organizations/me", payload);
+    return data;
+  }
+
+  async getOrgUsers(): Promise<User[]> {
+    const { data } = await this.client.get<User[]>("/organizations/me/users");
+    return data;
+  }
+
+  async inviteUser(payload: InviteRequest): Promise<User> {
+    const { data } = await this.client.post<User>("/organizations/invite", payload);
+    return data;
+  }
+
+  async getOrgStats(): Promise<OrgStats> {
+    const { data } = await this.client.get<OrgStats>("/organizations/me/stats");
     return data;
   }
 

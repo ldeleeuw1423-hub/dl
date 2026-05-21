@@ -1,4 +1,4 @@
-export type UserRole = "pm" | "engineer" | "om" | "admin";
+export type UserRole = "pm" | "engineer" | "om" | "admin" | "viewer";
 
 export interface User {
   id: string;
@@ -6,6 +6,7 @@ export interface User {
   name: string;
   role: UserRole;
   organization?: string;
+  organization_id?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -36,6 +37,7 @@ export interface Project {
   budget_actual?: number;
   hours_estimated?: number;
   hours_actual?: number;
+  organization_id?: string;
   created_by?: string;
   created_at: string;
   updated_at: string;
@@ -207,6 +209,7 @@ export interface HistoricalProject {
   risks_count?: number;
   issues_count?: number;
   created_at: string;
+  similarity_score?: number;
 }
 
 export interface GISLayer {
@@ -215,6 +218,38 @@ export interface GISLayer {
   url: string;
   type: "WMS" | "WFS" | "WMTS";
   layers: string[];
+}
+
+export interface PDOKAnalysisResult {
+  geometry_type: string;
+  analysis: {
+    estimated_length_m?: number;
+    estimated_area_m2?: number;
+    num_points?: number;
+    location?: { longitude: number; latitude: number };
+  };
+  risks: Array<{
+    description: string;
+    category: string;
+    probability: number;
+    impact: number;
+    source?: string;
+  }>;
+  permits_likely: string[];
+  notes: string[];
+  pdok?: {
+    gemeente?: string;
+    natura2000_proximity?: boolean;
+    address_count?: number;
+    urban_density?: "laag" | "gemiddeld" | "hoog";
+    crossings?: {
+      waterways: number;
+      major_roads: number;
+      railways: number;
+      cycle_paths: number;
+    };
+    error?: string;
+  };
 }
 
 export interface APIError {
@@ -226,4 +261,52 @@ export interface PaginatedResponse<T> {
   total: number;
   skip: number;
   limit: number;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-tenant — Organization types
+// ---------------------------------------------------------------------------
+
+export type SubscriptionTier = "free" | "professional" | "enterprise";
+
+export interface OrganizationSettings {
+  hourly_rate_engineering?: number;
+  hourly_rate_pm?: number;
+  hourly_rate_om?: number;
+  hourly_rate_workprep?: number;
+  hourly_rate_execution?: number;
+  risk_threshold_high?: number;
+  risk_threshold_critical?: number;
+  custom_disciplines?: string[];
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  subscription_tier: SubscriptionTier;
+  max_projects: number;
+  max_users: number;
+  settings?: OrganizationSettings & Record<string, unknown>;
+  created_at: string;
+}
+
+export interface OrganizationUpdate {
+  name?: string;
+  settings?: Partial<OrganizationSettings> & Record<string, unknown>;
+}
+
+export interface OrgStats {
+  total_projects: number;
+  active_projects: number;
+  total_risks: number;
+  open_risks: number;
+  high_risk_projects: number;
+  users_count: number;
+}
+
+export interface InviteRequest {
+  email: string;
+  name: string;
+  role: UserRole;
 }

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { clearAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
 const navItems = [
   {
@@ -95,6 +96,11 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
+
+      {/* Organization switcher */}
+      <div className="px-2 py-2 border-t border-navy-800">
+        <OrganizationSwitcher />
+      </div>
 
       {/* Footer */}
       <div className="px-2 py-3 border-t border-navy-800 space-y-0.5">
