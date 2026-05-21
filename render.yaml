@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: infraestimator-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements-demo.txt
+    startCommand: python3 demo_server.py
+    plan: free
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+    healthCheckPath: /api/v1/projects
