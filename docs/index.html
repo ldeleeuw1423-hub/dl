@@ -936,6 +936,56 @@ tailwind.config = {
 <!-- TOAST -->
 <div id="toast" class="toast"></div>
 
+<!-- FEEDBACK BUTTON -->
+<button onclick="document.getElementById('modal-feedback').style.display='flex'" style="position:fixed;bottom:24px;left:24px;background:#1e3a5f;color:#fff;border:none;border-radius:99px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:90;display:flex;align-items:center;gap:8px;transition:background .15s;" onmouseover="this.style.background='#2d4f7c'" onmouseout="this.style.background='#1e3a5f'">
+  <i class="fas fa-comment-alt"></i> Feedback
+</button>
+
+<!-- FEEDBACK MODAL -->
+<div id="modal-feedback" style="display:none;" class="modal">
+  <div class="modal-box" style="width:460px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#1e293b;">Feedback geven</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px;">Help ons het platform te verbeteren</div>
+      </div>
+      <button onclick="document.getElementById('modal-feedback').style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;">✕</button>
+    </div>
+    <div style="display:grid;gap:14px;">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;">Hoe beoordeel je het platform?</div>
+        <div style="display:flex;gap:8px;" id="rating-stars">
+          <span onclick="setRating(1)" style="font-size:28px;cursor:pointer;transition:transform .1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">⭐</span>
+          <span onclick="setRating(2)" style="font-size:28px;cursor:pointer;transition:transform .1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">⭐</span>
+          <span onclick="setRating(3)" style="font-size:28px;cursor:pointer;transition:transform .1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">⭐</span>
+          <span onclick="setRating(4)" style="font-size:28px;cursor:pointer;transition:transform .1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">⭐</span>
+          <span onclick="setRating(5)" style="font-size:28px;cursor:pointer;transition:transform .1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">⭐</span>
+        </div>
+        <div id="rating-label" style="font-size:12px;color:#64748b;margin-top:6px;min-height:16px;"></div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;">Categorie</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;" id="feedback-cats">
+          <button onclick="toggleFeedbackCat(this)" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:99px;font-size:12px;cursor:pointer;background:#fff;color:#475569;transition:all .15s;">Urenschatter</button>
+          <button onclick="toggleFeedbackCat(this)" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:99px;font-size:12px;cursor:pointer;background:#fff;color:#475569;transition:all .15s;">Risicobeheer</button>
+          <button onclick="toggleFeedbackCat(this)" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:99px;font-size:12px;cursor:pointer;background:#fff;color:#475569;transition:all .15s;">Vergunningen</button>
+          <button onclick="toggleFeedbackCat(this)" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:99px;font-size:12px;cursor:pointer;background:#fff;color:#475569;transition:all .15s;">GIS / Kaart</button>
+          <button onclick="toggleFeedbackCat(this)" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:99px;font-size:12px;cursor:pointer;background:#fff;color:#475569;transition:all .15s;">Project Intake</button>
+          <button onclick="toggleFeedbackCat(this)" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:99px;font-size:12px;cursor:pointer;background:#fff;color:#475569;transition:all .15s;">Overig</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px;">Toelichting</div>
+        <textarea id="feedback-text" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;height:90px;resize:vertical;font-family:inherit;" placeholder="Wat werkt goed? Wat kan beter? Mis je bepaalde functionaliteit?"></textarea>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+      <button class="btn-secondary" onclick="document.getElementById('modal-feedback').style.display='none'">Annuleren</button>
+      <button class="btn-primary" onclick="submitFeedback()"><i class="fas fa-paper-plane fa-sm"></i> Versturen</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== DATA =====
 const projects = [
@@ -1293,6 +1343,28 @@ function initCharts() {
 }
 
 // ===== INIT =====
+let feedbackRating = 0;
+const ratingLabels = ['','Slecht','Matig','Goed','Erg goed','Uitstekend!'];
+function setRating(n) {
+  feedbackRating = n;
+  document.querySelectorAll('#rating-stars span').forEach((s,i) => { s.style.opacity = i < n ? '1' : '0.3'; });
+  document.getElementById('rating-label').textContent = ratingLabels[n];
+}
+function toggleFeedbackCat(btn) {
+  const active = btn.style.background === 'rgb(30, 58, 95)';
+  btn.style.background = active ? '#fff' : '#1e3a5f';
+  btn.style.color = active ? '#475569' : '#fff';
+  btn.style.borderColor = active ? '#e2e8f0' : '#1e3a5f';
+}
+function submitFeedback() {
+  document.getElementById('modal-feedback').style.display = 'none';
+  document.getElementById('feedback-text').value = '';
+  feedbackRating = 0;
+  document.querySelectorAll('#rating-stars span').forEach(s => s.style.opacity = '1');
+  document.querySelectorAll('#feedback-cats button').forEach(b => { b.style.background='#fff'; b.style.color='#475569'; b.style.borderColor='#e2e8f0'; });
+  toast('Bedankt voor je feedback!');
+}
+
 window.onload = function() {
   renderDashboardProjects();
   renderProjectCards();
