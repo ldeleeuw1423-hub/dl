@@ -111,7 +111,9 @@ input[type=file] { display:none; }
     <div class="sidebar-item" onclick="showPage('strategies')"><i class="fas fa-robot fa-sm"></i> Strategieën</div>
 
     <div class="sidebar-section">AI & Leren</div>
-    <div class="sidebar-item" onclick="showPage('ai')"><i class="fas fa-brain fa-sm"></i> AI Analyse</div>
+    <div class="sidebar-item" onclick="showPage('ai')"><i class="fas fa-satellite-dish fa-sm"></i> AI Analyse</div>
+    <div class="sidebar-item" onclick="showPage('learning')"><i class="fas fa-brain fa-sm"></i> Wat ik leerde</div>
+    <div class="sidebar-item" onclick="showPage('social')"><i class="fas fa-rss fa-sm"></i> Markt Sentiment</div>
 
     <div class="sidebar-section">Instellingen</div>
     <div class="sidebar-item" onclick="showPage('apis')"><i class="fas fa-plug fa-sm"></i> API Verbindingen</div>
@@ -376,10 +378,21 @@ input[type=file] { display:none; }
   <!-- Header + controls -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
     <div>
-      <div style="font-size:14px;color:#7878a0;">Live Kraken marktanalyse · indicators berekend op 1h OHLCV · systeem leert elke dag van resultaten</div>
+      <div style="font-size:14px;color:#7878a0;">Live Kraken marktanalyse · indicators berekend op OHLCV · systeem leert elke dag van resultaten</div>
+      <div style="margin-top:6px;display:flex;align-items:center;gap:14px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+          <label class="toggle" style="width:36px;height:18px;">
+            <input type="checkbox" id="auto-scan-toggle" checked onchange="toggleAutoScan(this)">
+            <div class="toggle-slider"></div>
+          </label>
+          <span style="color:#e0e0e0;">Auto-scan</span>
+        </div>
+        <div style="font-size:12px;color:#7878a0;">Volgende scan: <span id="countdown-display" style="color:#00d4aa;font-weight:600;font-family:monospace;">15:00</span></div>
+        <div style="font-size:12px;color:#7878a0;">Scans uitgevoerd: <span id="scan-count-display" style="color:#e0e0e0;font-weight:600;">0</span></div>
+      </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <select class="filter-input" id="ai-tf" onchange="runAiScan()" style="width:110px;">
+      <select class="filter-input" id="ai-tf" style="width:110px;">
         <option value="60">1 uur</option>
         <option value="240">4 uur</option>
         <option value="1440">1 dag</option>
@@ -392,7 +405,7 @@ input[type=file] { display:none; }
         <option value="SELL">Sell</option>
         <option value="STRONG SELL">Strong Sell</option>
       </select>
-      <button class="btn btn-primary" onclick="runAiScan()" id="ai-scan-btn"><i class="fas fa-satellite-dish fa-xs"></i> Scan Kraken</button>
+      <button class="btn btn-primary" onclick="runAiScan()" id="ai-scan-btn"><i class="fas fa-satellite-dish fa-xs"></i> Nu scannen</button>
     </div>
   </div>
 
@@ -475,6 +488,174 @@ input[type=file] { display:none; }
       <thead><tr><th>Datum</th><th>Pair</th><th>Signaal</th><th>Score</th><th>Prijs toen</th><th>Prijs nu</th><th>Richting</th><th>Correct</th></tr></thead>
       <tbody id="pred-history-tbody"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: WAT IK LEERDE
+════════════════════════════════════════════════════════ -->
+<div class="page" id="page-learning">
+
+  <!-- KPI row -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;">
+    <div class="kpi" style="border-left-color:#00d4aa;">
+      <div class="form-label">Totale voorspellingen</div>
+      <div id="lrn-total" style="font-size:24px;font-weight:700;margin-top:5px;" class="neu">0</div>
+      <div id="lrn-total-sub" style="font-size:11px;margin-top:2px;" class="muted">opgeslagen</div>
+    </div>
+    <div class="kpi" style="border-left-color:#6382ff;">
+      <div class="form-label">Gemiddelde nauwkeurigheid</div>
+      <div id="lrn-acc" style="font-size:24px;font-weight:700;margin-top:5px;" class="neu">—</div>
+      <div id="lrn-acc-sub" style="font-size:11px;margin-top:2px;" class="muted">na evaluatie</div>
+    </div>
+    <div class="kpi" style="border-left-color:#f59e0b;">
+      <div class="form-label">Beste indicator</div>
+      <div id="lrn-best-ind" style="font-size:24px;font-weight:700;margin-top:5px;" class="neu">—</div>
+      <div id="lrn-best-ind-sub" style="font-size:11px;margin-top:2px;" class="muted">hoogste gewicht</div>
+    </div>
+    <div class="kpi" style="border-left-color:#00d4aa;">
+      <div class="form-label">Beste pair</div>
+      <div id="lrn-best-pair" style="font-size:22px;font-weight:700;margin-top:5px;" class="pos">—</div>
+      <div id="lrn-best-pair-sub" style="font-size:11px;margin-top:2px;" class="muted">hoogste trefkans</div>
+    </div>
+    <div class="kpi" style="border-left-color:#ff5555;">
+      <div class="form-label">Slechtste pair</div>
+      <div id="lrn-worst-pair" style="font-size:22px;font-weight:700;margin-top:5px;" class="neg">—</div>
+      <div id="lrn-worst-pair-sub" style="font-size:11px;margin-top:2px;" class="muted">laagste trefkans</div>
+    </div>
+    <div class="kpi" style="border-left-color:#7878a0;">
+      <div class="form-label">Leerdagen</div>
+      <div id="lrn-days" style="font-size:24px;font-weight:700;margin-top:5px;" class="neu">0</div>
+      <div style="font-size:11px;margin-top:2px;" class="muted">evaluatieronden</div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;">Indicator Gewichten</div>
+      <canvas id="chart-weights-radar" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;">Nauwkeurigheid per Signaaltype</div>
+      <canvas id="chart-signal-acc" height="200"></canvas>
+      <div id="signal-acc-legend" style="font-size:11px;color:#7878a0;margin-top:8px;text-align:center;"></div>
+    </div>
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;">Nauwkeurigheid over tijd</div>
+      <canvas id="chart-acc-time" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Strategy matching + pair accuracy -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+
+    <!-- Strategy matching -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:4px;"><i class="fas fa-puzzle-piece" style="color:#6382ff;"></i> Strategie–AI Match</div>
+      <div style="font-size:12px;color:#7878a0;margin-bottom:14px;">Hoe goed past elke strategie bij wat het AI-systeem heeft geleerd?</div>
+      <div id="strategy-match-table"></div>
+      <div style="margin-top:14px;border-top:1px solid #252540;padding-top:12px;">
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:8px;">AI-signalen voor actieve strategie-pairs</div>
+        <div id="strategy-ai-signals"></div>
+      </div>
+    </div>
+
+    <!-- Per-pair accuracy -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;"><i class="fas fa-trophy" style="color:#f59e0b;"></i> Nauwkeurigheid per Pair</div>
+      <table>
+        <thead><tr><th>Pair</th><th>Voorsp.</th><th>Correct</th><th>Acc %</th><th>Trend</th></tr></thead>
+        <tbody id="pair-acc-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Learned insights -->
+  <div class="card">
+    <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;"><i class="fas fa-lightbulb" style="color:#f59e0b;"></i> Geleerde Inzichten</div>
+    <div id="learned-insights" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: MARKT SENTIMENT (Reddit + nieuws, kritisch gefilterd)
+════════════════════════════════════════════════════════ -->
+<div class="page" id="page-social">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-size:14px;color:#7878a0;">Verzamelt posts van Reddit + crypto-nieuwsbronnen. Streng gefilterd op relevantie en betrouwbaarheid.</div>
+      <div style="margin-top:5px;display:flex;align-items:center;gap:12px;font-size:12px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label class="toggle" style="width:36px;height:18px;"><input type="checkbox" id="social-auto" checked onchange="toggleSocialAuto(this)"><div class="toggle-slider"></div></label>
+          <span class="muted">Auto-refresh 5 min</span>
+        </div>
+        <div class="muted">Laatste update: <span id="social-last-update" style="color:#e0e0e0;">—</span></div>
+        <div class="muted">Geladen: <span id="social-count" style="color:#e0e0e0;">0</span> berichten (<span id="social-filtered" style="color:#00d4aa;"></span> gefilterd)</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select class="filter-input" id="social-source" onchange="applySocialFilters()" style="width:130px;">
+        <option value="all">Alle bronnen</option>
+        <option value="reddit">Reddit</option>
+        <option value="news">Nieuws</option>
+      </select>
+      <select class="filter-input" id="social-sentiment" onchange="applySocialFilters()" style="width:130px;">
+        <option value="all">Alle sentiment</option>
+        <option value="bullish">Bullish</option>
+        <option value="bearish">Bearish</option>
+        <option value="neutral">Neutraal</option>
+      </select>
+      <select class="filter-input" id="social-coin" onchange="applySocialFilters()" style="width:120px;">
+        <option value="all">Alle coins</option>
+        <option value="BTC">Bitcoin</option>
+        <option value="ETH">Ethereum</option>
+        <option value="SOL">Solana</option>
+        <option value="XRP">XRP</option>
+        <option value="BNB">BNB</option>
+      </select>
+      <input class="filter-input" id="social-search" placeholder="Zoeken..." oninput="applySocialFilters()" style="width:140px;">
+      <button class="btn btn-primary" onclick="loadSocialFeed()"><i class="fas fa-sync-alt fa-xs" id="social-refresh-icon"></i> Verversen</button>
+    </div>
+  </div>
+
+  <!-- Sentiment KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
+    <div class="kpi" style="border-left-color:#00d4aa;">
+      <div class="form-label">Bullish posts</div>
+      <div id="soc-bull" style="font-size:22px;font-weight:700;margin-top:5px;" class="pos">0</div>
+    </div>
+    <div class="kpi" style="border-left-color:#ff5555;">
+      <div class="form-label">Bearish posts</div>
+      <div id="soc-bear" style="font-size:22px;font-weight:700;margin-top:5px;" class="neg">0</div>
+    </div>
+    <div class="kpi" style="border-left-color:#7878a0;">
+      <div class="form-label">Neutraal</div>
+      <div id="soc-neu" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">0</div>
+    </div>
+    <div class="kpi" style="border-left-color:#f59e0b;">
+      <div class="form-label">Markt Stemming</div>
+      <div id="soc-mood" style="font-size:20px;font-weight:700;margin-top:5px;" class="neu">—</div>
+    </div>
+    <div class="kpi" style="border-left-color:#ff5555;">
+      <div class="form-label">Geblokkeerd (spam/FUD)</div>
+      <div id="soc-blocked" style="font-size:22px;font-weight:700;margin-top:5px;" class="neg">0</div>
+    </div>
+  </div>
+
+  <!-- Kritische beoordeling banner -->
+  <div style="background:rgba(99,130,255,.06);border:1px solid rgba(99,130,255,.2);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#7878a0;display:flex;align-items:center;gap:10px;">
+    <i class="fas fa-shield-alt" style="color:#6382ff;font-size:16px;"></i>
+    <div><span style="color:#6382ff;font-weight:600;">Kritisch filter actief</span> — Berichten worden gescoord op: bewijsvoering, engagement-ratio, promotietaal, tegengestelde bronnen. Score &lt;40 = verborgen. Neem <strong>nooit</strong> een handelsbeslissing op basis van sociale media alleen.</div>
+  </div>
+
+  <!-- Feed -->
+  <div id="social-feed" style="display:flex;flex-direction:column;gap:10px;">
+    <div class="card" style="text-align:center;color:#7878a0;padding:40px;">
+      <i class="fas fa-rss" style="font-size:32px;color:#6382ff;margin-bottom:12px;display:block;"></i>
+      Klik "Verversen" om de feed te laden
+    </div>
   </div>
 </div>
 
@@ -663,7 +844,7 @@ function saveApis(a){ localStorage.setItem(APIS_KEY, JSON.stringify(a)); }
 // ══════════════════════════════════════════════════════════
 const PAGE_TITLES = { overview:'Overzicht', trades:'Trades', performance:'Performance',
   pairs:'Pairs', paper:'Paper Trading', strategies:'Strategieën', ai:'AI Analyse (Kraken)',
-  apis:'API Verbindingen', import:'CSV Import' };
+  learning:'Wat ik leerde', social:'Markt Sentiment', apis:'API Verbindingen', import:'CSV Import' };
 
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -680,6 +861,8 @@ function showPage(id){
   if(id==='paper')       renderPaperPage();
   if(id==='strategies')  renderStrategiesPage();
   if(id==='ai')          { renderWeightsDisplay(); renderPredHistory(); renderAiKPIs(); renderAccuracyChart(); }
+  if(id==='learning')    renderLearningPage();
+  if(id==='social')      renderSocialPage();
   if(id==='apis')        renderApisPage();
 }
 
@@ -1423,10 +1606,21 @@ const KRAKEN_BASE   = 'https://api.kraken.com/0/public';
 
 // Prioriteitsparen — Kraken-namen (XXBTZUSD = BTC/USD)
 const KRAKEN_PRIORITY = [
+  // USD paren
   'XXBTZUSD','XETHZUSD','SOLUSD','ADAUSD','XRPUSD',
   'DOTUSD','MATICUSD','LINKUSD','AVAXUSD','ATOMUSD',
   'UNIUSD','AAVEUSD','LTCUSD','XLMUSD','ALGOUSD',
-  'DOGEUSD','SHIBUSD','BNBUSD','TRXUSD','ETCUSD'
+  'DOGEUSD','SHIBUSD','BNBUSD','TRXUSD','ETCUSD',
+  'SANDUSD','MANAUSD','APEUSD','AXSUSD','ENSUSD',
+  'FTMUSD','NEARUSD','IOTAUSD','FLOWUSD','GRTUSD',
+  // EUR paren
+  'XXBTZEUR','XETHZEUR','SOLEUR','ADAEUR','XRPEUR',
+  'DOTEUR','LINKEUR','AVAXEUR','LTCEUR','XLMEUR',
+  // BTC paren (crypto/crypto)
+  'XETHXXBT','SOLXBT','ADAXBT','XRPXXBT',
+  'DOTXBT','LINKXBT','LTCXBT','XLMXBT',
+  // ETH paren
+  'SOLETHEREUM','ADAETH','LINKETH','MATICETH',
 ];
 
 const WEIGHT_DEFAULTS = { rsi:1, ema:1, macd:1, bb:1, vol:1 };
@@ -1448,9 +1642,12 @@ async function krakenFetch(endpoint){
 
 async function getKrakenPairs(){
   const result = await krakenFetch('/AssetPairs');
+  // Alle actieve paren — geen valuta-filter, alleen darkpool weggooien
   return Object.keys(result).filter(k=>
-    !k.includes('.d') && (k.endsWith('USD')||k.endsWith('ZUSD')||k.endsWith('EUR'))
-  ).slice(0,40);
+    !k.includes('.d') &&                  // geen darkpool
+    !k.endsWith('F')  &&                  // geen futures
+    result[k].status === 'online'         // alleen online markets
+  );
 }
 
 async function getOHLCV(pair, interval=60){
@@ -1846,6 +2043,533 @@ function renderAccuracyChart(){
 }
 
 // ══════════════════════════════════════════════════════════
+//  AUTO-SCAN TIMER (elke 15 minuten)
+// ══════════════════════════════════════════════════════════
+const AUTO_SCAN_INTERVAL = 15 * 60; // seconden
+let countdownSec = AUTO_SCAN_INTERVAL;
+let autoScanEnabled = true;
+let scanCount = 0;
+const SCAN_LOG_KEY = 'tb_scan_log';
+
+function loadScanLog(){ return JSON.parse(localStorage.getItem(SCAN_LOG_KEY)||'[]'); }
+function saveScanLog(l){ localStorage.setItem(SCAN_LOG_KEY,JSON.stringify(l.slice(-200))); }
+
+function toggleAutoScan(el){
+  autoScanEnabled = el.checked;
+  if(autoScanEnabled) countdownSec = AUTO_SCAN_INTERVAL;
+}
+
+// Countdown tick — elke seconde
+setInterval(()=>{
+  if(!autoScanEnabled) return;
+  countdownSec--;
+  const m=Math.floor(countdownSec/60).toString().padStart(2,'0');
+  const s=(countdownSec%60).toString().padStart(2,'0');
+  const el=document.getElementById('countdown-display');
+  if(el) el.textContent=m+':'+s;
+  if(countdownSec<=0){
+    countdownSec=AUTO_SCAN_INTERVAL;
+    // alleen scannen als AI pagina actief is OF altijd (achtergrond)
+    runAiScan();
+  }
+}, 1000);
+
+// Wrappen rond runAiScan voor logging
+const _origRunAiScan = runAiScan;
+async function runAiScan(){
+  scanCount++;
+  const el=document.getElementById('scan-count-display');
+  if(el) el.textContent=scanCount;
+  // Log scan
+  const log=loadScanLog();
+  log.push({ ts: new Date().toISOString(), count: aiResults.length });
+  saveScanLog(log);
+  return _origRunAiScan();
+}
+
+// ══════════════════════════════════════════════════════════
+//  WAT IK LEERDE — RENDER
+// ══════════════════════════════════════════════════════════
+function renderLearningPage(){
+  const preds   = loadPredictions();
+  const evals   = loadEvals();
+  const weights = loadWeights();
+
+  // ── KPIs ──
+  const evaluated = preds.filter(p=>p.evaluated);
+  const correct   = evaluated.filter(p=>p.correct).length;
+  const acc       = evaluated.length ? Math.round(correct/evaluated.length*100) : null;
+  document.getElementById('lrn-total').textContent = preds.length;
+  document.getElementById('lrn-total-sub').textContent = evaluated.length+' geëvalueerd';
+  const accEl=document.getElementById('lrn-acc');
+  accEl.textContent = acc!==null ? acc+'%' : '—';
+  accEl.className   = acc===null?'neu':acc>=55?'pos':acc<45?'neg':'neu';
+  document.getElementById('lrn-acc-sub').textContent = evaluated.length+' na evaluatie';
+
+  const sortedW=Object.entries(weights).sort((a,b)=>b[1]-a[1]);
+  const WLBL={rsi:'RSI',ema:'EMA',macd:'MACD',bb:'Bollinger',vol:'Volume'};
+  document.getElementById('lrn-best-ind').textContent  = sortedW.length?WLBL[sortedW[0][0]]+'('+sortedW[0][1].toFixed(2)+')':'—';
+  document.getElementById('lrn-best-ind-sub').textContent = 'hoogste gewicht';
+
+  // Per-pair accuracy
+  const byPair={};
+  evaluated.forEach(p=>{ if(!byPair[p.pair]){byPair[p.pair]={c:0,t:0,hist:[]};} byPair[p.pair].t++; if(p.correct){byPair[p.pair].c++;} byPair[p.pair].hist.push(p.correct?1:0); });
+  const sortedPairs=Object.entries(byPair).filter(([,v])=>v.t>=2).sort((a,b)=>(b[1].c/b[1].t)-(a[1].c/a[1].t));
+  const bestP=sortedPairs[0], worstP=sortedPairs[sortedPairs.length-1];
+  const fmtP=p=>p?p.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD'):'—';
+  document.getElementById('lrn-best-pair').textContent  = bestP  ? fmtP(bestP[0])  : '—';
+  document.getElementById('lrn-best-pair-sub').textContent  = bestP  ? Math.round(bestP[1].c/bestP[1].t*100)+'% correct ('+bestP[1].t+' pred.)' : 'te weinig data';
+  document.getElementById('lrn-worst-pair').textContent = worstP ? fmtP(worstP[0]) : '—';
+  document.getElementById('lrn-worst-pair-sub').textContent = worstP ? Math.round(worstP[1].c/worstP[1].t*100)+'% correct ('+worstP[1].t+' pred.)' : 'te weinig data';
+  document.getElementById('lrn-days').textContent = [...new Set(evals.map(e=>e.date))].length;
+
+  // ── Radar: indicator gewichten ──
+  destroyChart('weights-radar');
+  const wVals=[weights.rsi,weights.ema,weights.macd,weights.bb,weights.vol];
+  charts['weights-radar']=new Chart(document.getElementById('chart-weights-radar').getContext('2d'),{
+    type:'radar',
+    data:{labels:['RSI','EMA','MACD','Bollinger','Volume'],
+      datasets:[{data:wVals,borderColor:'#6382ff',backgroundColor:'rgba(99,130,255,.15)',pointBackgroundColor:'#6382ff',borderWidth:2}]},
+    options:{plugins:{legend:{display:false}},scales:{r:{ticks:{color:'#7878a0',font:{size:9},backdropColor:'transparent'},grid:{color:'#252540'},pointLabels:{color:'#e0e0e0',font:{size:11}},min:0,max:Math.max(...wVals,1.5)+.2}},animation:{duration:400}}
+  });
+
+  // ── Bar: nauwkeurigheid per signaaltype ──
+  const sigAcc={'STRONG BUY':{c:0,t:0},'BUY':{c:0,t:0},'HOLD':{c:0,t:0},'SELL':{c:0,t:0},'STRONG SELL':{c:0,t:0}};
+  evaluated.forEach(p=>{ if(sigAcc[p.signal]){sigAcc[p.signal].t++; if(p.correct)sigAcc[p.signal].c++;} });
+  const sigLabels=Object.keys(sigAcc).filter(k=>sigAcc[k].t>0);
+  const sigVals=sigLabels.map(k=>sigAcc[k].t?Math.round(sigAcc[k].c/sigAcc[k].t*100):0);
+  const sigColors=sigLabels.map(k=>k.includes('BUY')?'rgba(0,212,170,.7)':k.includes('SELL')?'rgba(255,85,85,.7)':'rgba(245,158,11,.7)');
+  destroyChart('signal-acc');
+  charts['signal-acc']=new Chart(document.getElementById('chart-signal-acc').getContext('2d'),{
+    type:'bar',
+    data:{labels:sigLabels.map(l=>l.replace('STRONG ','')),datasets:[{data:sigVals,backgroundColor:sigColors,borderWidth:0}]},
+    options:{plugins:{legend:{display:false}},scales:{
+      x:{ticks:{color:'#7878a0',font:{size:10}},grid:{color:'#252540'}},
+      y:{ticks:{color:'#7878a0',font:{size:10},callback:v=>v+'%'},grid:{color:'#252540'},min:0,max:100}
+    },animation:{duration:300}}
+  });
+  document.getElementById('signal-acc-legend').textContent=sigLabels.map((k,i)=>k+': '+sigVals[i]+'%').join(' · ');
+
+  // ── Line: nauwkeurigheid over tijd ──
+  const accByDay={};
+  evals.forEach(e=>{ if(!accByDay[e.date]){accByDay[e.date]={c:0,t:0};} accByDay[e.date].t++; if(e.correct)accByDay[e.date].c++; });
+  const days=Object.keys(accByDay).sort().slice(-20);
+  const dayAccs=days.map(d=>Math.round(accByDay[d].c/accByDay[d].t*100));
+  destroyChart('acc-time');
+  charts['acc-time']=new Chart(document.getElementById('chart-acc-time').getContext('2d'),{
+    type:'line',
+    data:{labels:days.map(d=>d.slice(5)),datasets:[
+      {data:dayAccs,borderColor:'#6382ff',backgroundColor:'rgba(99,130,255,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3,label:'Acc%'},
+      {data:Array(days.length).fill(50),borderColor:'rgba(255,85,85,.3)',borderWidth:1,borderDash:[4,4],pointRadius:0,label:'50%'}
+    ]},
+    options:{plugins:{legend:{display:false}},scales:{
+      x:{ticks:{color:'#7878a0',font:{size:10}},grid:{color:'#252540'}},
+      y:{ticks:{color:'#7878a0',font:{size:10},callback:v=>v+'%'},grid:{color:'#252540'},min:0,max:100}
+    },animation:{duration:300}}
+  });
+
+  // ── Per-pair accuracy table ──
+  const tbody=document.getElementById('pair-acc-tbody');
+  tbody.innerHTML=sortedPairs.slice(0,15).map(([pair,d])=>{
+    const pairAcc=Math.round(d.c/d.t*100);
+    const trend=d.hist.slice(-3).reduce((a,b)=>a+b,0);
+    const trendIcon=trend>=2?'<span class="pos">↑</span>':trend<=0?'<span class="neg">↓</span>':'<span class="muted">→</span>';
+    return `<tr>
+      <td style="font-weight:600;">${fmtP(pair)}</td>
+      <td class="muted">${d.t}</td>
+      <td>${d.c}</td>
+      <td class="${pairAcc>=55?'pos':pairAcc<45?'neg':'neu'}" style="font-weight:700;">${pairAcc}%</td>
+      <td>${trendIcon}</td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="5" class="muted" style="text-align:center;padding:20px;">Nog geen geëvalueerde voorspellingen</td></tr>';
+
+  // ── Strategy matching ──
+  renderStrategyMatch(weights, byPair, evaluated);
+
+  // ── Geleerde inzichten ──
+  renderInsights(weights, byPair, sigAcc, acc);
+}
+
+// ── Strategie–AI Match ──────────────────────────────────
+function renderStrategyMatch(weights, byPair, evaluated){
+  const strats = loadStrategies();
+  const WLBL = {rsi:'RSI',ema:'EMA',macd:'MACD',bb:'Bollinger',vol:'Volume'};
+
+  // Indicator→strategie mapping
+  const IND_MAP = { rsi:['rsi'], ma:['ema'], macd:['macd','vol'], bb:['bb','vol'], manual:[] };
+
+  const matchDiv = document.getElementById('strategy-match-table');
+  if(!strats.length){
+    matchDiv.innerHTML='<div class="muted" style="font-size:13px;">Nog geen strategieën. Ga naar Strategieën om er een aan te maken.</div>';
+  } else {
+    matchDiv.innerHTML=strats.map((s,i)=>{
+      const inds = IND_MAP[s.type]||[];
+      const avgWeight = inds.length ? inds.reduce((sum,k)=>sum+(weights[k]||1),0)/inds.length : 1;
+      const matchScore = Math.round(Math.min(100,(avgWeight/1.5)*100));
+      const color = matchScore>=70?'#00d4aa':matchScore>=45?'#f59e0b':'#ff5555';
+      const indLabels = inds.map(k=>WLBL[k]||k).join(', ')||'—';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e1e38;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:#fff;">${s.name}</div>
+          <div style="font-size:11px;color:#7878a0;">${STRAT_TYPE_LABELS[s.type]||s.type} · indicators: ${indLabels}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:16px;font-weight:700;color:${color};">${matchScore}%</div>
+          <div style="font-size:10px;color:#7878a0;">AI match</div>
+        </div>
+        <div style="width:50px;height:50px;border-radius:50%;border:3px solid ${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${color};">${matchScore}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // AI-signalen voor actieve strategie-pairs
+  const sigDiv = document.getElementById('strategy-ai-signals');
+  const activeStrats = strats.filter(s=>s.active);
+  if(!activeStrats.length || !aiResults.length){
+    sigDiv.innerHTML='<div class="muted" style="font-size:12px;">Activeer een strategie en run een AI-scan om signalen te zien.</div>';
+    return;
+  }
+  const rows=[];
+  activeStrats.forEach(s=>{
+    (s.pairs||[]).forEach(pair=>{
+      // probeer Kraken-naam te matchen
+      const krakenPair=pair.replace('BTC','XXBT').replace('ETH','XETH').replace('USDT','USD').replace('USDT','ZUSD');
+      const aiRes=aiResults.find(r=>r.pair===krakenPair||r.pair===pair)||null;
+      if(aiRes){
+        rows.push({strat:s.name,pair,signal:aiRes.signal,score:aiRes.score});
+      }
+    });
+  });
+  sigDiv.innerHTML=rows.length?`<table><thead><tr><th>Strategie</th><th>Pair</th><th>AI Signaal</th><th>Score</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td style="font-size:12px;">${r.strat}</td>
+      <td style="font-weight:600;font-size:12px;">${r.pair}</td>
+      <td>${signalBadge(r.signal)}</td>
+      <td>${scoreBar(r.score)}</td>
+    </tr>`).join('')}
+  </tbody></table>`:'<div class="muted" style="font-size:12px;">Geen actieve pairs gevonden in de laatste AI-scan.</div>';
+}
+
+// ── Geleerde Inzichten ──────────────────────────────────
+function renderInsights(weights, byPair, sigAcc, overallAcc){
+  const insights=[];
+  const sortedW=Object.entries(weights).sort((a,b)=>b[1]-a[1]);
+  const WLBL={rsi:'RSI',ema:'EMA',macd:'MACD',bb:'Bollinger',vol:'Volume'};
+
+  // Beste indicator
+  if(sortedW[0][1]>1.1) insights.push({
+    icon:'⭐',color:'#00d4aa',
+    title:`${WLBL[sortedW[0][0]]} is jouw sterkste indicator`,
+    desc:`Gewicht: ${sortedW[0][1].toFixed(2)} — het systeem vertrouwt dit signaal het meest. Overweeg een ${WLBL[sortedW[0][0]]}-gebaseerde strategie.`
+  });
+
+  // Zwakste indicator
+  const weakest=sortedW[sortedW.length-1];
+  if(weakest[1]<0.7) insights.push({
+    icon:'⚠️',color:'#f59e0b',
+    title:`${WLBL[weakest[0]]} presteert slecht`,
+    desc:`Gewicht: ${weakest[1].toFixed(2)} — dit signaal leidt regelmatig tot foute voorspellingen. Het systeem weegt het minder mee.`
+  });
+
+  // Algehele nauwkeurigheid
+  if(overallAcc!==null){
+    if(overallAcc>=60) insights.push({icon:'🎯',color:'#00d4aa',title:`Sterke nauwkeurigheid: ${overallAcc}%`,desc:'Het systeem doet het beter dan toeval (>50%). Behoud de huidige instellingen en blijf evalueren.'});
+    else if(overallAcc<45) insights.push({icon:'📉',color:'#ff5555',title:`Nauwkeurigheid onder de 50%: ${overallAcc}%`,desc:'Meer evaluatierondes nodig om patronen te leren. Zorg dat je dagelijks evalueert na elke scan.'});
+  }
+
+  // Beste signaaltype
+  const sigEntries=Object.entries(sigAcc).filter(([,v])=>v.t>=3);
+  if(sigEntries.length){
+    const bestSig=sigEntries.sort((a,b)=>(b[1].c/b[1].t)-(a[1].c/a[1].t))[0];
+    const bestAcc=Math.round(bestSig[1].c/bestSig[1].t*100);
+    if(bestAcc>=55) insights.push({icon:'🔍',color:'#6382ff',title:`"${bestSig[0]}" signalen zijn betrouwbaar (${bestAcc}%)`,desc:`Van de ${bestSig[1].t} "${bestSig[0]}" voorspellingen was ${bestAcc}% correct. Focus je op deze signaalsterkte.`});
+  }
+
+  // Beste pair
+  const pairsArr=Object.entries(byPair).filter(([,v])=>v.t>=3);
+  if(pairsArr.length){
+    const best=pairsArr.sort((a,b)=>(b[1].c/b[1].t)-(a[1].c/a[1].t))[0];
+    const bestAcc=Math.round(best[1].c/best[1].t*100);
+    const displayP=best[0].replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD');
+    if(bestAcc>=60) insights.push({icon:'💎',color:'#00d4aa',title:`${displayP} is het makkelijkst te voorspellen (${bestAcc}%)`,desc:`Dit pair gedraagt zich het meest volgens de technische indicatoren. Prioriteer het in je strategieën.`});
+  }
+
+  if(!insights.length) insights.push({icon:'🔄',color:'#7878a0',title:'Te weinig data voor inzichten',desc:'Voer dagelijks een scan + evaluatie uit. Na ~5 evaluatieronden verschijnen hier automatisch geleerde patronen.'});
+
+  document.getElementById('learned-insights').innerHTML=insights.map(ins=>`
+    <div style="background:#252540;border-radius:8px;padding:16px;border-left:3px solid ${ins.color};">
+      <div style="font-size:16px;margin-bottom:6px;">${ins.icon} <span style="color:${ins.color};font-weight:600;font-size:13px;">${ins.title}</span></div>
+      <div style="font-size:12px;color:#7878a0;line-height:1.5;">${ins.desc}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+//  MARKT SENTIMENT — Reddit + nieuws, kritisch gefilterd
+// ══════════════════════════════════════════════════════════
+let allSocialItems = [];
+let socialAutoInterval = null;
+const SOCIAL_INTERVAL = 5 * 60 * 1000; // 5 minuten
+
+// ── Sentiment woordenlijsten ────────────────────────────
+const BULLISH_WORDS = ['bullish','moon','pump','breakout','buy','long','surge','rally','uptrend','ath','accumulate','hodl','green','gains','outperform','strong','adoption','partnership','growth','launch','upgrade','milestone'];
+const BEARISH_WORDS = ['bearish','crash','dump','drop','sell','short','decline','downtrend','fear','panic','scam','rug','hack','ban','regulation','lawsuit','overvalued','bubble','correction','fall','plunge','collapse'];
+const PROMO_WORDS   = ['100x','1000x','guaranteed','no risk','giveaway','airdrop','whitelist','presale','get rich','passive income','financial advice','not financial advice','dm me','telegram','discord link','referral'];
+const FUD_WORDS     = ['ponzi','pyramid','fraud','insider trading','manipulation','wash trading','fake volume'];
+const EVIDENCE_WORDS= ['data','chart','analysis','report','source','research','study','according to','metrics','on-chain','volume','liquidity','market cap'];
+
+const COIN_MAP = {
+  'bitcoin':'BTC','btc':'BTC','eth':'ETH','ethereum':'ETH','sol':'SOL','solana':'SOL',
+  'xrp':'XRP','ripple':'XRP','bnb':'BNB','binance':'BNB','ada':'ADA','cardano':'ADA',
+  'doge':'DOGE','dogecoin':'DOGE','dot':'DOT','polkadot':'DOT','link':'LINK','chainlink':'LINK',
+  'avax':'AVAX','avalanche':'AVAX','matic':'MATIC','polygon':'MATIC','ltc':'LTC','litecoin':'LTC',
+  'atom':'ATOM','cosmos':'ATOM','uni':'UNI','uniswap':'UNI'
+};
+
+// ── Reddit bronnen (public CORS-vriendelijke JSON API) ──
+const REDDIT_SUBS = [
+  { sub:'CryptoCurrency',  label:'r/CryptoCurrency',  minScore:50 },
+  { sub:'Bitcoin',         label:'r/Bitcoin',          minScore:30 },
+  { sub:'ethtrader',       label:'r/ethtrader',        minScore:20 },
+  { sub:'CryptoMarkets',   label:'r/CryptoMarkets',    minScore:15 },
+  { sub:'solana',          label:'r/solana',           minScore:10 },
+];
+
+// ── Nieuws via CryptoCompare (gratis, CORS OK) ──────────
+async function fetchCryptoNews(){
+  try {
+    const r = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest&extraParams=TradingDashboard');
+    const d = await r.json();
+    return (d.Data||[]).slice(0,30).map(item=>({
+      id: 'news_'+item.id,
+      source: 'news',
+      sourceLabel: item.source_info?.name||item.source||'Nieuws',
+      title: item.title,
+      body: item.body||'',
+      url: item.url,
+      score: null,
+      upvotes: null,
+      comments: null,
+      created: item.published_on*1000,
+      author: item.source_info?.name||'',
+    }));
+  } catch(e){ return []; }
+}
+
+// ── Reddit fetch ────────────────────────────────────────
+async function fetchRedditSub(sub, minScore){
+  try {
+    const r = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=25&t=day`,{headers:{'Accept':'application/json'}});
+    const d = await r.json();
+    return (d?.data?.children||[])
+      .map(c=>c.data)
+      .filter(p=>p.score>=minScore && !p.is_self===false || p.score>=minScore)
+      .map(p=>({
+        id: 'reddit_'+p.id,
+        source: 'reddit',
+        sourceLabel: 'r/'+p.subreddit,
+        title: p.title,
+        body: p.selftext||'',
+        url: 'https://reddit.com'+p.permalink,
+        score: p.score,
+        upvotes: p.ups,
+        upvoteRatio: p.upvote_ratio,
+        comments: p.num_comments,
+        created: p.created_utc*1000,
+        author: 'u/'+p.author,
+      }));
+  } catch(e){ return []; }
+}
+
+// ── Kritisch scoring systeem ────────────────────────────
+function scoreItem(item){
+  const text = (item.title+' '+item.body).toLowerCase();
+  const scores = {};
+
+  // 1. Engagement score (voor Reddit: hoog is beter, maar ook verdacht als ratio laag)
+  if(item.source==='reddit'){
+    const ratio = item.upvoteRatio||0.5;
+    scores.engagement = Math.round(Math.min(25, item.score/20)) * (ratio>0.6?1:0.5);
+    scores.commentRatio = item.comments>5 && item.score>0 ? Math.min(15, (item.comments/item.score*100)) : 0;
+  } else {
+    scores.engagement = 15; // Nieuws krijgt basis engagement score
+  }
+
+  // 2. Promotietaal check (negatief)
+  const promoHits = PROMO_WORDS.filter(w=>text.includes(w)).length;
+  scores.promopenalty = -(promoHits*15);
+
+  // 3. Evidence/analyse taal (positief)
+  const evidenceHits = EVIDENCE_WORDS.filter(w=>text.includes(w)).length;
+  scores.evidence = Math.min(20, evidenceHits*5);
+
+  // 4. FUD check (negatief als ongefundeerd, check of er evidence bij is)
+  const fudHits = FUD_WORDS.filter(w=>text.includes(w)).length;
+  scores.fudpenalty = evidenceHits>0 ? -(fudHits*5) : -(fudHits*12);
+
+  // 5. Lengte: te kort = weinig waarde
+  const wordCount = text.split(/\s+/).length;
+  scores.length = wordCount<10 ? -10 : wordCount<30 ? 0 : Math.min(10, (wordCount-30)/20);
+
+  // 6. Sentimentbalans: extreme claims zonder bewijs = aftrek
+  const bullCount = BULLISH_WORDS.filter(w=>text.includes(w)).length;
+  const bearCount = BEARISH_WORDS.filter(w=>text.includes(w)).length;
+  scores.extremepenalty = (bullCount>5||bearCount>5)&&evidenceHits<2 ? -10 : 0;
+
+  // Totaalscore 0-100
+  const raw = 30 + scores.engagement + (scores.commentRatio||0) + scores.promopenalty + scores.evidence + scores.fudpenalty + scores.length + scores.extremepenalty;
+  return { total: Math.max(0,Math.min(100,Math.round(raw))), breakdown: scores };
+}
+
+// ── Sentiment detectie ──────────────────────────────────
+function detectSentiment(item){
+  const text=(item.title+' '+item.body).toLowerCase();
+  const bull=BULLISH_WORDS.filter(w=>text.includes(w)).length;
+  const bear=BEARISH_WORDS.filter(w=>text.includes(w)).length;
+  if(bull>bear+1)  return 'bullish';
+  if(bear>bull+1)  return 'bearish';
+  return 'neutral';
+}
+
+// ── Coin detectie ───────────────────────────────────────
+function detectCoins(item){
+  const text=(item.title+' '+item.body).toLowerCase();
+  const found=new Set();
+  Object.entries(COIN_MAP).forEach(([word,coin])=>{ if(text.includes(word)) found.add(coin); });
+  return [...found].slice(0,4);
+}
+
+// ── Verrijkt item ───────────────────────────────────────
+function enrichItem(item){
+  const {total,breakdown} = scoreItem(item);
+  return { ...item, reliabilityScore:total, breakdown, sentiment:detectSentiment(item), coins:detectCoins(item) };
+}
+
+// ── Hoofd laad functie ──────────────────────────────────
+async function loadSocialFeed(){
+  const icon=document.getElementById('social-refresh-icon');
+  icon.classList.add('fa-spin');
+  document.getElementById('social-feed').innerHTML=`<div class="card" style="text-align:center;color:#7878a0;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:24px;color:#6382ff;margin-bottom:10px;display:block;"></i>Laden van bronnen...</div>`;
+
+  // Fetch alles parallel
+  const [newsItems,...redditArrays] = await Promise.all([
+    fetchCryptoNews(),
+    ...REDDIT_SUBS.map(s=>fetchRedditSub(s.sub, s.minScore))
+  ]);
+  const redditItems = redditArrays.flat();
+  const raw = [...newsItems,...redditItems];
+
+  // Verrijken + dedupliceren
+  const seen=new Set();
+  allSocialItems = raw.map(enrichItem).filter(item=>{
+    if(seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  }).sort((a,b)=>b.created-a.created);
+
+  document.getElementById('social-last-update').textContent=new Date().toLocaleTimeString('nl');
+  applySocialFilters();
+  icon.classList.remove('fa-spin');
+}
+
+// ── Filter + render ─────────────────────────────────────
+function applySocialFilters(){
+  const srcF  = document.getElementById('social-source').value;
+  const senF  = document.getElementById('social-sentiment').value;
+  const coinF = document.getElementById('social-coin').value;
+  const srchF = (document.getElementById('social-search').value||'').toLowerCase();
+
+  const blocked=allSocialItems.filter(i=>i.reliabilityScore<40).length;
+  const visible=allSocialItems.filter(i=>{
+    if(i.reliabilityScore<40) return false; // streng filter
+    if(srcF!=='all'&&i.source!==srcF) return false;
+    if(senF!=='all'&&i.sentiment!==senF) return false;
+    if(coinF!=='all'&&!i.coins.includes(coinF)) return false;
+    if(srchF&&!(i.title+i.body).toLowerCase().includes(srchF)) return false;
+    return true;
+  });
+
+  document.getElementById('social-count').textContent=allSocialItems.length;
+  document.getElementById('social-filtered').textContent=visible.length+' zichtbaar';
+  document.getElementById('soc-blocked').textContent=blocked;
+  document.getElementById('soc-bull').textContent=visible.filter(i=>i.sentiment==='bullish').length;
+  document.getElementById('soc-bear').textContent=visible.filter(i=>i.sentiment==='bearish').length;
+  document.getElementById('soc-neu').textContent=visible.filter(i=>i.sentiment==='neutral').length;
+
+  const bull=visible.filter(i=>i.sentiment==='bullish').length;
+  const bear=visible.filter(i=>i.sentiment==='bearish').length;
+  const moodEl=document.getElementById('soc-mood');
+  if(!visible.length){ moodEl.textContent='—'; moodEl.className='neu'; }
+  else if(bull>bear*1.5){ moodEl.textContent='🟢 Bullish'; moodEl.className='pos'; }
+  else if(bear>bull*1.5){ moodEl.textContent='🔴 Bearish'; moodEl.className='neg'; }
+  else { moodEl.textContent='🟡 Gemengd'; moodEl.className='neu'; }
+
+  renderSocialFeed(visible);
+}
+
+// ── Render cards ────────────────────────────────────────
+function renderSocialFeed(items){
+  const feed=document.getElementById('social-feed');
+  if(!items.length){
+    feed.innerHTML='<div class="card" style="text-align:center;color:#7878a0;padding:30px;">Geen berichten gevonden met de huidige filters.</div>';
+    return;
+  }
+  feed.innerHTML=items.slice(0,60).map(item=>{
+    const age=formatAge(item.created);
+    const sentColor=item.sentiment==='bullish'?'#00d4aa':item.sentiment==='bearish'?'#ff5555':'#7878a0';
+    const sentLabel=item.sentiment==='bullish'?'Bullish':item.sentiment==='bearish'?'Bearish':'Neutraal';
+    const scoreColor=item.reliabilityScore>=70?'#00d4aa':item.reliabilityScore>=50?'#f59e0b':'#ff5555';
+    const srcIcon=item.source==='reddit'?'<i class="fab fa-reddit" style="color:#ff4500;"></i>':'<i class="fas fa-newspaper" style="color:#6382ff;"></i>';
+    const coinBadges=item.coins.map(c=>`<span style="background:rgba(99,130,255,.12);color:#6382ff;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:700;">${c}</span>`).join(' ');
+
+    // Score breakdown tooltip text
+    const bd=item.breakdown;
+    const bdText=Object.entries(bd).map(([k,v])=>`${k}:${v>=0?'+':''}${v}`).join(' ');
+
+    return `<div class="card" style="border-left:3px solid ${sentColor};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+            ${srcIcon} <span style="font-size:12px;color:#7878a0;">${item.sourceLabel}</span>
+            <span style="font-size:11px;color:#7878a0;">·</span>
+            <span style="font-size:11px;color:#7878a0;">${age}</span>
+            <span style="font-size:11px;color:#7878a0;">·</span>
+            <span style="font-size:11px;color:#7878a0;">${item.author}</span>
+            ${coinBadges}
+          </div>
+          <a href="${item.url}" target="_blank" rel="noopener" style="font-size:14px;font-weight:600;color:#fff;text-decoration:none;line-height:1.4;display:block;margin-bottom:6px;">${item.title}</a>
+          ${item.body&&item.body.length>20?`<div style="font-size:12px;color:#7878a0;line-height:1.5;max-height:60px;overflow:hidden;">${item.body.slice(0,200)}${item.body.length>200?'…':''}</div>`:''}
+          <div style="display:flex;align-items:center;gap:14px;margin-top:8px;font-size:11px;color:#7878a0;">
+            ${item.score!=null?`<span>↑ ${item.score}</span>`:''}
+            ${item.comments!=null?`<span>💬 ${item.comments}</span>`:''}
+            ${item.upvoteRatio!=null?`<span>Ratio: ${Math.round(item.upvoteRatio*100)}%</span>`:''}
+          </div>
+        </div>
+        <div style="text-align:center;flex-shrink:0;">
+          <div title="Betrouwbaarheidsscore: ${bdText}" style="width:48px;height:48px;border-radius:50%;border:2px solid ${scoreColor};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:${scoreColor};cursor:help;">${item.reliabilityScore}</div>
+          <div style="font-size:9px;color:#7878a0;margin-top:3px;">score</div>
+          <div style="margin-top:6px;font-size:10px;font-weight:700;color:${sentColor};">${sentLabel}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function formatAge(ms){
+  const diff=(Date.now()-ms)/1000;
+  if(diff<60)   return Math.round(diff)+'s geleden';
+  if(diff<3600) return Math.round(diff/60)+'m geleden';
+  if(diff<86400)return Math.round(diff/3600)+'u geleden';
+  return Math.round(diff/86400)+'d geleden';
+}
+
+function renderSocialPage(){ if(!allSocialItems.length) loadSocialFeed(); else applySocialFilters(); }
+
+function toggleSocialAuto(el){
+  if(el.checked){ socialAutoInterval=setInterval(loadSocialFeed,SOCIAL_INTERVAL); }
+  else { clearInterval(socialAutoInterval); }
+}
+
+// ══════════════════════════════════════════════════════════
 //  MODAL UTILS
 // ══════════════════════════════════════════════════════════
 function closeModal(id){ document.getElementById(id).style.display='none'; }
@@ -1870,6 +2594,9 @@ renderAccuracyChart();
 loadDemoData();
 updateLivePrices();
 setInterval(updateLivePrices, 15000);
+
+// Social feed auto-refresh (5 min)
+socialAutoInterval = setInterval(()=>{ if(document.getElementById('social-auto').checked) loadSocialFeed(); }, SOCIAL_INTERVAL);
 </script>
 </body>
 </html>
