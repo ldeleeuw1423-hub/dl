@@ -5,9 +5,9 @@ Start met: python3 demo_server.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, date
-import uuid, json
+import uuid, json, httpx
 
 app = FastAPI(title="InfraRaming Demo API", version="1.0.0")
 
@@ -245,6 +245,49 @@ def analyze_pdok(data: dict):
 @app.get("/api/v1/dashboard/kpis")
 def get_kpis():
     return {"total_projects": 12, "active_projects": 5, "budget_total": 18500000, "budget_spent": 8200000, "hours_estimated": 48200, "hours_actual": 21400, "open_risks": 23, "critical_risks": 4, "pending_permits": 8}
+
+# ── Claude AI Proxy ──────────────────────────────────────
+# Forwards requests to Anthropic API (bypasses browser CORS restriction).
+# The user's API key is passed per-request and never stored server-side.
+
+class ClaudeMsgItem(BaseModel):
+    role: str
+    content: str
+
+class ClaudeProxyRequest(BaseModel):
+    messages: List[ClaudeMsgItem]
+    api_key: str
+    model: str = "claude-haiku-4-5-20251001"
+    max_tokens: int = 512
+    system: Optional[str] = None
+
+@app.post("/api/claude-proxy")
+async def claude_proxy(req: ClaudeProxyRequest):
+    if not req.api_key or not req.api_key.startswith("sk-ant-"):
+        raise HTTPException(status_code=400, detail="Ongeldige Anthropic API key (moet beginnen met sk-ant-)")
+    payload = {
+        "model": req.model,
+        "max_tokens": min(req.max_tokens, 2048),
+        "messages": [{"role": m.role, "content": m.content} for m in req.messages]
+    }
+    if req.system:
+        payload["system"] = req.system
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": req.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json=payload
+            )
+        if r.status_code != 200:
+            raise HTTPException(status_code=r.status_code, detail=r.text[:500])
+        return r.json()
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Anthropic API timeout")
 
 if __name__ == "__main__":
     import uvicorn

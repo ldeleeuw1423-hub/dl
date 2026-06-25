@@ -543,6 +543,24 @@ body.help-mode * { cursor: help !important; }
     <div id="at-trade-log"><div style="color:#7878a0;font-size:13px;text-align:center;padding:20px 0;">Nog geen trades — schakel Auto Trading aan en run een scan.</div></div>
   </div>
 
+  <!-- Claude AI markt-analyse chat -->
+  <div class="card" style="margin-bottom:14px;" id="claude-chat-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:#fff;"><i class="fas fa-robot" style="color:#6382ff;"></i> Claude AI Marktanalyse <span id="claude-chat-badge" style="font-size:10px;background:rgba(99,130,255,.15);color:#6382ff;border-radius:4px;padding:2px 7px;margin-left:6px;display:none;">ACTIEF</span></div>
+      <span style="font-size:11px;color:#7878a0;" id="claude-key-hint">Sla je Anthropic API key op bij API Verbindingen om dit te gebruiken</span>
+    </div>
+    <div id="claude-chat-messages" style="min-height:60px;max-height:320px;overflow-y:auto;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;">
+      <input class="form-input" id="claude-chat-input" type="text" placeholder="Vraag iets over de markt, je posities of strategie..." style="flex:1;padding:8px 12px;" onkeydown="if(event.key==='Enter')askClaude()">
+      <button class="btn btn-primary" onclick="askClaude()" id="claude-chat-btn" style="padding:8px 14px;"><i class="fas fa-paper-plane fa-xs"></i></button>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;" id="claude-quick-btns">
+      <button class="btn btn-ghost" onclick="askClaudeQuick('Analyseer mijn huidige open posities en geef advies')" style="font-size:11px;padding:3px 9px;">Analyseer posities</button>
+      <button class="btn btn-ghost" onclick="askClaudeQuick('Welke strategie past het beste bij de huidige AI-signalen?')" style="font-size:11px;padding:3px 9px;">Strategie advies</button>
+      <button class="btn btn-ghost" onclick="askClaudeQuick('Geef een marktoverzicht op basis van de laatste scan resultaten')" style="font-size:11px;padding:3px 9px;">Marktoverzicht</button>
+    </div>
+  </div>
+
   <!-- Auto-trade succes statistieken -->
   <div class="card" style="margin-top:14px;">
     <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:16px;"><i class="fas fa-trophy" style="color:#f59e0b;"></i> Auto-trade Succes Statistieken</div>
@@ -626,14 +644,19 @@ body.help-mode * { cursor: help !important; }
         </div>
       </div>
 
-      <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #7878a0;">
-        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;"><i class="fas fa-robot" style="color:#7878a0;"></i> Claude AI Chat (optioneel)</div>
-        <div style="font-size:12px;color:#7878a0;line-height:1.6;">
+      <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #6382ff;">
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:8px;"><i class="fas fa-robot" style="color:#6382ff;"></i> Claude AI Chat — Markt Analyse</div>
+        <div style="font-size:12px;color:#7878a0;line-height:1.6;margin-bottom:10px;">
           <div>• Ga naar <strong style="color:#e0e0e0;">console.anthropic.com → API Keys</strong></div>
-          <div>• Geeft: <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">ANTHROPIC_API_KEY</code></div>
+          <div>• Geeft: <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">ANTHROPIC_API_KEY</code> (begint met sk-ant-)</div>
           <div>• Kosten: ~$0.003/vraag (Haiku model)</div>
-          <div style="margin-top:6px;color:#f59e0b;">⚠ Heeft ook een backend proxy nodig (CORS)</div>
+          <div style="margin-top:4px;color:#00d4aa;">✓ CORS proxy is ingebouwd — werkt direct vanuit de browser</div>
         </div>
+        <div style="margin-bottom:6px;">
+          <input class="form-input" id="claude-api-key-input" type="password" placeholder="sk-ant-api03-..." style="width:100%;padding:6px 10px;font-size:12px;font-family:monospace;margin-bottom:6px;">
+          <button class="btn btn-primary" onclick="saveClaudeKey()" style="width:100%;justify-content:center;font-size:12px;"><i class="fas fa-save fa-xs"></i> Sleutel opslaan</button>
+        </div>
+        <div id="claude-key-status" style="font-size:11px;color:#7878a0;"></div>
       </div>
 
     </div>
@@ -1782,6 +1805,10 @@ function toggleApiMode(idx){
 }
 
 function renderApisPage(){
+  // Sync Claude key input if it exists on this page
+  const keyInput = document.getElementById('claude-api-key-input');
+  const savedKey = loadClaudeKey();
+  if(keyInput && savedKey) keyInput.value = savedKey.slice(0,8)+'••••••••••••';
   const apis=loadApis();
   const grid=document.getElementById('apis-grid');
   document.getElementById('global-live-toggle').checked = apis.some(a=>a.mode==='live');
@@ -2925,6 +2952,7 @@ function renderActiveTradingPage(){
   loadLiveChart();
   populateStrategySelector();
   challengeCurrentStrategy();
+  updateClaudeChatUI();
   // Sync toggle state
   const s = loadAutoTradeSettings();
   const toggle = document.getElementById('auto-trade-toggle');
@@ -4231,6 +4259,128 @@ function closeHelpTooltip(){
   document.getElementById('help-tooltip').style.display = 'none';
 }
 
+// ══════════════════════════════════════════════════════════
+//  CLAUDE AI CHAT (via proxy op Render backend)
+// ══════════════════════════════════════════════════════════
+const CLAUDE_KEY_STORAGE = 'tb_anthropic_key';
+const CLAUDE_PROXY_URL   = 'https://infraestimator-api.onrender.com/api/claude-proxy';
+
+function loadClaudeKey(){ return localStorage.getItem(CLAUDE_KEY_STORAGE)||''; }
+
+function saveClaudeKey(){
+  const key = (document.getElementById('claude-api-key-input')?.value||'').trim();
+  if(!key.startsWith('sk-ant-')){
+    const st = document.getElementById('claude-key-status');
+    if(st) st.innerHTML = '<span style="color:#ff5555;">Sleutel moet beginnen met sk-ant-</span>';
+    return;
+  }
+  localStorage.setItem(CLAUDE_KEY_STORAGE, key);
+  const st = document.getElementById('claude-key-status');
+  if(st) st.innerHTML = '<span style="color:#00d4aa;"><i class="fas fa-check fa-xs"></i> Sleutel opgeslagen</span>';
+  updateClaudeChatUI();
+}
+
+function updateClaudeChatUI(){
+  const key = loadClaudeKey();
+  const badge = document.getElementById('claude-chat-badge');
+  const hint  = document.getElementById('claude-key-hint');
+  const input = document.getElementById('claude-chat-input');
+  const btn   = document.getElementById('claude-chat-btn');
+  const qbtns = document.getElementById('claude-quick-btns');
+  if(key){
+    if(badge) badge.style.display='inline';
+    if(hint)  hint.style.display='none';
+    if(input) input.disabled=false;
+    if(btn)   btn.disabled=false;
+    if(qbtns) qbtns.style.opacity='1';
+  } else {
+    if(badge) badge.style.display='none';
+    if(hint)  hint.style.display='block';
+    if(input) input.disabled=true;
+    if(btn)   btn.disabled=true;
+    if(qbtns) qbtns.style.opacity='.4';
+  }
+}
+
+let claudeChatHistory = [];
+
+function buildClaudeContext(){
+  const paper    = loadPaper();
+  const settings = loadAutoTradeSettings();
+  const top3     = aiResults.slice(0,3).map(r=>`${krakenPairToDisplay(r.pair)}: score ${r.score}, RSI ${r.rsi}, signal ${r.signal}`).join('\n');
+  const positions = paper.positions.map(p=>`${p.pair} @ $${p.entry.toFixed(2)}, qty ${p.qty.toFixed(4)}`).join('\n') || 'Geen open posities';
+  return `Je bent een crypto trading assistent die helpt bij het analyseren van de markt en handelsstrategieën.
+Huidige datum: ${new Date().toLocaleDateString('nl')}.
+Actieve strategie: ${settings.strategy||'AI Auto'}.
+Risiconiveau: ${settings.riskLevel||'medium'}.
+Inzet per trade: $${settings.positionSize||150}.
+Paper portfolio saldo: $${paper.balance?.toFixed(2)||1000}.
+Open posities:\n${positions}
+Laatste AI-scan (top 3):\n${top3||'Nog geen scan uitgevoerd.'}
+Antwoord altijd in het Nederlands. Wees beknopt en praktisch.`;
+}
+
+function appendClaudeMsg(role, text){
+  claudeChatHistory.push({role,content:text});
+  const el = document.getElementById('claude-chat-messages');
+  if(!el) return;
+  const isUser = role==='user';
+  const div = document.createElement('div');
+  div.style.cssText=`margin-bottom:10px;display:flex;gap:8px;align-items:flex-start;${isUser?'flex-direction:row-reverse':''}`;
+  div.innerHTML=`
+    <div style="width:28px;height:28px;border-radius:50%;background:${isUser?'#6382ff':'rgba(99,130,255,.15)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <i class="fas ${isUser?'fa-user':'fa-robot'} fa-xs" style="color:${isUser?'#fff':'#6382ff'};"></i>
+    </div>
+    <div style="max-width:85%;background:${isUser?'rgba(99,130,255,.15)':'#252540'};border-radius:10px;padding:9px 13px;font-size:13px;color:#e0e0e0;line-height:1.55;">${text.replace(/\n/g,'<br>')}</div>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function askClaude(){
+  const key   = loadClaudeKey();
+  if(!key){ alert('Sla eerst je Anthropic API key op bij API Verbindingen.'); return; }
+  const input = document.getElementById('claude-chat-input');
+  const btn   = document.getElementById('claude-chat-btn');
+  const msg   = (input?.value||'').trim();
+  if(!msg) return;
+  input.value='';
+  btn.disabled=true;
+  btn.innerHTML='<i class="fas fa-spinner fa-spin fa-xs"></i>';
+  appendClaudeMsg('user', msg);
+
+  const messages = [
+    ...claudeChatHistory.slice(-8).slice(0,-1), // keep recent history, skip last (just added)
+    {role:'user', content: msg}
+  ];
+
+  try {
+    const r = await fetch(CLAUDE_PROXY_URL, {
+      method: 'POST',
+      headers: {'content-type':'application/json'},
+      body: JSON.stringify({
+        messages,
+        api_key: key,
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 600,
+        system: buildClaudeContext()
+      })
+    });
+    if(!r.ok){ const e=await r.json(); throw new Error(e.detail||r.statusText); }
+    const data = await r.json();
+    const reply = data?.content?.[0]?.text || '(geen antwoord)';
+    appendClaudeMsg('assistant', reply);
+  } catch(e){
+    appendClaudeMsg('assistant', `⚠ Fout: ${e.message}`);
+  }
+  btn.disabled=false;
+  btn.innerHTML='<i class="fas fa-paper-plane fa-xs"></i>';
+}
+
+function askClaudeQuick(q){
+  const input = document.getElementById('claude-chat-input');
+  if(input){ input.value=q; askClaude(); }
+}
+
 // ── INIT ──────────────────────────────────────────────────
 renderStratParams();
 renderWeightsDisplay();
@@ -4239,6 +4389,7 @@ renderAiKPIs();
 renderAccuracyChart();
 renderStrategyLibrary();
 loadDemoData(); // also calls showPage('activetrading')
+updateClaudeChatUI();
 updateLivePrices();
 setInterval(updateLivePrices, 15000);
 
