@@ -120,16 +120,15 @@ body.help-mode * { cursor: help !important; }
     </div>
   </div>
   <nav>
+    <div class="sidebar-section">Trading</div>
+    <div class="sidebar-item active" onclick="showPage('activetrading')"><i class="fas fa-bolt fa-sm"></i> Actieve Trading</div>
+    <div class="sidebar-item" onclick="showPage('paper')"><i class="fas fa-flask fa-sm"></i> Paper Trading</div>
+    <div class="sidebar-item" onclick="showPage('strategies')"><i class="fas fa-book-open fa-sm"></i> Strategieën</div>
+
     <div class="sidebar-section">Analyse</div>
-    <div class="sidebar-item active" onclick="showPage('overview')"><i class="fas fa-th-large fa-sm"></i> Overzicht</div>
+    <div class="sidebar-item" onclick="showPage('overview')"><i class="fas fa-th-large fa-sm"></i> Overzicht</div>
     <div class="sidebar-item" onclick="showPage('trades')"><i class="fas fa-exchange-alt fa-sm"></i> Trades</div>
     <div class="sidebar-item" onclick="showPage('performance')"><i class="fas fa-chart-area fa-sm"></i> Performance</div>
-    <div class="sidebar-item" onclick="showPage('pairs')"><i class="fas fa-coins fa-sm"></i> Pairs</div>
-
-    <div class="sidebar-section">Trading</div>
-    <div class="sidebar-item" onclick="showPage('paper')"><i class="fas fa-flask fa-sm"></i> Paper Trading</div>
-    <div class="sidebar-item" onclick="showPage('activetrading')"><i class="fas fa-bolt fa-sm"></i> Actieve Trading</div>
-    <div class="sidebar-item" onclick="showPage('strategies')"><i class="fas fa-book-open fa-sm"></i> Strategieën</div>
 
     <div class="sidebar-section">AI & Leren</div>
     <div class="sidebar-item" onclick="showPage('ai')"><i class="fas fa-satellite-dish fa-sm"></i> AI Analyse</div>
@@ -169,7 +168,7 @@ body.help-mode * { cursor: help !important; }
 <div class="content">
 
 <!-- ═══ PAGE: OVERZICHT ═══ -->
-<div class="page active" id="page-overview">
+<div class="page" id="page-overview">
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:20px;">
     <div class="kpi" style="border-left-color:#00d4aa;">
       <div class="form-label">Totaal P&L</div>
@@ -390,7 +389,7 @@ body.help-mode * { cursor: help !important; }
 <!-- ═══════════════════════════════════════════════════════
      PAGE: ACTIEVE TRADING
 ════════════════════════════════════════════════════════ -->
-<div class="page" id="page-activetrading">
+<div class="page active" id="page-activetrading">
 
   <!-- Auto-trade status banner (shown when enabled) -->
   <div id="auto-trade-banner" style="display:none;background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:none;align-items:center;gap:12px;">
@@ -449,43 +448,30 @@ body.help-mode * { cursor: help !important; }
     <!-- Right column -->
     <div style="display:flex;flex-direction:column;gap:12px;">
 
-      <!-- Auto Trading control -->
-      <div class="card" style="border:1px solid rgba(0,212,170,.2);">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-robot" style="color:#00d4aa;"></i> Auto Trading (Paper)</div>
-          <label class="toggle"><input type="checkbox" id="auto-trade-toggle" onchange="toggleAutoTradeEnabled(this.checked)"><div class="toggle-slider"></div></label>
-        </div>
-        <div style="font-size:12px;color:#7878a0;margin-bottom:12px;line-height:1.6;">Het systeem plaatst automatisch paper orders op basis van AI-scores na elke scan.</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Koop drempel (score)</label>
-            <input class="form-input" id="at-buy-thresh" type="number" value="60" min="10" max="99" style="padding:6px 10px;">
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Verkoop drempel</label>
-            <input class="form-input" id="at-sell-thresh" type="number" value="-50" max="-10" min="-99" style="padding:6px 10px;">
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Positie (USDT)</label>
-            <input class="form-input" id="at-pos-size" type="number" value="50" min="15" style="padding:6px 10px;">
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Max posities</label>
-            <input class="form-input" id="at-max-pos" type="number" value="5" min="1" max="20" style="padding:6px 10px;">
+      <!-- Auto Trading control (simplified) -->
+      <div class="card" id="auto-trade-card" style="border:2px solid rgba(0,212,170,.2);">
+        <!-- Big toggle -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #252540;">
+          <label class="toggle" style="transform:scale(1.25);transform-origin:left;flex-shrink:0;">
+            <input type="checkbox" id="auto-trade-toggle" onchange="toggleAutoTradeEnabled(this.checked)">
+            <div class="toggle-slider"></div>
+          </label>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#fff;">Auto Trading <span id="at-onoff-lbl" style="color:#ff5555;">UIT</span></div>
+            <div style="font-size:11px;color:#7878a0;margin-top:2px;"><i class="fas fa-flask fa-xs"></i> Paper modus — geen echt geld</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Stop Loss %</label>
-            <input class="form-input" id="at-sl-pct" type="number" value="3" min="0.5" max="20" step="0.5" style="padding:6px 10px;">
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Take Profit %</label>
-            <input class="form-input" id="at-tp-pct" type="number" value="6" min="1" max="50" step="0.5" style="padding:6px 10px;">
-          </div>
+        <!-- Strategy selector -->
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:5px;">Strategie</label>
+          <select class="filter-input" id="at-strategy-sel" style="width:100%;margin-bottom:8px;" onchange="onStrategySelect()">
+            <option value="ai">AI Auto (leergedrag + scores)</option>
+          </select>
+          <div id="at-strat-desc" style="font-size:11px;color:#7878a0;line-height:1.5;min-height:28px;"></div>
         </div>
-        <div id="at-auto-status" style="font-size:12px;color:#7878a0;margin-bottom:8px;">Status: inactief</div>
-        <button class="btn btn-ghost" onclick="runAiScan()" style="width:100%;justify-content:center;font-size:12px;"><i class="fas fa-satellite-dish fa-xs"></i> AI-scan nu uitvoeren</button>
+        <!-- Status line -->
+        <div id="at-auto-status" style="font-size:12px;color:#7878a0;margin-bottom:10px;padding:8px 10px;background:#0f0f1a;border-radius:6px;">Status: inactief</div>
+        <button class="btn btn-ghost" onclick="runAiScan()" style="width:100%;justify-content:center;font-size:12px;"><i class="fas fa-satellite-dish fa-xs"></i> Nu scannen</button>
       </div>
 
       <!-- Portfolio snapshot -->
@@ -952,6 +938,18 @@ body.help-mode * { cursor: help !important; }
 
 </div><!-- /content -->
 </div><!-- /main -->
+
+<!-- ══ AI STRATEGIE SUGGESTIE POPUP ══ -->
+<div id="ai-strat-suggest-modal" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.65);align-items:center;justify-content:center;">
+  <div style="background:#13132a;border:1px solid #252540;border-radius:14px;padding:24px;max-width:400px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,.6);">
+    <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:10px;"><i class="fas fa-lightbulb" style="color:#f59e0b;"></i> AI Strategie Suggestie</div>
+    <div id="ai-strat-suggest-body" style="font-size:13px;color:#c0c0d0;margin-bottom:18px;line-height:1.65;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="dismissStratSuggest()" style="font-size:12px;">Niet nu</button>
+      <button class="btn btn-primary" onclick="addSuggestedStrat()" style="font-size:12px;"><i class="fas fa-plus fa-xs"></i> Strategie toevoegen</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══ HELP MODE BAR ══ -->
 <div id="help-mode-bar">
@@ -1857,7 +1855,7 @@ function parseCSV(file){
       status:(r.status||'CLOSED').toUpperCase()
     }));
     document.getElementById('import-status').innerHTML=`<div class="pos"><i class="fas fa-check-circle"></i> ${allTrades.length} trades geladen uit <strong>${file.name}</strong></div>`;
-    renderAll(); showPage('overview');
+    renderAll(); showPage('activetrading');
   };
   reader.readAsText(file);
 }
@@ -1877,7 +1875,7 @@ function loadDemoData(){
   }
   allTrades=rows;
   document.getElementById('import-status').innerHTML=`<div class="pos"><i class="fas fa-check-circle"></i> ${allTrades.length} demo-trades geladen.</div>`;
-  renderAll(); showPage('overview');
+  renderAll(); showPage('activetrading');
 }
 
 function clearData(){ allTrades=[]; renderAll(); document.getElementById('import-status').innerHTML='<div class="muted">Data gewist.</div>'; }
@@ -2877,17 +2875,19 @@ function renderActiveTradingPage(){
   renderAtTopSignals();
   renderAutoTradeLog();
   loadLiveChart();
+  populateStrategySelector();
   // Sync toggle state
   const s = loadAutoTradeSettings();
-  document.getElementById('auto-trade-toggle').checked = s.enabled;
-  document.getElementById('at-buy-thresh').value  = s.buyThreshold;
-  document.getElementById('at-sell-thresh').value = s.sellThreshold;
-  document.getElementById('at-pos-size').value    = s.positionSize;
-  document.getElementById('at-max-pos').value     = s.maxPositions;
-  document.getElementById('at-sl-pct').value      = s.slPct;
-  document.getElementById('at-tp-pct').value      = s.tpPct;
+  const toggle = document.getElementById('auto-trade-toggle');
+  if(toggle) toggle.checked = s.enabled;
+  const lbl = document.getElementById('at-onoff-lbl');
+  if(lbl){ lbl.textContent=s.enabled?'AAN':'UIT'; lbl.style.color=s.enabled?'#00d4aa':'#ff5555'; }
+  const card = document.getElementById('auto-trade-card');
+  if(card) card.style.border = s.enabled?'2px solid rgba(0,212,170,.6)':'2px solid rgba(0,212,170,.2)';
   const banner = document.getElementById('auto-trade-banner');
-  banner.style.display = s.enabled ? 'flex' : 'none';
+  if(banner) banner.style.display = s.enabled ? 'flex' : 'none';
+  const stat = document.getElementById('at-auto-status');
+  if(stat) stat.textContent = s.enabled?`Status: ACTIEF · ${s.strategy||'ai'}`:'Status: inactief';
 }
 
 function renderAtPricesBar(){
@@ -3121,7 +3121,7 @@ const AUTO_TRADE_LOG_KEY = 'tb_auto_trade_log';
 
 function loadAutoTradeSettings(){
   return Object.assign(
-    { enabled:false, buyThreshold:60, sellThreshold:-50, positionSize:50, maxPositions:5, slPct:3, tpPct:6 },
+    { enabled:false, strategy:'ai', positionSize:50, maxPositions:5 },
     JSON.parse(localStorage.getItem(AUTO_TRADE_KEY)||'{}')
   );
 }
@@ -3129,48 +3129,198 @@ function saveAutoTradeSettings(s){ localStorage.setItem(AUTO_TRADE_KEY, JSON.str
 function loadAutoTradeLog(){ return JSON.parse(localStorage.getItem(AUTO_TRADE_LOG_KEY)||'[]'); }
 function saveAutoTradeLog(l){ localStorage.setItem(AUTO_TRADE_LOG_KEY, JSON.stringify(l.slice(-150))); }
 
+// Per-strategy trade parameters (buy/sell logic + SL/TP)
+function getStrategyTradeParams(strategyKey, res){
+  const defaults = { sl:3, tp:6, pos:50, maxpos:5 };
+  if(strategyKey === 'ai' || !strategyKey){
+    const ai = loadAutoTradeSettings();
+    // AI score ≥ 55 → buy, ≤ -40 → sell
+    return { ...defaults, pos: ai.positionSize||50, maxpos: ai.maxPositions||5,
+      buySignal:  res.score >= 55,
+      sellSignal: res.score <= -40
+    };
+  }
+  const strat = STRATEGY_LIBRARY.find(s=>s.name===strategyKey);
+  if(!strat) return { ...defaults, buySignal: res.score>=55, sellSignal: res.score<=-40 };
+  const ai = loadAutoTradeSettings();
+  const p = strat.params||{};
+  let buySignal=false, sellSignal=false, sl=3, tp=6;
+  switch(strat.type){
+    case 'rsi':
+      sl=4; tp=9;
+      buySignal  = res.rsi <= (p.oversold||30) && res.score >= 20;
+      sellSignal = res.rsi >= (p.overbought||70) && res.score <= -20;
+      break;
+    case 'macd':
+      sl=3; tp=7;
+      buySignal  = res.macdHist > 0 && res.score >= 20;
+      sellSignal = res.macdHist < 0 && res.score <= -20;
+      break;
+    case 'bb':
+      sl=3; tp=7;
+      buySignal  = res.bbPct <= 0.2 && res.score >= 20;
+      sellSignal = res.bbPct >= 0.8 && res.score <= -20;
+      break;
+    case 'ma': case 'hybrid': default:
+      sl=4; tp=10;
+      buySignal  = res.ema.score > 0 && res.score >= 25;
+      sellSignal = res.ema.score < 0 && res.score <= -25;
+      break;
+  }
+  return { sl, tp, pos: ai.positionSize||50, maxpos: ai.maxPositions||5, buySignal, sellSignal };
+}
+
 function toggleAutoTradeEnabled(enabled){
   const s = loadAutoTradeSettings();
-  s.enabled         = enabled;
-  s.buyThreshold    = parseFloat(document.getElementById('at-buy-thresh')?.value)  || 60;
-  s.sellThreshold   = parseFloat(document.getElementById('at-sell-thresh')?.value) || -50;
-  s.positionSize    = parseFloat(document.getElementById('at-pos-size')?.value)    || 50;
-  s.maxPositions    = parseInt(document.getElementById('at-max-pos')?.value)        || 5;
-  s.slPct           = parseFloat(document.getElementById('at-sl-pct')?.value)      || 3;
-  s.tpPct           = parseFloat(document.getElementById('at-tp-pct')?.value)      || 6;
+  s.enabled  = enabled;
+  s.strategy = document.getElementById('at-strategy-sel')?.value || 'ai';
   saveAutoTradeSettings(s);
 
   const toggle = document.getElementById('auto-trade-toggle');
   if(toggle) toggle.checked = enabled;
+  const lbl = document.getElementById('at-onoff-lbl');
+  if(lbl){ lbl.textContent = enabled?'AAN':'UIT'; lbl.style.color = enabled?'#00d4aa':'#ff5555'; }
+  const card = document.getElementById('auto-trade-card');
+  if(card) card.style.border = enabled?'2px solid rgba(0,212,170,.6)':'2px solid rgba(0,212,170,.2)';
   const banner = document.getElementById('auto-trade-banner');
   if(banner) banner.style.display = enabled?'flex':'none';
   const stat = document.getElementById('at-auto-status');
-  if(stat) stat.textContent = enabled?'Status: ACTIEF — traden op volgende AI-scan':'Status: inactief';
+  if(stat) stat.textContent = enabled?'Status: ACTIEF — traden op volgende scan':'Status: inactief';
+
+  if(enabled) checkAutoTrades();
+}
+
+function populateStrategySelector(){
+  const sel = document.getElementById('at-strategy-sel');
+  if(!sel) return;
+  const s = loadAutoTradeSettings();
+  sel.innerHTML = '<option value="ai">AI Auto (leergedrag + scores)</option>' +
+    STRATEGY_LIBRARY.map(st=>`<option value="${st.name}">${st.name}</option>`).join('');
+  sel.value = s.strategy||'ai';
+  onStrategySelect();
+}
+
+function onStrategySelect(){
+  const val = document.getElementById('at-strategy-sel')?.value;
+  const desc = document.getElementById('at-strat-desc');
+  if(!desc) return;
+  if(!val || val==='ai'){
+    desc.textContent = 'Combineert alle AI-leerscores. Koopt bij score ≥ 55, verkoopt bij ≤ -40.';
+  } else {
+    const st = STRATEGY_LIBRARY.find(s=>s.name===val);
+    desc.textContent = st ? st.desc.slice(0,120)+'…' : '';
+  }
+  // Save selection
+  const s = loadAutoTradeSettings();
+  s.strategy = val||'ai';
+  saveAutoTradeSettings(s);
+}
+
+// AI strategy suggestion after scan
+let _suggestedStratIdx = null;
+function checkAiStrategySuggestion(){
+  if(!aiResults.length) return;
+  // Find which strategy type is most represented in current signals
+  const rsiCount  = aiResults.filter(r=>r.rsi<=32||r.rsi>=68).length;
+  const macdCount = aiResults.filter(r=>Math.abs(r.macdHist)>0.001).length;
+  const bbCount   = aiResults.filter(r=>r.bbPct<=0.2||r.bbPct>=0.8).length;
+  const emaCount  = aiResults.filter(r=>r.ema&&r.ema.score!==0).length;
+  const maxCount  = Math.max(rsiCount, macdCount, bbCount, emaCount);
+  if(maxCount < 3) return; // Not enough signal
+  let suggestType = 'ai';
+  if(rsiCount===maxCount)  suggestType='rsi';
+  else if(bbCount===maxCount)  suggestType='bb';
+  else if(macdCount===maxCount) suggestType='macd';
+  else suggestType='ma';
+  const strat = STRATEGY_LIBRARY.find(s=>s.type===suggestType);
+  if(!strat) return;
+  // Don't suggest if already selected or recently dismissed
+  const current = loadAutoTradeSettings().strategy;
+  if(current===strat.name) return;
+  const dismissed = JSON.parse(localStorage.getItem('tb_dismissed_strat_suggest')||'[]');
+  if(dismissed.includes(strat.name)) return;
+  _suggestedStratIdx = STRATEGY_LIBRARY.indexOf(strat);
+  const bodyEl = document.getElementById('ai-strat-suggest-body');
+  const modal  = document.getElementById('ai-strat-suggest-modal');
+  if(!bodyEl||!modal) return;
+  bodyEl.innerHTML = `Op basis van de huidige marktdata ziet het AI-model <strong style="color:#f59e0b;">${maxCount} van ${aiResults.length} paren</strong> met een signaal dat past bij de <strong style="color:#00d4aa;">${strat.name}</strong> strategie.<br><br><em style="color:#7878a0;">${strat.desc.slice(0,160)}…</em><br><br>Wil je deze strategie activeren?`;
+  modal.style.display = 'flex';
+}
+
+function dismissStratSuggest(){
+  const modal = document.getElementById('ai-strat-suggest-modal');
+  if(modal) modal.style.display='none';
+  if(_suggestedStratIdx===null) return;
+  const strat = STRATEGY_LIBRARY[_suggestedStratIdx];
+  const dismissed = JSON.parse(localStorage.getItem('tb_dismissed_strat_suggest')||'[]');
+  dismissed.push(strat.name);
+  localStorage.setItem('tb_dismissed_strat_suggest', JSON.stringify(dismissed.slice(-10)));
+  _suggestedStratIdx = null;
+}
+
+function addSuggestedStrat(){
+  const modal = document.getElementById('ai-strat-suggest-modal');
+  if(modal) modal.style.display='none';
+  if(_suggestedStratIdx===null) return;
+  const strat = STRATEGY_LIBRARY[_suggestedStratIdx];
+  // Set as active strategy
+  const s = loadAutoTradeSettings();
+  s.strategy = strat.name;
+  saveAutoTradeSettings(s);
+  const sel = document.getElementById('at-strategy-sel');
+  if(sel){ sel.value=strat.name; onStrategySelect(); }
+  _suggestedStratIdx = null;
+  // Also add to user strategies
+  addStrategyFromLibrary(STRATEGY_LIBRARY.indexOf(strat));
+}
+
+// Convert Kraken raw pair name → display pair (e.g. XXBTZUSD → BTCUSDT)
+function krakenPairToDisplay(pair){
+  const BASE = {'XXBT':'BTC','XETH':'ETH','XLTC':'LTC','XXLM':'XLM',
+                'XZEC':'ZEC','XXRP':'XRP','XDOT':'DOT'};
+  const QUOTE = {'ZUSD':'USDT','ZEUR':'EUR','ZBTC':'BTC','ZUSDTUSDT':'USDT'};
+  let p = pair;
+  // Replace known base prefixes (order matters: longer keys first)
+  for(const k of Object.keys(BASE).sort((a,b)=>b.length-a.length)){
+    if(p.startsWith(k)){ p = BASE[k] + p.slice(k.length); break; }
+  }
+  // Replace known quote suffixes
+  for(const k of Object.keys(QUOTE).sort((a,b)=>b.length-a.length)){
+    if(p.endsWith(k)){ p = p.slice(0,-k.length) + QUOTE[k]; break; }
+  }
+  // Bare USD ending → USDT
+  if(p.endsWith('USD') && !p.endsWith('USDT')) p = p.slice(0,-3)+'USDT';
+  return p;
 }
 
 // Called automatically at end of every AI scan
 async function checkAutoTrades(){
   const s = loadAutoTradeSettings();
-  if(!s.enabled || !aiResults.length) return;
+  if(!s.enabled) return;
+  // If no scan results yet, trigger one now
+  if(!aiResults.length){
+    const stat = document.getElementById('at-auto-status');
+    if(stat) stat.textContent = 'Status: scan bezig...';
+    await runAiScan();
+    return; // runAiScan calls checkAutoTrades again at the end
+  }
 
   const paper = loadPaper();
   const log   = loadAutoTradeLog();
   let changed = false;
 
   for(const res of aiResults){
-    // Convert Kraken pair → Binance USDT format for paper trading
-    const displayPair = res.pair
-      .replace('XXBT','BTC').replace('XETH','ETH')
-      .replace('ZUSD','USDT').replace('ZEUR','USDT')
-      .replace('USD','USDT').replace('USDTUSDT','USDT'); // dedupe
+    // Convert Kraken pair → display/paper trading format
+    const displayPair = krakenPairToDisplay(res.pair);
+    const tp_s = getStrategyTradeParams(s.strategy, res);
 
     const price      = res.price;
     const hasPos     = paper.positions.findIndex(p=>p.pair===displayPair);
     const openCount  = paper.positions.length;
 
     // ── BUY signal ──────────────────────────────────
-    if(res.score >= s.buyThreshold && hasPos === -1 && openCount < s.maxPositions){
-      const qty  = s.positionSize / price;
+    if(tp_s.buySignal && hasPos === -1 && openCount < tp_s.maxpos){
+      const qty  = tp_s.pos / price;
       const cost = price * qty;
       if(paper.balance >= cost){
         paper.balance -= cost;
@@ -3179,10 +3329,11 @@ async function checkAutoTrades(){
           side:      'BUY',
           entry:     price,
           qty:       qty,
-          sl:        price * (1 - s.slPct/100),
-          tp:        price * (1 + s.tpPct/100),
+          sl:        price * (1 - tp_s.sl/100),
+          tp:        price * (1 + tp_s.tp/100),
           ts:        new Date().toISOString().replace('T',' ').slice(0,19),
-          autoTrade: true
+          autoTrade: true,
+          strategy:  s.strategy||'ai'
         });
         log.push({
           ts:     new Date().toISOString(),
@@ -3191,14 +3342,14 @@ async function checkAutoTrades(){
           price:  price,
           qty:    +qty.toFixed(6),
           score:  res.score,
-          reason: `Score +${res.score} (${res.signal}) · SL ${s.slPct}% TP ${s.tpPct}%`
+          reason: `[${s.strategy||'ai'}] Score ${res.score} (${res.signal}) · SL ${tp_s.sl}% TP ${tp_s.tp}%`
         });
         changed = true;
       }
     }
 
     // ── SELL signal (close existing position) ───────
-    if(res.score <= s.sellThreshold && hasPos !== -1){
+    if(tp_s.sellSignal && hasPos !== -1){
       const pos  = paper.positions[hasPos];
       const pnl  = (price - pos.entry) * pos.qty;
       paper.balance += pos.entry * pos.qty + pnl;
@@ -3218,7 +3369,7 @@ async function checkAutoTrades(){
         price:  price,
         qty:    +pos.qty.toFixed(6),
         score:  res.score,
-        reason: `Score ${res.score} (${res.signal}) · PnL ${pnl>=0?'+':''}${pnl.toFixed(4)}`
+        reason: `[${s.strategy||'ai'}] Score ${res.score} (${res.signal}) · PnL ${pnl>=0?'+':''}${pnl.toFixed(4)}`
       });
       changed = true;
     }
@@ -3244,7 +3395,9 @@ async function checkAutoTrades(){
   }
 
   const stat = document.getElementById('at-auto-status');
-  if(stat) stat.textContent = `Status: ACTIEF · ${aiResults.length} pairs gescand · ${log.length} trades uitgevoerd`;
+  const stratName = s.strategy||'ai';
+  if(stat) stat.textContent = `Status: ACTIEF · ${stratName} · ${aiResults.length} pairs gescand · ${log.length} trades`;
+  checkAiStrategySuggestion();
 }
 
 function renderAutoTradeLog(){
@@ -3842,7 +3995,7 @@ renderPredHistory();
 renderAiKPIs();
 renderAccuracyChart();
 renderStrategyLibrary();
-loadDemoData();
+loadDemoData(); // also calls showPage('activetrading')
 updateLivePrices();
 setInterval(updateLivePrices, 15000);
 
