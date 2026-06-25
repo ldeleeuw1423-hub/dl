@@ -86,6 +86,25 @@ input[type=file] { display:none; }
 ::-webkit-scrollbar { width:5px; height:5px; }
 ::-webkit-scrollbar-track { background:#0f0f1a; }
 ::-webkit-scrollbar-thumb { background:#252540; border-radius:3px; }
+
+/* ── Help modus ── */
+body.help-mode,
+body.help-mode * { cursor: help !important; }
+#help-btn.help-active { background:rgba(0,212,170,.15) !important; border:1px solid #00d4aa !important; color:#00d4aa !important; box-shadow:0 0 10px rgba(0,212,170,.3); }
+#help-mode-bar { position:fixed; top:0; left:0; right:0; z-index:200; background:rgba(0,212,170,.12); border-bottom:2px solid #00d4aa; padding:6px 20px; font-size:12px; color:#00d4aa; font-weight:600; display:flex; align-items:center; gap:10px; display:none; }
+.help-tooltip {
+  position:fixed; z-index:500; background:#13132a; border:1px solid #00d4aa;
+  border-radius:10px; padding:16px 18px; max-width:340px; min-width:240px;
+  box-shadow:0 8px 32px rgba(0,0,0,.7); pointer-events:auto;
+  animation: helpfade .15s ease;
+}
+@keyframes helpfade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+.help-tooltip-title { font-size:14px; font-weight:700; color:#00d4aa; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+.help-tooltip-body { font-size:13px; color:#d0d0d0; line-height:1.65; }
+.help-tooltip-body ul { padding-left:16px; margin-top:4px; }
+.help-tooltip-body li { margin-bottom:3px; }
+.help-tooltip-close { margin-left:auto; background:none; border:none; color:#7878a0; cursor:pointer !important; font-size:16px; line-height:1; padding:0; }
+.help-tooltip-close:hover { color:#fff; }
 </style>
 </head>
 <body>
@@ -143,6 +162,7 @@ input[type=file] { display:none; }
       <option value="90">90 dagen</option>
     </select>
     <button class="btn btn-ghost" onclick="refreshAll()"><i class="fas fa-sync-alt fa-sm" id="refresh-icon"></i> Ververs</button>
+    <button class="btn btn-ghost" id="help-btn" onclick="toggleHelpMode()" title="Help modus — klik dan op elk onderdeel voor uitleg" style="font-size:15px;padding:7px 12px;font-weight:700;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">?</button>
   </div>
 </div>
 
@@ -348,6 +368,12 @@ input[type=file] { display:none; }
   <div id="strategies-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
   <div id="strategies-signals" style="margin-top:20px;"></div>
 
+  <!-- Strategie Success Rates -->
+  <div style="margin-top:24px;" id="strat-stats-section">
+    <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:12px;"><i class="fas fa-chart-bar" style="color:#f59e0b;"></i> Succes-statistieken per strategie</div>
+    <div id="strat-stats-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+  </div>
+
   <!-- Strategie Bibliotheek -->
   <div style="margin-top:28px;border-top:1px solid #252540;padding-top:22px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
@@ -509,6 +535,12 @@ input[type=file] { display:none; }
       </div>
       <div id="at-trade-log" style="font-size:11px;max-height:200px;overflow-y:auto;"><div style="color:#7878a0;">Nog geen auto-trades uitgevoerd.</div></div>
     </div>
+  </div>
+
+  <!-- Auto-trade succes statistieken -->
+  <div class="card" style="margin-top:14px;">
+    <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:16px;"><i class="fas fa-trophy" style="color:#f59e0b;"></i> Auto-trade Succes Statistieken</div>
+    <div id="at-auto-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;"></div>
   </div>
 
 </div>
@@ -921,6 +953,24 @@ input[type=file] { display:none; }
 </div><!-- /content -->
 </div><!-- /main -->
 
+<!-- ══ HELP MODE BAR ══ -->
+<div id="help-mode-bar">
+  <i class="fas fa-question-circle"></i>
+  Help modus actief — klik op elk onderdeel voor uitleg &nbsp;·&nbsp;
+  <span style="font-weight:400;color:#7878a0;">Druk op Escape of ? om te stoppen</span>
+  <button onclick="toggleHelpMode()" style="margin-left:auto;background:rgba(0,212,170,.15);border:1px solid #00d4aa;color:#00d4aa;border-radius:5px;padding:3px 12px;cursor:pointer;font-size:12px;">Sluiten</button>
+</div>
+
+<!-- ══ HELP TOOLTIP ══ -->
+<div class="help-tooltip" id="help-tooltip" style="display:none;">
+  <div class="help-tooltip-title">
+    <i class="fas fa-question-circle" style="font-size:13px;"></i>
+    <span id="help-tt-title">—</span>
+    <button class="help-tooltip-close" onclick="closeHelpTooltip()">✕</button>
+  </div>
+  <div class="help-tooltip-body" id="help-tt-body"></div>
+</div>
+
 <!-- ══════════════════════════════════════
      MODAL: STRATEGY
 ══════════════════════════════════════ -->
@@ -1094,8 +1144,8 @@ function showPage(id){
   if(id==='performance')   renderPerfCharts();
   if(id==='pairs')         renderPairsPage();
   if(id==='paper')         renderPaperPage();
-  if(id==='activetrading') renderActiveTradingPage();
-  if(id==='strategies')    { renderStrategiesPage(); renderStrategyLibrary(); }
+  if(id==='activetrading') { renderActiveTradingPage(); renderAutoTradeStats(); }
+  if(id==='strategies')    { renderStrategiesPage(); renderStrategyStats(); renderStrategyLibrary(); }
   if(id==='ai')            { renderWeightsDisplay(); renderPredHistory(); renderAiKPIs(); renderAccuracyChart(); }
   if(id==='learning')      renderLearningPage();
   if(id==='social')        renderSocialPage();
@@ -3185,6 +3235,11 @@ async function checkAutoTrades(){
     if(document.getElementById('page-activetrading').classList.contains('active')){
       renderAtPortfolio();
       renderAutoTradeLog();
+      renderAutoTradeStats();
+    }
+    // Also refresh strategy stats (auto-trades affect paper closed trades)
+    if(document.getElementById('page-strategies').classList.contains('active')){
+      renderStrategyStats();
     }
   }
 
@@ -3447,6 +3502,340 @@ function refreshAll(){
 // ══════════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+//  SUCCES STATISTIEKEN
+// ══════════════════════════════════════════════════════════
+
+// ── Strategie succes-rates (op basis van paper closed trades) ──
+function renderStrategyStats(){
+  const strats  = loadStrategies();
+  const paper   = loadPaper();
+  const closed  = paper.closedTrades || [];
+  const grid    = document.getElementById('strat-stats-grid');
+  if(!grid) return;
+
+  if(!strats.length){
+    grid.innerHTML = '<div class="muted" style="font-size:13px;padding:10px;">Nog geen strategieën — voeg er een toe of laad uit de bibliotheek.</div>';
+    return;
+  }
+
+  grid.innerHTML = strats.map((s,i)=>{
+    // Match closed trades to this strategy's pairs
+    const pairs   = (s.pairs||[]).map(p=>p.toUpperCase());
+    const matched = closed.filter(t=>pairs.includes((t.pair||'').toUpperCase()));
+    const wins    = matched.filter(t=>parseFloat(t.pnl||0)>0);
+    const losses  = matched.filter(t=>parseFloat(t.pnl||0)<=0);
+    const wr      = matched.length ? Math.round(wins.length/matched.length*100) : null;
+    const totalPnl= matched.reduce((s,t)=>s+parseFloat(t.pnl||0),0);
+    const wrColor = wr===null?'#7878a0':wr>=55?'#00d4aa':wr>=45?'#f59e0b':'#ff5555';
+
+    // Avg holding duration if timestamps available
+    let avgPnl = matched.length ? totalPnl/matched.length : null;
+
+    // AI match score
+    const weights = loadWeights();
+    const IND_MAP = { rsi:['rsi'], ma:['ema'], macd:['macd','vol'], bb:['bb','vol'], manual:[] };
+    const inds    = IND_MAP[s.type]||[];
+    const avgW    = inds.length ? inds.reduce((sum,k)=>sum+(weights[k]||1),0)/inds.length : 1;
+    const aiMatch = Math.round(Math.min(100,(avgW/1.5)*100));
+    const aiColor = aiMatch>=70?'#00d4aa':aiMatch>=45?'#f59e0b':'#ff5555';
+
+    return `<div class="card" style="border-left:3px solid ${wrColor};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#fff;">${s.name}</div>
+          <div style="font-size:11px;color:#7878a0;">${(STRAT_TYPE_LABELS[s.type]||s.type)} · ${s.tf}</div>
+        </div>
+        <span class="${s.active?'badge badge-run':'badge badge-stop'}">${s.active?'ACTIEF':'GESTOPT'}</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;text-align:center;">
+        <div style="background:#252540;border-radius:6px;padding:8px;">
+          <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;">Trades</div>
+          <div style="font-size:18px;font-weight:700;color:#fff;margin-top:2px;">${matched.length||'—'}</div>
+        </div>
+        <div style="background:#252540;border-radius:6px;padding:8px;">
+          <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;">Win rate</div>
+          <div style="font-size:18px;font-weight:700;color:${wrColor};margin-top:2px;">${wr!==null?wr+'%':'—'}</div>
+        </div>
+        <div style="background:#252540;border-radius:6px;padding:8px;">
+          <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;">Totaal P&L</div>
+          <div style="font-size:16px;font-weight:700;color:${totalPnl>=0?'#00d4aa':'#ff5555'};margin-top:2px;">${totalPnl>=0?'+':''}${totalPnl.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;">
+        <span class="muted">${wins.length} wins / ${losses.length} losses</span>
+        <span class="muted">gem. ${avgPnl!==null?(avgPnl>=0?'+':'')+avgPnl.toFixed(3)+' USDT':'—'}</span>
+      </div>
+
+      <!-- Win-rate balk -->
+      <div style="background:#252540;border-radius:3px;height:4px;overflow:hidden;margin-bottom:10px;">
+        <div style="width:${wr||0}%;height:100%;background:${wrColor};border-radius:3px;transition:width .5s;"></div>
+      </div>
+
+      <!-- AI match -->
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+        <span class="muted">AI match:</span>
+        <div style="flex:1;background:#252540;border-radius:3px;height:4px;overflow:hidden;">
+          <div style="width:${aiMatch}%;height:100%;background:${aiColor};border-radius:3px;transition:width .5s;"></div>
+        </div>
+        <span style="color:${aiColor};font-weight:700;">${aiMatch}%</span>
+      </div>
+      ${matched.length===0?'<div style="margin-top:8px;font-size:11px;color:#7878a0;">⚠ Geen gesloten trades gevonden voor deze pairs. Laad CSV of trade via Paper Trading.</div>':''}
+    </div>`;
+  }).join('');
+}
+
+// ── Auto-trade succes statistieken ──────────────────────
+function renderAutoTradeStats(){
+  const div  = document.getElementById('at-auto-stats');
+  if(!div) return;
+  const log  = loadAutoTradeLog();
+  const paper= loadPaper();
+  const closed = paper.closedTrades.filter(t=>t.autoTrade);
+
+  if(!log.length && !closed.length){
+    div.innerHTML = '<div class="muted" style="font-size:12px;padding:8px 0;">Nog geen auto-trades. Schakel Auto Trading aan en run een AI-scan.</div>';
+    return;
+  }
+
+  const buys  = log.filter(l=>l.action==='AUTO BUY').length;
+  const sells = log.filter(l=>l.action==='AUTO SELL').length;
+  const wins  = closed.filter(t=>parseFloat(t.pnl||0)>0);
+  const losses= closed.filter(t=>parseFloat(t.pnl||0)<=0);
+  const totalPnl = closed.reduce((s,t)=>s+parseFloat(t.pnl||0),0);
+  const wr    = closed.length?Math.round(wins.length/closed.length*100):null;
+  const wrColor = wr===null?'#7878a0':wr>=55?'#00d4aa':wr>=45?'#f59e0b':'#ff5555';
+
+  // Best and worst auto-trade
+  const sorted = [...closed].sort((a,b)=>parseFloat(b.pnl||0)-parseFloat(a.pnl||0));
+  const best   = sorted[0];
+  const worst  = sorted[sorted.length-1];
+
+  // Per pair breakdown
+  const byPair = {};
+  closed.forEach(t=>{ if(!byPair[t.pair]){byPair[t.pair]={pnl:0,w:0,l:0};} byPair[t.pair].pnl+=parseFloat(t.pnl||0); if(parseFloat(t.pnl||0)>0)byPair[t.pair].w++;else byPair[t.pair].l++; });
+
+  div.innerHTML = `
+    <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid ${wrColor};">
+      <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:10px;">Overzicht</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+        <div><span class="muted">Koop-orders:</span> <strong>${buys}</strong></div>
+        <div><span class="muted">Verkoop-orders:</span> <strong>${sells}</strong></div>
+        <div><span class="muted">Gesloten trades:</span> <strong>${closed.length}</strong></div>
+        <div><span class="muted">Win rate:</span> <strong style="color:${wrColor}">${wr!==null?wr+'%':'—'}</strong></div>
+        <div><span class="muted">Wins / Losses:</span> <strong>${wins.length} / ${losses.length}</strong></div>
+        <div><span class="muted">Totaal P&L:</span> <strong style="color:${totalPnl>=0?'#00d4aa':'#ff5555'}">${totalPnl>=0?'+':''}${totalPnl.toFixed(4)} USDT</strong></div>
+      </div>
+      <div style="margin-top:10px;background:#1a1a2e;border-radius:3px;height:5px;overflow:hidden;">
+        <div style="width:${wr||0}%;height:100%;background:${wrColor};border-radius:3px;transition:width .6s;"></div>
+      </div>
+    </div>
+
+    ${best?`<div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #00d4aa;">
+      <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:8px;"><i class="fas fa-medal" style="color:#f59e0b;"></i> Beste Auto-trade</div>
+      <div style="font-size:13px;font-weight:700;">${best.pair}</div>
+      <div style="font-size:12px;color:#7878a0;">${best.ts||''}</div>
+      <div style="font-size:18px;font-weight:700;color:#00d4aa;margin-top:4px;">+${parseFloat(best.pnl||0).toFixed(4)} USDT</div>
+    </div>`:''}
+
+    ${worst&&worst!==best?`<div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #ff5555;">
+      <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:8px;"><i class="fas fa-arrow-down" style="color:#ff5555;"></i> Slechtste Auto-trade</div>
+      <div style="font-size:13px;font-weight:700;">${worst.pair}</div>
+      <div style="font-size:12px;color:#7878a0;">${worst.ts||''}</div>
+      <div style="font-size:18px;font-weight:700;color:#ff5555;">${parseFloat(worst.pnl||0).toFixed(4)} USDT</div>
+    </div>`:''}
+
+    <div style="background:#252540;border-radius:8px;padding:14px;">
+      <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:8px;">Per Pair</div>
+      ${Object.entries(byPair).sort((a,b)=>b[1].pnl-a[1].pnl).slice(0,6).map(([pair,d])=>{
+        const pwr=Math.round(d.w/(d.w+d.l)*100);
+        const pc=d.pnl>=0?'#00d4aa':'#ff5555';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1e1e38;font-size:12px;">
+          <div style="flex:1;font-weight:700;">${pair}</div>
+          <div style="color:#7878a0;">${d.w}W/${d.l}L</div>
+          <div style="color:${pwr>=50?'#00d4aa':'#ff5555'};font-weight:600;">${pwr}%</div>
+          <div style="color:${pc};font-weight:700;min-width:60px;text-align:right;">${d.pnl>=0?'+':''}${d.pnl.toFixed(3)}</div>
+        </div>`;
+      }).join('')||'<div class="muted" style="font-size:12px;">Geen gesloten auto-trades per pair.</div>'}
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════
+//  HELP MODUS — VRAAGTEKEN CURSOR + UITLEG TOOLTIPS
+// ══════════════════════════════════════════════════════════
+let helpModeActive = false;
+
+// Beschrijvingen per element-id of klikzone
+const HELP_MAP = {
+  // ── Navigatie ──
+  'nav-overview':    { title:'Overzicht', body:'De startpagina met een samenvatting van je trading portfolio. Je ziet je totale P&L, win-rate, recente trades en cumulatieve winstgrafiek.' },
+  'nav-trades':      { title:'Trades', body:'Een volledig overzicht van al je trades. Je kunt filteren op pair, richting (buy/sell) en resultaat (win/loss/open). Trades komen uit de geüploade CSV of de demo-dataset.' },
+  'nav-performance': { title:'Performance', body:'Grafieken van je dagelijkse winst/verlies, winst per pair, drawdown (maximale terugval) en statistieken zoals profit factor en gemiddelde P&L.' },
+  'nav-pairs':       { title:'Pairs', body:'Een kaartoverzicht van alle crypto-pairs waarop je gehandeld hebt. Per pair zie je aantal trades, win-rate en totale P&L.' },
+  'nav-paper':       { title:'Paper Trading', body:'Simuleer trades zonder echt geld. Je begint met 10.000 virtuele USDT. Koop en verkoop met live Binance-prijzen. Ideaal om strategieën te testen.' },
+  'nav-activetrading': { title:'Actieve Trading', body:'Realtime handelsscherm met een live candlestick-grafiek (Kraken data), open posities, AI-koopsignalen en het Auto Trading systeem dat zelf orders plaatst.' },
+  'nav-strategies':  { title:'Strategieën', body:'Beheer je eigen trading strategieën (RSI, MA Crossover, Bollinger, MACD). Activeer ze om signalen te zien. Onderaan vind je de Strategie Bibliotheek met 11 bewezen strategieën.' },
+  'nav-ai':          { title:'AI Analyse', body:'Het hart van het systeem: scant alle Kraken-paren met technische indicatoren (RSI, EMA, MACD, Bollinger Bands, Volume) en geeft een koopscore van -100 tot +100. Scan loopt automatisch elke 15 minuten.' },
+  'nav-learning':    { title:'Wat ik leerde', body:'Toont wat het AI-systeem heeft geleerd van evaluaties. Je ziet indicatorgewichten (welke indicator het betrouwbaarst is), nauwkeurigheid per pair en signaaltype, en automatisch gegenereerde inzichten.' },
+  'nav-social':      { title:'Markt Sentiment', body:'Verzamelt posts van Reddit (r/CryptoCurrency, r/Bitcoin, etc.) en crypto-nieuws. Elk bericht krijgt een betrouwbaarheidsscore 0-100. Alles onder 40 wordt verborgen om spam en FUD te filteren.' },
+  'nav-apis':        { title:'API Verbindingen', body:'Sla je exchange API-sleutels op (Binance, Kraken, etc.). Deze worden alleen lokaal opgeslagen in je browser, nooit verstuurd naar een server. Gebruik paper-modus totdat je zeker bent.' },
+  'nav-import':      { title:'CSV Import', body:'Upload een CSV-bestand van je trading bot met kolommen: timestamp, pair, side, price, qty, pnl, status. Of laad de demo-dataset om het dashboard te verkennen.' },
+
+  // ── KPI kaarten overzicht ──
+  'kpi-pnl':       { title:'Totaal P&L', body:'Profit & Loss — het totale winst of verlies van alle <strong>gesloten</strong> trades in de geselecteerde periode. Groen = winst, rood = verlies.' },
+  'kpi-wr':        { title:'Win Rate', body:'Het percentage trades dat met winst is afgesloten. Alles boven 50% betekent dat je vaker wint dan verliest. Een goede trader streeft naar ≥55%.' },
+  'kpi-trades':    { title:'Aantal Trades', body:'Het totaal aantal trades (open + gesloten) in de geselecteerde tijdsperiode. Klik op "Trades" in de sidebar voor het volledige overzicht.' },
+  'kpi-paper-bal': { title:'Paper Saldo', body:'De huidige waarde van je virtuele paper-trading portfolio, inclusief open posities gewaardeerd op live prijzen.' },
+  'kpi-strats':    { title:'Strategieën', body:'Het aantal geconfigureerde strategieën en hoeveel ervan momenteel actief zijn (groen = actief, oranje = gestopt).' },
+  'kpi-apis':      { title:'API\'s', body:'Het aantal opgeslagen exchange-API verbindingen. "Live" betekent dat er minstens één op echte handel is ingesteld (let op: gebruik altijd eerst paper-modus).' },
+
+  // ── Overzichtspagina charts ──
+  'chart-pnl':  { title:'Cumulatieve P&L grafiek', body:'Toont hoe je totale winst/verlies zich ontwikkelt over tijd. Een stijgende lijn betekent groei. Scherpe dalingen wijzen op verliesperiodes.' },
+  'chart-wl':   { title:'Win / Loss diagram', body:'Verhouding tussen winnende en verliezende trades als taartdiagram. Streef naar de groene (win) sectie die groter is dan de rode (loss).' },
+
+  // ── AI pagina ──
+  'ai-scan-btn':     { title:'Scan Kraken knop', body:'Start een volledige analyse van alle actieve Kraken-paren. Haalt OHLCV-kaarsen op, berekent RSI, EMA, MACD, Bollinger Bands en Volume, en geeft elk pair een score van -100 tot +100.' },
+  'auto-scan-toggle':{ title:'Auto-scan toggle', body:'Wanneer aan: het systeem voert automatisch elke 15 minuten een nieuwe scan uit. De countdown bovenaan toont wanneer de volgende scan plaatsvindt.' },
+  'ai-kpi-acc':      { title:'Voorspellingsnauwkeurigheid', body:'Het percentage AI-voorspellingen dat achteraf correct bleek. Boven 50% is beter dan toeval. Evalueer dagelijks via "Evalueer & Leer" om dit bij te werken.' },
+  'ai-kpi-best-ind': { title:'Sterkste indicator', body:'De indicator met het hoogste geleerde gewicht — dus de indicator die het vaakst correct voorspelde in eerdere evaluaties.' },
+  'ai-kpi-days':     { title:'Leerdagen', body:'Het aantal dagelijkse evaluatieronden dat het systeem heeft uitgevoerd. Meer evaluaties = betere gewichten = betere voorspellingen.' },
+  'weights-display': { title:'Geleerde Gewichten', body:'Het systeem past na elke evaluatie de gewichten aan. Hoog gewicht (groen) = indicator presteert goed. Laag gewicht (rood) = indicator geeft vaak valse signalen. Bereik: 0.1 tot 3.0.' },
+
+  // ── Actieve Trading ──
+  'auto-trade-toggle': { title:'Auto Trading toggle', body:'Wanneer AAN: na elke AI-scan plaatst het systeem automatisch paper-orders. BUY bij score ≥ drempel, SELL bij score ≤ drempel. Alle orders hebben automatisch stop-loss en take-profit.' },
+  'at-buy-thresh':  { title:'Koop drempel', body:'Minimale AI-score (0–100) om een automatisch kooporder te plaatsen. Standaard: 60 (STRONG BUY). Hogere waarde = minder maar zekerder signalen.' },
+  'at-sell-thresh': { title:'Verkoop drempel', body:'Maximale AI-score (-100–0) om een open positie automatisch te sluiten. Standaard: -50. Lagere waarde (bijv. -70) = het systeem sluit posities pas bij heel sterke verkoopsignalen.' },
+  'at-pos-size':    { title:'Positiegrootte (USDT)', body:'Hoeveel virtuele USDT wordt ingezet per automatische trade. Standaard: 50 USDT. Houd dit klein t.o.v. je totale portfolio voor goed risicobeheer.' },
+  'at-max-pos':     { title:'Maximum posities', body:'Het maximale aantal gelijktijdig open auto-trade posities. Als dit bereikt is, worden geen nieuwe orders geplaatst totdat een positie gesloten wordt.' },
+  'at-sl-pct':      { title:'Stop Loss %', body:'Procentuele koersdaling waarbij een positie automatisch gesloten wordt om verder verlies te beperken. Bij 3%: als BTC van 60.000 naar 58.200 daalt, wordt de positie gesloten.' },
+  'at-tp-pct':      { title:'Take Profit %', body:'Procentuele koersstijging waarbij een positie automatisch met winst gesloten wordt. Bij 6%: als BTC van 60.000 naar 63.600 stijgt, wordt de winst genomen.' },
+  'live-chart-container': { title:'Live Candlestick Grafiek', body:'Echte marktdata rechtstreeks van Kraken. Toont OHLCV-kaarsen (Open/High/Low/Close/Volume), EMA-lijnen (groen=EMA9, oranje=EMA21, blauw=EMA50) en optioneel Bollinger Bands. Selecteer een ander pair of interval met de knoppen erboven.' },
+  'live-rsi-container': { title:'RSI Panel', body:'Relative Strength Index — een oscillator tussen 0 en 100. <strong>Boven 70</strong>: overbought (koers mogelijk te hoog, correctie verwacht). <strong>Onder 30</strong>: oversold (koers mogelijk te laag, stijging verwacht). De horizontale lijnen tonen de 70 en 30 grenzen.' },
+  'at-trade-log':   { title:'Auto Trade Log', body:'Een overzicht van alle automatisch uitgevoerde trades. Je ziet het pair, de actie (BUY/SELL), prijs, score en de reden (welk signaal de trade triggerde).' },
+
+  // ── Paper Trading ──
+  'positions-tbody': { title:'Open Posities', body:'Overzicht van je huidige open paper-posities. Per positie zie je de instapprijs, huidige prijs (live bijgewerkt), ongerealiseerde winst/verlies, en stop-loss/take-profit niveaus. Klik "Sluiten" om een positie handmatig te sluiten.' },
+  'pp-free':  { title:'Vrij Saldo', body:'Het beschikbare virtuele USDT-saldo dat je nog kunt inzetten voor nieuwe trades. Daalt bij een BUY en stijgt weer bij SELL.' },
+  'pp-upnl':  { title:'Ongerealiseerde P&L', body:'De theoretische winst/verlies van je open posities op basis van de huidige marktprijzen. Dit wordt alleen "echt" als je de positie sluit.' },
+
+  // ── Strategieën ──
+  'strategies-grid':   { title:'Mijn Strategieën', body:'Jouw geconfigureerde trading-strategieën. Elke strategie heeft een type (RSI, MA, MACD, Bollinger), pairs waarop hij actief is, en parameters. Zet de toggle aan om signalen te ontvangen.' },
+  'library-grid':      { title:'Strategie Bibliotheek', body:'Elf bewezen trading-strategieën uit de vakliteratuur: Golden Cross, RSI Oversold/Overbought, MACD Cross, Bollinger Squeeze, en meer. Klik "Toevoegen" om een strategie direct aan jouw lijst toe te voegen.' },
+
+  // ── Markt Sentiment ──
+  'social-feed':    { title:'Sentiment Feed', body:'Gefilterde berichten van Reddit en crypto-nieuws. Elk bericht heeft een betrouwbaarheidsscore: <strong style="color:#00d4aa">groen (≥70)</strong> = betrouwbaar, <strong style="color:#f59e0b">oranje (50-69)</strong> = neutraal, <strong style="color:#ff5555">rood (<50)</strong> = voorzichtig. Berichten onder 40 worden automatisch verborgen.' },
+  'soc-mood':       { title:'Markt Stemming', body:'De overall sfeer van alle zichtbare berichten gecombineerd. Groen = meer bullish dan bearish posts. Rood = meer bearish. Geel = gemengd beeld. Let op: sociale media volgen de markt, ze voorspellen hem zelden.' },
+
+  // ── Topbar / algemeen ──
+  'help-btn':       { title:'Help modus', body:'Dat ben je nu al aan het gebruiken! 😊 Klik op elk onderdeel van het dashboard voor een uitleg.' },
+  'global-period':  { title:'Tijdsperiode filter', body:'Filter alle grafieken en statistieken op de geselecteerde periode: alles, 7 dagen, 30 dagen of 90 dagen. Geldt voor de tabs Overzicht, Trades en Performance.' },
+  'refresh-icon':   { title:'Ververs knop', body:'Haalt live marktprijzen op via de Binance public API (geen API-sleutel nodig) en herberekent alle statistieken.' },
+  'mode-label':     { title:'Trading Modus indicator', body:'Toont of je in Paper (simulatie) of Live (echt geld) modus bent. Verander dit bij API Verbindingen → toggle bovenaan. Begin altijd met Paper!' },
+  'status-dot':     { title:'Verbindingsstatus', body:'Groen = live verbinding met Binance API actief, prijzen worden bijgewerkt. Rood = geen verbinding (controleer je internetverbinding).' },
+  'countdown-display': { title:'Volgende AI-scan', body:'Aftelling tot de volgende automatische AI-scan van alle Kraken-paren. De scan duurt 2-10 minuten afhankelijk van het aantal paren en je internetverbinding.' },
+
+  // ── Wat ik leerde ──
+  'chart-weights-radar': { title:'Indicator Gewichten radar', body:'Een spinnenweb-grafiek van de vijf indicator-gewichten. Hoe verder een punt naar buiten, hoe meer het systeem die indicator vertrouwt op basis van eerdere resultaten.' },
+  'learned-insights':    { title:'Geleerde Inzichten', body:'Automatisch gegenereerde conclusies op basis van de evaluatiedata. Verschijnen pas na meerdere evaluatieronden. Het systeem vertelt je welke indicator het sterkst is, welk pair het makkelijkst te voorspellen is, en meer.' },
+  'pair-acc-tbody':      { title:'Nauwkeurigheid per Pair', body:'Voor elk pair: hoeveel voorspellingen er gedaan zijn, hoeveel correct waren, en de trendpijl (↑ = recent beter, ↓ = recent slechter). Gebruik dit om te beslissen op welke pairs je je focust.' },
+};
+
+// Extra tekst voor elementen die in de map ontbreken — fallback per pagina
+const PAGE_HELP = {
+  'page-overview':      { title:'Overzicht Pagina', body:'De startpagina van je TradingBot Dashboard. Toont een samenvatting van je portfolio-performance. Laad CSV-data of gebruik Demo Data om te beginnen.' },
+  'page-trades':        { title:'Trades Pagina', body:'Hier zie je alle individuele trades. Filteren kan op pair-naam, richting (BUY/SELL) en resultaat. De tabel is aflopend gesorteerd op tijd.' },
+  'page-performance':   { title:'Performance Pagina', body:'Gedetailleerde prestatieanalyse met dagelijkse P&L, winst per pair, drawdown-grafiek en statistieken zoals profit factor en maximale verlieshandel.' },
+  'page-pairs':         { title:'Pairs Pagina', body:'Kaartoverzicht per crypto-pair. Hoe groener de waarde, hoe meer winst op dat pair. De balk onderaan toont de win-rate.' },
+  'page-paper':         { title:'Paper Trading Pagina', body:'Simuleer trades met 10.000 virtuele USDT. Gebruik "Live" om een echte prijs op te halen. Stel optioneel stop-loss en take-profit in. Alle gesloten trades verschijnen onderaan.' },
+  'page-activetrading': { title:'Actieve Trading Pagina', body:'Het live handelsscherm. Toont een echte candlestick-grafiek van Kraken, je open posities, de sterkste AI-signalen en het auto-trading systeem.' },
+  'page-strategies':    { title:'Strategieën Pagina', body:'Definieer en beheer trading-strategieën. Koppel ze aan specifieke pairs en activeer ze om signalen te ontvangen. Onderaan vind je de Bibliotheek met bewezen strategieën.' },
+  'page-ai':            { title:'AI Analyse Pagina', body:'Het zelflerende analyse-systeem. Scant alle Kraken-paren met 5 technische indicatoren, slaat voorspellingen op, en leert dagelijks van de resultaten door indicator-gewichten aan te passen.' },
+  'page-learning':      { title:'Wat ik leerde Pagina', body:'Een samenvatting van alles wat het AI-systeem heeft geleerd: welke indicators het beste werken, welke pairs het makkelijkst te voorspellen zijn, en automatisch gegenereerde handelsadviezen.' },
+  'page-social':        { title:'Markt Sentiment Pagina', body:'Crypto-nieuws en Reddit-posts gecombineerd in één feed, met een kritisch betrouwbaarheidsfilter. Berichten onder score 40 worden automatisch verborgen om spam en manipulatie te weren.' },
+  'page-apis':          { title:'API Verbindingen Pagina', body:'Sla exchange-sleutels op en lees welke API-sleutels je nodig hebt voor elk platform. Alles wordt lokaal in je browser opgeslagen — nooit verstuurd.' },
+  'page-import':        { title:'CSV Import Pagina', body:'Upload je eigen trade-data als CSV of gebruik de Demo Data om het dashboard te verkennen. Verwacht formaat: timestamp, pair, side, price, qty, pnl, status.' },
+};
+
+function toggleHelpMode(){
+  helpModeActive = !helpModeActive;
+  document.body.classList.toggle('help-mode', helpModeActive);
+  const btn = document.getElementById('help-btn');
+  btn.classList.toggle('help-active', helpModeActive);
+  const bar = document.getElementById('help-mode-bar');
+  bar.style.display = helpModeActive ? 'flex' : 'none';
+  // Push content down when bar is visible
+  document.querySelector('.main').style.marginTop = helpModeActive ? '36px' : '';
+
+  if(helpModeActive){
+    document.addEventListener('click', handleHelpClick, true);
+    document.addEventListener('keydown', handleHelpKey);
+  } else {
+    document.removeEventListener('click', handleHelpClick, true);
+    document.removeEventListener('keydown', handleHelpKey);
+    closeHelpTooltip();
+  }
+}
+
+function handleHelpKey(e){
+  if(e.key === 'Escape' || e.key === '?') { toggleHelpMode(); }
+}
+
+function handleHelpClick(e){
+  // Don't intercept the tooltip close button or help-btn itself
+  if(e.target.closest('#help-tooltip') || e.target.closest('#help-btn') || e.target.closest('#help-mode-bar')) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  let help = null;
+
+  // 1. Walk up DOM looking for a known ID
+  let el = e.target;
+  while(el && el !== document.body && !help){
+    if(el.id && HELP_MAP[el.id]){ help = HELP_MAP[el.id]; break; }
+    // Check sidebar-item onclick for showPage
+    const oc = el.getAttribute && el.getAttribute('onclick');
+    if(oc){
+      const m = oc.match(/showPage\('(\w+)'\)/);
+      if(m && HELP_MAP['nav-'+m[1]]){ help = HELP_MAP['nav-'+m[1]]; break; }
+    }
+    el = el.parentElement;
+  }
+
+  // 2. Fallback: describe the active page
+  if(!help){
+    const activePage = document.querySelector('.page.active');
+    if(activePage && PAGE_HELP[activePage.id]){ help = PAGE_HELP[activePage.id]; }
+  }
+
+  // 3. Ultimate fallback
+  if(!help) help = { title:'TradingBot Dashboard', body:'Klik op een specifiek knop, kaart, grafiek of tabel voor uitleg. Je kunt ook op een menu-item in de sidebar klikken om te zien wat die pagina doet.' };
+
+  showHelpTooltip(e.clientX, e.clientY, help.title, help.body);
+}
+
+function showHelpTooltip(x, y, title, body){
+  document.getElementById('help-tt-title').textContent = title;
+  document.getElementById('help-tt-body').innerHTML    = body;
+  const tt  = document.getElementById('help-tooltip');
+  tt.style.display = 'block';
+  // Position — keep inside viewport
+  const W = window.innerWidth, H = window.innerHeight;
+  const TW = 350, TH = 220;
+  let left = x + 14, top = y + 14;
+  if(left + TW > W - 10) left = x - TW - 10;
+  if(top  + TH > H - 10) top  = y - TH - 10;
+  tt.style.left = Math.max(8, left) + 'px';
+  tt.style.top  = Math.max(8, top)  + 'px';
+}
+
+function closeHelpTooltip(){
+  document.getElementById('help-tooltip').style.display = 'none';
+}
+
+// ── INIT ──────────────────────────────────────────────────
 renderStratParams();
 renderWeightsDisplay();
 renderPredHistory();
