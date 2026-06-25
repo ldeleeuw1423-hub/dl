@@ -6,6 +6,7 @@
 <title>TradingBot Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -108,7 +109,8 @@ input[type=file] { display:none; }
 
     <div class="sidebar-section">Trading</div>
     <div class="sidebar-item" onclick="showPage('paper')"><i class="fas fa-flask fa-sm"></i> Paper Trading</div>
-    <div class="sidebar-item" onclick="showPage('strategies')"><i class="fas fa-robot fa-sm"></i> Strategieën</div>
+    <div class="sidebar-item" onclick="showPage('activetrading')"><i class="fas fa-bolt fa-sm"></i> Actieve Trading</div>
+    <div class="sidebar-item" onclick="showPage('strategies')"><i class="fas fa-book-open fa-sm"></i> Strategieën</div>
 
     <div class="sidebar-section">AI & Leren</div>
     <div class="sidebar-item" onclick="showPage('ai')"><i class="fas fa-satellite-dish fa-sm"></i> AI Analyse</div>
@@ -345,6 +347,170 @@ input[type=file] { display:none; }
   </div>
   <div id="strategies-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
   <div id="strategies-signals" style="margin-top:20px;"></div>
+
+  <!-- Strategie Bibliotheek -->
+  <div style="margin-top:28px;border-top:1px solid #252540;padding-top:22px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#fff;"><i class="fas fa-book" style="color:#6382ff;"></i> Strategie Bibliotheek</div>
+        <div style="font-size:12px;color:#7878a0;margin-top:3px;">Gedocumenteerde, bewezen trading strategieën uit de literatuur. Klik "Toevoegen" om direct te activeren.</div>
+      </div>
+      <input class="filter-input" id="lib-search" placeholder="Zoeken in bibliotheek..." oninput="renderStrategyLibrary()" style="width:200px;">
+    </div>
+    <div id="library-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: ACTIEVE TRADING
+════════════════════════════════════════════════════════ -->
+<div class="page" id="page-activetrading">
+
+  <!-- Auto-trade status banner (shown when enabled) -->
+  <div id="auto-trade-banner" style="display:none;background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:none;align-items:center;gap:12px;">
+    <div style="width:8px;height:8px;border-radius:50%;background:#00d4aa;box-shadow:0 0 8px #00d4aa;animation:pulse 1.5s infinite;"></div>
+    <div style="font-size:13px;font-weight:600;color:#00d4aa;">Auto Trading ACTIEF</div>
+    <div style="font-size:12px;color:#7878a0;flex:1;" id="at-banner-info">Wacht op volgende AI-scan...</div>
+    <button class="btn btn-ghost" onclick="toggleAutoTradeEnabled(false)" style="font-size:11px;padding:4px 10px;">Stoppen</button>
+  </div>
+  <style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}</style>
+
+  <!-- Live pair prices bar -->
+  <div id="at-prices-bar" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:14px;"></div>
+
+  <!-- Main layout: chart + right panel -->
+  <div style="display:grid;grid-template-columns:1fr 330px;gap:14px;margin-bottom:14px;">
+
+    <!-- Live Chart (lightweight-charts + Kraken data) -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid #252540;flex-wrap:wrap;">
+        <select class="filter-input" id="at-symbol" onchange="loadLiveChart()" style="width:180px;">
+          <option value="XXBTZUSD">BTC/USD</option>
+          <option value="XETHZUSD">ETH/USD</option>
+          <option value="SOLUSD">SOL/USD</option>
+          <option value="XRPUSD">XRP/USD</option>
+          <option value="ADAUSD">ADA/USD</option>
+          <option value="DOGEUSD">DOGE/USD</option>
+          <option value="AVAXUSD">AVAX/USD</option>
+          <option value="DOTUSD">DOT/USD</option>
+          <option value="LINKUSD">LINK/USD</option>
+          <option value="BNBUSD">BNB/USD</option>
+        </select>
+        <select class="filter-input" id="at-interval" onchange="loadLiveChart()" style="width:105px;">
+          <option value="1">1 minuut</option>
+          <option value="5">5 minuten</option>
+          <option value="15" selected>15 minuten</option>
+          <option value="60">1 uur</option>
+          <option value="240">4 uur</option>
+          <option value="1440">1 dag</option>
+        </select>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:6px;">
+          <label style="font-size:11px;color:#7878a0;cursor:pointer;">
+            <input type="checkbox" id="at-show-ema" checked onchange="loadLiveChart()" style="accent-color:#00d4aa;"> EMA
+          </label>
+          <label style="font-size:11px;color:#7878a0;cursor:pointer;">
+            <input type="checkbox" id="at-show-bb" onchange="loadLiveChart()" style="accent-color:#6382ff;"> BB
+          </label>
+        </div>
+        <button class="btn btn-ghost" onclick="loadLiveChart()" style="font-size:11px;padding:4px 10px;margin-left:auto;"><i class="fas fa-sync fa-xs" id="at-chart-spin"></i> Verversen</button>
+        <div id="at-chart-status" style="font-size:11px;color:#7878a0;"></div>
+      </div>
+      <div id="live-chart-container" style="height:400px;background:#131722;"></div>
+      <!-- RSI panel below chart -->
+      <div id="live-rsi-container" style="height:80px;background:#0f0f1a;border-top:1px solid #1e1e38;"></div>
+    </div>
+
+    <!-- Right column -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Auto Trading control -->
+      <div class="card" style="border:1px solid rgba(0,212,170,.2);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-robot" style="color:#00d4aa;"></i> Auto Trading (Paper)</div>
+          <label class="toggle"><input type="checkbox" id="auto-trade-toggle" onchange="toggleAutoTradeEnabled(this.checked)"><div class="toggle-slider"></div></label>
+        </div>
+        <div style="font-size:12px;color:#7878a0;margin-bottom:12px;line-height:1.6;">Het systeem plaatst automatisch paper orders op basis van AI-scores na elke scan.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Koop drempel (score)</label>
+            <input class="form-input" id="at-buy-thresh" type="number" value="60" min="10" max="99" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Verkoop drempel</label>
+            <input class="form-input" id="at-sell-thresh" type="number" value="-50" max="-10" min="-99" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Positie (USDT)</label>
+            <input class="form-input" id="at-pos-size" type="number" value="50" min="15" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Max posities</label>
+            <input class="form-input" id="at-max-pos" type="number" value="5" min="1" max="20" style="padding:6px 10px;">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Stop Loss %</label>
+            <input class="form-input" id="at-sl-pct" type="number" value="3" min="0.5" max="20" step="0.5" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Take Profit %</label>
+            <input class="form-input" id="at-tp-pct" type="number" value="6" min="1" max="50" step="0.5" style="padding:6px 10px;">
+          </div>
+        </div>
+        <div id="at-auto-status" style="font-size:12px;color:#7878a0;margin-bottom:8px;">Status: inactief</div>
+        <button class="btn btn-ghost" onclick="runAiScan()" style="width:100%;justify-content:center;font-size:12px;"><i class="fas fa-satellite-dish fa-xs"></i> AI-scan nu uitvoeren</button>
+      </div>
+
+      <!-- Portfolio snapshot -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-wallet" style="color:#f59e0b;"></i> Portfolio</div>
+          <button class="btn btn-ghost" onclick="refreshActivePrices()" style="font-size:11px;padding:3px 8px;"><i class="fas fa-sync fa-xs" id="at-refresh-icon"></i></button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px;">
+          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
+            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Vrij Saldo</div>
+            <div id="at-free" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
+          </div>
+          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
+            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">U-PnL</div>
+            <div id="at-upnl" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
+          </div>
+          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
+            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Totaal</div>
+            <div id="at-total" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
+          </div>
+          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
+            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Posities</div>
+            <div id="at-poscount" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
+          </div>
+        </div>
+        <div id="at-positions" style="font-size:12px;max-height:180px;overflow-y:auto;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bottom: top signals + auto trade log -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;"><i class="fas fa-arrow-trend-up" style="color:#00d4aa;"></i> Top Koop Signalen (AI)</div>
+      <div id="at-top-buys"><div style="color:#7878a0;font-size:12px;">Run AI-scan om te laden.</div></div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;"><i class="fas fa-arrow-trend-down" style="color:#ff5555;"></i> Top Verkoop Signalen (AI)</div>
+      <div id="at-top-sells"><div style="color:#7878a0;font-size:12px;">Run AI-scan om te laden.</div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-history" style="color:#6382ff;"></i> Auto Trade Log</div>
+        <button class="btn btn-ghost" onclick="clearAutoTradeLog()" style="font-size:10px;padding:2px 7px;"><i class="fas fa-trash fa-xs"></i></button>
+      </div>
+      <div id="at-trade-log" style="font-size:11px;max-height:200px;overflow-y:auto;"><div style="color:#7878a0;">Nog geen auto-trades uitgevoerd.</div></div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -365,6 +531,74 @@ input[type=file] { display:none; }
     </div>
     <label class="toggle"><input type="checkbox" id="global-live-toggle" onchange="toggleGlobalLive(this)"><div class="toggle-slider"></div></label>
     <div style="font-size:13px;font-weight:600;" id="live-toggle-label">PAPER</div>
+  </div>
+
+  <!-- Wat heb je nodig? -->
+  <div class="card" style="margin-bottom:16px;">
+    <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:14px;"><i class="fas fa-key" style="color:#f59e0b;"></i> Wat heb je nodig? — Sleutels & Tokens overzicht</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+
+      <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #f59e0b;">
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;"><i class="fas fa-bolt" style="color:#f59e0b;"></i> Kraken — Live Trading</div>
+        <div style="font-size:12px;color:#7878a0;line-height:1.6;">
+          <div>• Ga naar <strong style="color:#e0e0e0;">kraken.com → Security → API</strong></div>
+          <div>• Maak een API-sleutel met <strong style="color:#e0e0e0;">Order lezen + Plaatsen</strong></div>
+          <div>• Geeft: <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">API Key</code> + <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">Private Key</code></div>
+          <div style="margin-top:6px;color:#00d4aa;">✓ Gratis · AI-scan gebruikt publieke API (geen sleutel nodig)</div>
+        </div>
+      </div>
+
+      <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #f59e0b;">
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;"><i class="fas fa-bolt" style="color:#f59e0b;"></i> Binance — Live Trading</div>
+        <div style="font-size:12px;color:#7878a0;line-height:1.6;">
+          <div>• Ga naar <strong style="color:#e0e0e0;">binance.com → Profiel → API Management</strong></div>
+          <div>• Maak sleutel met <strong style="color:#e0e0e0;">Spot Trading</strong> recht</div>
+          <div>• Geeft: <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">API Key</code> + <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">Secret Key</code></div>
+          <div style="margin-top:6px;color:#00d4aa;">✓ Gratis · Liveprijzen in topbalk = gratis publieke API</div>
+        </div>
+      </div>
+
+      <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #6382ff;">
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;"><i class="fab fa-reddit" style="color:#ff4500;"></i> Reddit — Markt Sentiment</div>
+        <div style="font-size:12px;color:#7878a0;line-height:1.6;">
+          <div>• <strong style="color:#00d4aa;">Geen sleutel nodig</strong> voor publieke posts (huidige implementatie)</div>
+          <div>• Voor hogere rate limits: ga naar <strong style="color:#e0e0e0;">reddit.com/prefs/apps</strong> → maak "script" app</div>
+          <div>• Geeft: <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">client_id</code> + <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">client_secret</code></div>
+          <div style="margin-top:6px;color:#f59e0b;">⚠ Publieke JSON API werkt nu al</div>
+        </div>
+      </div>
+
+      <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #6382ff;">
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;"><i class="fas fa-newspaper" style="color:#6382ff;"></i> CryptoCompare — Crypto Nieuws</div>
+        <div style="font-size:12px;color:#7878a0;line-height:1.6;">
+          <div>• <strong style="color:#00d4aa;">Geen sleutel nodig</strong> voor nieuws feed (huidige implementatie)</div>
+          <div>• Voor hogere limieten: registreer op <strong style="color:#e0e0e0;">cryptocompare.com</strong> → API Keys</div>
+          <div>• Gratis tier: 100k calls/maand</div>
+          <div style="margin-top:6px;color:#00d4aa;">✓ Gratis nieuwsfeed werkt nu al</div>
+        </div>
+      </div>
+
+      <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #7878a0;">
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;"><i class="fab fa-x-twitter" style="color:#e0e0e0;"></i> X / Twitter — (optioneel)</div>
+        <div style="font-size:12px;color:#7878a0;line-height:1.6;">
+          <div>• Vereist <strong style="color:#e0e0e0;">developer.twitter.com</strong> account</div>
+          <div>• Gratis tier: slechts 500k tekens/maand lezen</div>
+          <div>• Geeft: <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">Bearer Token</code></div>
+          <div style="margin-top:6px;color:#ff5555;">✗ X-API werkt niet vanuit browser (CORS blokkade). Vereist een backend proxy.</div>
+        </div>
+      </div>
+
+      <div style="background:#252540;border-radius:8px;padding:14px;border-left:3px solid #7878a0;">
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;"><i class="fas fa-robot" style="color:#7878a0;"></i> Claude AI Chat (optioneel)</div>
+        <div style="font-size:12px;color:#7878a0;line-height:1.6;">
+          <div>• Ga naar <strong style="color:#e0e0e0;">console.anthropic.com → API Keys</strong></div>
+          <div>• Geeft: <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;">ANTHROPIC_API_KEY</code></div>
+          <div>• Kosten: ~$0.003/vraag (Haiku model)</div>
+          <div style="margin-top:6px;color:#f59e0b;">⚠ Heeft ook een backend proxy nodig (CORS)</div>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <div id="apis-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;"></div>
@@ -843,8 +1077,9 @@ function saveApis(a){ localStorage.setItem(APIS_KEY, JSON.stringify(a)); }
 //  NAVIGATION
 // ══════════════════════════════════════════════════════════
 const PAGE_TITLES = { overview:'Overzicht', trades:'Trades', performance:'Performance',
-  pairs:'Pairs', paper:'Paper Trading', strategies:'Strategieën', ai:'AI Analyse (Kraken)',
-  learning:'Wat ik leerde', social:'Markt Sentiment', apis:'API Verbindingen', import:'CSV Import' };
+  pairs:'Pairs', paper:'Paper Trading', activetrading:'Actieve Trading', strategies:'Strategieën',
+  ai:'AI Analyse (Kraken)', learning:'Wat ik leerde', social:'Markt Sentiment',
+  apis:'API Verbindingen', import:'CSV Import' };
 
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -855,15 +1090,16 @@ function showPage(id){
     if(s.getAttribute('onclick')&&s.getAttribute('onclick').includes("'"+id+"'")) s.classList.add('active');
   });
   document.getElementById('page-title').textContent = PAGE_TITLES[id]||id;
-  if(id==='trades')      renderTradesTable();
-  if(id==='performance') renderPerfCharts();
-  if(id==='pairs')       renderPairsPage();
-  if(id==='paper')       renderPaperPage();
-  if(id==='strategies')  renderStrategiesPage();
-  if(id==='ai')          { renderWeightsDisplay(); renderPredHistory(); renderAiKPIs(); renderAccuracyChart(); }
-  if(id==='learning')    renderLearningPage();
-  if(id==='social')      renderSocialPage();
-  if(id==='apis')        renderApisPage();
+  if(id==='trades')        renderTradesTable();
+  if(id==='performance')   renderPerfCharts();
+  if(id==='pairs')         renderPairsPage();
+  if(id==='paper')         renderPaperPage();
+  if(id==='activetrading') renderActiveTradingPage();
+  if(id==='strategies')    { renderStrategiesPage(); renderStrategyLibrary(); }
+  if(id==='ai')            { renderWeightsDisplay(); renderPredHistory(); renderAiKPIs(); renderAccuracyChart(); }
+  if(id==='learning')      renderLearningPage();
+  if(id==='social')        renderSocialPage();
+  if(id==='apis')          renderApisPage();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1829,6 +2065,12 @@ async function _runAiScanCore(){
   document.getElementById('ai-scan-status').textContent=`${aiResults.length} paren geanalyseerd · ${new Date().toLocaleTimeString('nl')}`;
   btn.disabled=false; btn.innerHTML='<i class="fas fa-satellite-dish fa-xs"></i> Scan Kraken';
   renderAiKPIs(); renderWeightsDisplay(); renderPredHistory(); renderAccuracyChart();
+  // Auto-trading: place/close paper orders based on AI results
+  await checkAutoTrades();
+  // Refresh active trading page if visible
+  if(document.getElementById('page-activetrading').classList.contains('active')){
+    renderAtTopSignals(); renderAtPortfolio(); renderAutoTradeLog();
+  }
 }
 
 function renderAiRow(r){
@@ -2568,6 +2810,627 @@ function toggleSocialAuto(el){
 }
 
 // ══════════════════════════════════════════════════════════
+//  ACTIEVE TRADING PAGE
+// ══════════════════════════════════════════════════════════
+const AT_TRACKED = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','AVAXUSDT','DOGEUSDT'];
+
+// Kraken pair → display name
+const KRAKEN_DISPLAY = {
+  'XXBTZUSD':'BTC/USD','XETHZUSD':'ETH/USD','SOLUSD':'SOL/USD','XRPUSD':'XRP/USD',
+  'ADAUSD':'ADA/USD','DOGEUSD':'DOGE/USD','AVAXUSD':'AVAX/USD','DOTUSD':'DOT/USD',
+  'LINKUSD':'LINK/USD','BNBUSD':'BNB/USD'
+};
+
+function renderActiveTradingPage(){
+  renderAtPricesBar();
+  renderAtPortfolio();
+  renderAtTopSignals();
+  renderAutoTradeLog();
+  loadLiveChart();
+  // Sync toggle state
+  const s = loadAutoTradeSettings();
+  document.getElementById('auto-trade-toggle').checked = s.enabled;
+  document.getElementById('at-buy-thresh').value  = s.buyThreshold;
+  document.getElementById('at-sell-thresh').value = s.sellThreshold;
+  document.getElementById('at-pos-size').value    = s.positionSize;
+  document.getElementById('at-max-pos').value     = s.maxPositions;
+  document.getElementById('at-sl-pct').value      = s.slPct;
+  document.getElementById('at-tp-pct').value      = s.tpPct;
+  const banner = document.getElementById('auto-trade-banner');
+  banner.style.display = s.enabled ? 'flex' : 'none';
+}
+
+function renderAtPricesBar(){
+  const bar = document.getElementById('at-prices-bar');
+  const krakenPairs = Object.keys(KRAKEN_DISPLAY);
+  bar.innerHTML = krakenPairs.map(kp=>{
+    const dp = KRAKEN_DISPLAY[kp];
+    const sym = dp.split('/')[0];
+    // Try to find price in livePrices (Binance format)
+    const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+    const pr = livePrices[bPair]||null;
+    return `<div class="kpi" style="border-left-color:#252540;padding:10px 12px;cursor:pointer;" onclick="document.getElementById('at-symbol').value='${kp}';loadLiveChart()">
+      <div class="form-label" style="font-size:10px;">${dp}</div>
+      <div style="font-size:16px;font-weight:700;color:${pr?'#fff':'#3a3a5c'};font-family:monospace;margin-top:3px;">${pr?pr.toLocaleString('nl',{maximumFractionDigits:pr>100?2:6}):'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderAtPortfolio(){
+  const paper = loadPaper();
+  let upnl = 0;
+  paper.positions.forEach(pos=>{
+    const sym = pos.pair.replace('USDT','');
+    const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+    const cur = livePrices[bPair]||livePrices[pos.pair]||pos.entry;
+    upnl += pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
+  });
+  const totalVal = calcPaperTotal(paper);
+
+  document.getElementById('at-free').textContent = paper.balance.toFixed(2);
+  const upnlEl = document.getElementById('at-upnl');
+  upnlEl.textContent = (upnl>=0?'+':'')+upnl.toFixed(2);
+  upnlEl.className = upnl>=0?'pos':'neg';
+  document.getElementById('at-total').textContent = totalVal.toFixed(2);
+  document.getElementById('at-poscount').textContent = paper.positions.length;
+
+  const posDiv = document.getElementById('at-positions');
+  if(!paper.positions.length){
+    posDiv.innerHTML = '<div style="color:#7878a0;text-align:center;padding:10px;font-size:12px;">Geen open posities</div>';
+    return;
+  }
+  posDiv.innerHTML = paper.positions.map((pos,i)=>{
+    const sym = pos.pair.replace('USDT','');
+    const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+    const cur = livePrices[bPair]||livePrices[pos.pair]||pos.entry;
+    const pnl = pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
+    const pc = pnl>=0?'#00d4aa':'#ff5555';
+    const autoTag = pos.autoTrade?'<span style="font-size:9px;background:rgba(99,130,255,.15);color:#6382ff;border-radius:3px;padding:1px 5px;">AUTO</span>':'';
+    return `<div style="display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid #1e1e38;">
+      <div style="font-weight:700;font-size:12px;flex:1;">${pos.pair} ${autoTag}</div>
+      <div style="font-family:monospace;font-size:10px;color:#7878a0;">${pos.entry.toLocaleString('nl',{maximumFractionDigits:4})}</div>
+      <div style="font-size:12px;font-weight:700;color:${pc};">${pnl>=0?'+':''}${pnl.toFixed(2)}</div>
+      <button onclick="openClosePosModal(${i})" style="background:rgba(255,85,85,.1);border:none;color:#ff5555;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function renderAtTopSignals(){
+  const noData = '<div style="color:#7878a0;font-size:12px;">Run AI-scan. <span onclick="showPage(\'ai\')" style="color:#00d4aa;cursor:pointer;">→ AI pagina</span></div>';
+  if(!aiResults.length){
+    document.getElementById('at-top-buys').innerHTML = noData;
+    document.getElementById('at-top-sells').innerHTML = noData;
+    return;
+  }
+  const sorted = [...aiResults].sort((a,b)=>b.score-a.score);
+  const buys  = sorted.filter(r=>r.score>0).slice(0,6);
+  const sells = [...sorted].reverse().filter(r=>r.score<0).slice(0,6);
+  const fmt = r=>{
+    const dp = r.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD').replace('ZEUR','EUR');
+    const krakenKey = Object.keys(KRAKEN_DISPLAY).find(k=>k===r.pair)||null;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1e1e38;">
+      <div style="font-size:12px;font-weight:700;flex:1;">${dp}</div>
+      ${scoreBar(r.score)}
+      ${krakenKey?`<button onclick="document.getElementById('at-symbol').value='${krakenKey}';loadLiveChart()" style="background:rgba(0,212,170,.1);border:none;color:#00d4aa;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;"><i class="fas fa-chart-line fa-xs"></i></button>`:''}
+    </div>`;
+  };
+  document.getElementById('at-top-buys').innerHTML  = buys.length  ? buys.map(fmt).join('')  : noData;
+  document.getElementById('at-top-sells').innerHTML = sells.length ? sells.map(fmt).join('') : noData;
+}
+
+async function refreshActivePrices(){
+  const icon = document.getElementById('at-refresh-icon');
+  icon.classList.add('fa-spin');
+  await updateLivePrices();
+  renderAtPricesBar();
+  renderAtPortfolio();
+  icon.classList.remove('fa-spin');
+}
+
+// ── Live Chart (lightweight-charts + Kraken OHLCV) ──────
+let liveChartObj = null;
+let liveRsiChartObj = null;
+
+async function loadLiveChart(){
+  const pair     = document.getElementById('at-symbol')?.value || 'XXBTZUSD';
+  const interval = parseInt(document.getElementById('at-interval')?.value || '15');
+  const showEma  = document.getElementById('at-show-ema')?.checked;
+  const showBb   = document.getElementById('at-show-bb')?.checked;
+
+  const spin = document.getElementById('at-chart-spin');
+  const stat = document.getElementById('at-chart-status');
+  if(spin) spin.classList.add('fa-spin');
+  if(stat) stat.textContent = 'Laden…';
+
+  // Destroy old charts
+  if(liveChartObj)    { try{ liveChartObj.remove();    }catch(e){} liveChartObj    = null; }
+  if(liveRsiChartObj) { try{ liveRsiChartObj.remove(); }catch(e){} liveRsiChartObj = null; }
+
+  let candles = [];
+  try {
+    candles = await getOHLCV(pair, interval);
+  } catch(e) {
+    if(stat) stat.textContent = 'Fout bij laden: '+pair;
+    if(spin) spin.classList.remove('fa-spin');
+    return;
+  }
+
+  if(candles.length < 5){
+    if(stat) stat.textContent = 'Te weinig data voor '+pair;
+    if(spin) spin.classList.remove('fa-spin');
+    return;
+  }
+
+  const closes = candles.map(c=>c.close);
+
+  // ── Main candlestick chart ──────────────────────────
+  const mainContainer = document.getElementById('live-chart-container');
+  mainContainer.innerHTML = '';
+
+  liveChartObj = LightweightCharts.createChart(mainContainer, {
+    width:  mainContainer.clientWidth,
+    height: 400,
+    layout: { background:{ type:'solid', color:'#131722' }, textColor:'#d1d4dc' },
+    grid:   { vertLines:{ color:'rgba(42,46,57,.4)' }, horzLines:{ color:'rgba(42,46,57,.4)' } },
+    crosshair: { mode:1 },
+    rightPriceScale: { borderColor:'#485c7b' },
+    timeScale: { borderColor:'#485c7b', timeVisible:true, secondsVisible:false },
+  });
+
+  // Candlesticks
+  const candleSeries = liveChartObj.addCandlestickSeries({
+    upColor:'#00d4aa', downColor:'#ff5555',
+    borderUpColor:'#00d4aa', borderDownColor:'#ff5555',
+    wickUpColor:'#00d4aa', wickDownColor:'#ff5555',
+  });
+  candleSeries.setData(candles.map(c=>({ time:c.t, open:c.open, high:c.high, low:c.low, close:c.close })));
+
+  // Volume histogram
+  const volSeries = liveChartObj.addHistogramSeries({
+    priceFormat:{ type:'volume' }, priceScaleId:'vol',
+    scaleMargins:{ top:0.85, bottom:0 },
+  });
+  volSeries.setData(candles.map(c=>({ time:c.t, value:c.vol, color: c.close>=c.open?'rgba(0,212,170,.3)':'rgba(255,85,85,.3)' })));
+  liveChartObj.priceScale('vol').applyOptions({ scaleMargins:{ top:0.85, bottom:0 } });
+
+  // EMA lines
+  if(showEma && closes.length >= 21){
+    const ema9Data  = candles.slice(8).map((c,i)=>({ time:c.t, value:+calcEMA(closes.slice(0,i+9),9).toFixed(6) }));
+    const ema21Data = candles.slice(20).map((c,i)=>({ time:c.t, value:+calcEMA(closes.slice(0,i+21),21).toFixed(6) }));
+    const ema9Line  = liveChartObj.addLineSeries({ color:'#00d4aa', lineWidth:1, priceLineVisible:false });
+    const ema21Line = liveChartObj.addLineSeries({ color:'#f59e0b', lineWidth:1, priceLineVisible:false });
+    ema9Line.setData(ema9Data);
+    ema21Line.setData(ema21Data);
+    if(closes.length >= 50){
+      const ema50Data = candles.slice(49).map((c,i)=>({ time:c.t, value:+calcEMA(closes.slice(0,i+50),50).toFixed(6) }));
+      const ema50Line = liveChartObj.addLineSeries({ color:'#6382ff', lineWidth:1, priceLineVisible:false });
+      ema50Line.setData(ema50Data);
+    }
+  }
+
+  // Bollinger Bands
+  if(showBb && closes.length >= 20){
+    const bbUpper = liveChartObj.addLineSeries({ color:'rgba(99,130,255,.6)', lineWidth:1, priceLineVisible:false, lineStyle:2 });
+    const bbMid   = liveChartObj.addLineSeries({ color:'rgba(99,130,255,.3)', lineWidth:1, priceLineVisible:false });
+    const bbLower = liveChartObj.addLineSeries({ color:'rgba(99,130,255,.6)', lineWidth:1, priceLineVisible:false, lineStyle:2 });
+    const bbData  = candles.slice(19).map((c,i)=>{
+      const sl = closes.slice(i, i+20);
+      const mid = sl.reduce((a,b)=>a+b,0)/20;
+      const std = Math.sqrt(sl.reduce((s,x)=>s+(x-mid)**2,0)/20)*2;
+      return { t:c.t, upper:mid+std, mid, lower:mid-std };
+    });
+    bbUpper.setData(bbData.map(d=>({ time:d.t, value:+d.upper.toFixed(6) })));
+    bbMid.setData(bbData.map(d=>({ time:d.t, value:+d.mid.toFixed(6) })));
+    bbLower.setData(bbData.map(d=>({ time:d.t, value:+d.lower.toFixed(6) })));
+  }
+
+  liveChartObj.timeScale().fitContent();
+
+  // ── RSI panel ─────────────────────────────────────
+  const rsiContainer = document.getElementById('live-rsi-container');
+  rsiContainer.innerHTML = '';
+  liveRsiChartObj = LightweightCharts.createChart(rsiContainer, {
+    width: rsiContainer.clientWidth,
+    height: 80,
+    layout: { background:{ type:'solid', color:'#0f0f1a' }, textColor:'#7878a0' },
+    grid:   { vertLines:{ color:'rgba(42,46,57,.2)' }, horzLines:{ color:'rgba(42,46,57,.2)' } },
+    rightPriceScale: { borderColor:'#485c7b', scaleMargins:{ top:0.1, bottom:0.1 } },
+    timeScale: { visible:false },
+    crosshair: { mode:0 },
+  });
+  const rsiSeries = liveRsiChartObj.addLineSeries({ color:'#6382ff', lineWidth:1, priceLineVisible:false });
+  const ob70 = liveRsiChartObj.addLineSeries({ color:'rgba(255,85,85,.4)', lineWidth:1, priceLineVisible:false, lineStyle:2 });
+  const os30 = liveRsiChartObj.addLineSeries({ color:'rgba(0,212,170,.4)', lineWidth:1, priceLineVisible:false, lineStyle:2 });
+  if(closes.length > 15){
+    const rsiData = candles.slice(14).map((c,i)=>({ time:c.t, value:+calcRSI(closes.slice(0,i+15)).toFixed(2) }));
+    rsiSeries.setData(rsiData);
+    ob70.setData(rsiData.map(d=>({ time:d.time, value:70 })));
+    os30.setData(rsiData.map(d=>({ time:d.time, value:30 })));
+  }
+
+  // Sync crosshair time scales
+  liveRsiChartObj.timeScale().setVisibleRange(liveChartObj.timeScale().getVisibleRange()||{ from:0, to:Date.now()/1000 });
+
+  const dp = KRAKEN_DISPLAY[pair]||pair;
+  if(stat) stat.textContent = `${dp} · ${candles.length} kaarsen · ${new Date().toLocaleTimeString('nl')}`;
+  if(spin) spin.classList.remove('fa-spin');
+
+  // Auto-resize
+  const resizer = new ResizeObserver(()=>{
+    if(liveChartObj) liveChartObj.applyOptions({ width: mainContainer.clientWidth });
+    if(liveRsiChartObj) liveRsiChartObj.applyOptions({ width: rsiContainer.clientWidth });
+  });
+  resizer.observe(mainContainer);
+}
+
+// ══════════════════════════════════════════════════════════
+//  AUTO TRADING ENGINE
+// ══════════════════════════════════════════════════════════
+const AUTO_TRADE_KEY     = 'tb_auto_trade_settings';
+const AUTO_TRADE_LOG_KEY = 'tb_auto_trade_log';
+
+function loadAutoTradeSettings(){
+  return Object.assign(
+    { enabled:false, buyThreshold:60, sellThreshold:-50, positionSize:50, maxPositions:5, slPct:3, tpPct:6 },
+    JSON.parse(localStorage.getItem(AUTO_TRADE_KEY)||'{}')
+  );
+}
+function saveAutoTradeSettings(s){ localStorage.setItem(AUTO_TRADE_KEY, JSON.stringify(s)); }
+function loadAutoTradeLog(){ return JSON.parse(localStorage.getItem(AUTO_TRADE_LOG_KEY)||'[]'); }
+function saveAutoTradeLog(l){ localStorage.setItem(AUTO_TRADE_LOG_KEY, JSON.stringify(l.slice(-150))); }
+
+function toggleAutoTradeEnabled(enabled){
+  const s = loadAutoTradeSettings();
+  s.enabled         = enabled;
+  s.buyThreshold    = parseFloat(document.getElementById('at-buy-thresh')?.value)  || 60;
+  s.sellThreshold   = parseFloat(document.getElementById('at-sell-thresh')?.value) || -50;
+  s.positionSize    = parseFloat(document.getElementById('at-pos-size')?.value)    || 50;
+  s.maxPositions    = parseInt(document.getElementById('at-max-pos')?.value)        || 5;
+  s.slPct           = parseFloat(document.getElementById('at-sl-pct')?.value)      || 3;
+  s.tpPct           = parseFloat(document.getElementById('at-tp-pct')?.value)      || 6;
+  saveAutoTradeSettings(s);
+
+  const toggle = document.getElementById('auto-trade-toggle');
+  if(toggle) toggle.checked = enabled;
+  const banner = document.getElementById('auto-trade-banner');
+  if(banner) banner.style.display = enabled?'flex':'none';
+  const stat = document.getElementById('at-auto-status');
+  if(stat) stat.textContent = enabled?'Status: ACTIEF — traden op volgende AI-scan':'Status: inactief';
+}
+
+// Called automatically at end of every AI scan
+async function checkAutoTrades(){
+  const s = loadAutoTradeSettings();
+  if(!s.enabled || !aiResults.length) return;
+
+  const paper = loadPaper();
+  const log   = loadAutoTradeLog();
+  let changed = false;
+
+  for(const res of aiResults){
+    // Convert Kraken pair → Binance USDT format for paper trading
+    const displayPair = res.pair
+      .replace('XXBT','BTC').replace('XETH','ETH')
+      .replace('ZUSD','USDT').replace('ZEUR','USDT')
+      .replace('USD','USDT').replace('USDTUSDT','USDT'); // dedupe
+
+    const price      = res.price;
+    const hasPos     = paper.positions.findIndex(p=>p.pair===displayPair);
+    const openCount  = paper.positions.length;
+
+    // ── BUY signal ──────────────────────────────────
+    if(res.score >= s.buyThreshold && hasPos === -1 && openCount < s.maxPositions){
+      const qty  = s.positionSize / price;
+      const cost = price * qty;
+      if(paper.balance >= cost){
+        paper.balance -= cost;
+        paper.positions.push({
+          pair:      displayPair,
+          side:      'BUY',
+          entry:     price,
+          qty:       qty,
+          sl:        price * (1 - s.slPct/100),
+          tp:        price * (1 + s.tpPct/100),
+          ts:        new Date().toISOString().replace('T',' ').slice(0,19),
+          autoTrade: true
+        });
+        log.push({
+          ts:     new Date().toISOString(),
+          pair:   displayPair,
+          action: 'AUTO BUY',
+          price:  price,
+          qty:    +qty.toFixed(6),
+          score:  res.score,
+          reason: `Score +${res.score} (${res.signal}) · SL ${s.slPct}% TP ${s.tpPct}%`
+        });
+        changed = true;
+      }
+    }
+
+    // ── SELL signal (close existing position) ───────
+    if(res.score <= s.sellThreshold && hasPos !== -1){
+      const pos  = paper.positions[hasPos];
+      const pnl  = (price - pos.entry) * pos.qty;
+      paper.balance += pos.entry * pos.qty + pnl;
+      paper.realizedPnl = (paper.realizedPnl||0) + pnl;
+      paper.closedTrades.push({
+        pair:  displayPair, side: pos.side,
+        entry: pos.entry,   exit: price,
+        qty:   pos.qty,     pnl:  +pnl.toFixed(4),
+        ts:    new Date().toISOString().replace('T',' ').slice(0,19),
+        autoTrade: true
+      });
+      paper.positions.splice(hasPos, 1);
+      log.push({
+        ts:     new Date().toISOString(),
+        pair:   displayPair,
+        action: 'AUTO SELL',
+        price:  price,
+        qty:    +pos.qty.toFixed(6),
+        score:  res.score,
+        reason: `Score ${res.score} (${res.signal}) · PnL ${pnl>=0?'+':''}${pnl.toFixed(4)}`
+      });
+      changed = true;
+    }
+  }
+
+  if(changed){
+    savePaper(paper);
+    saveAutoTradeLog(log);
+    renderKPIs();
+    // Update banner
+    const info = document.getElementById('at-banner-info');
+    if(info) info.textContent = `Laatste actie: ${log[log.length-1]?.action} ${log[log.length-1]?.pair} @ ${log[log.length-1]?.price?.toLocaleString()}`;
+    // Refresh active page
+    if(document.getElementById('page-activetrading').classList.contains('active')){
+      renderAtPortfolio();
+      renderAutoTradeLog();
+    }
+  }
+
+  const stat = document.getElementById('at-auto-status');
+  if(stat) stat.textContent = `Status: ACTIEF · ${aiResults.length} pairs gescand · ${log.length} trades uitgevoerd`;
+}
+
+function renderAutoTradeLog(){
+  const log = loadAutoTradeLog().slice().reverse().slice(0,30);
+  const div = document.getElementById('at-trade-log');
+  if(!div) return;
+  if(!log.length){
+    div.innerHTML = '<div style="color:#7878a0;">Nog geen auto-trades uitgevoerd.</div>';
+    return;
+  }
+  div.innerHTML = log.map(e=>{
+    const isBuy = e.action.includes('BUY');
+    const color = isBuy?'#00d4aa':'#ff5555';
+    return `<div style="padding:5px 0;border-bottom:1px solid #1e1e38;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-weight:700;color:${color};font-size:11px;">${e.action}</span>
+        <span style="font-weight:700;font-size:11px;">${e.pair}</span>
+        <span style="color:#7878a0;font-size:10px;margin-left:auto;">${e.ts.slice(5,16)}</span>
+      </div>
+      <div style="font-size:10px;color:#7878a0;margin-top:2px;">${e.reason}</div>
+    </div>`;
+  }).join('');
+}
+
+function clearAutoTradeLog(){
+  saveAutoTradeLog([]);
+  renderAutoTradeLog();
+}
+
+// ══════════════════════════════════════════════════════════
+//  STRATEGIE BIBLIOTHEEK (bewezen internet-strategieën)
+// ══════════════════════════════════════════════════════════
+const STRATEGY_LIBRARY = [
+  {
+    name: 'Golden Cross',
+    type: 'ma',
+    tf: '1d',
+    pairs: 'BTCUSDT, ETHUSDT',
+    maxpos: 100,
+    params: { fast:50, slow:200 },
+    source: 'Dow Theory / Technische Analyse klassieker',
+    desc: 'EMA 50 kruist boven EMA 200 → koop. Onder → verkoop. Werkt best op dagelijkse timeframes in trending markten. Eén van de meest gebruikte indicators door professionele traders.',
+    signals: ['▲ Buy: EMA50 kruist boven EMA200', '▼ Sell: EMA50 kruist onder EMA200'],
+    reliability: 'Hoog bij trends, slecht bij zijwaartse markt',
+    color: '#00d4aa'
+  },
+  {
+    name: 'RSI Oversold/Overbought',
+    type: 'rsi',
+    tf: '4h',
+    pairs: 'BTCUSDT, ETHUSDT, SOLUSDT',
+    maxpos: 50,
+    params: { period:14, oversold:30, overbought:70 },
+    source: 'J. Welles Wilder Jr. — New Concepts in Technical Trading Systems (1978)',
+    desc: 'Koop wanneer RSI(14) onder 30 (oversold), verkoop boven 70 (overbought). Klassieke mean-reversion strategie. Meest gebruikte oscillator ter wereld.',
+    signals: ['▲ Buy: RSI < 30', '▼ Sell: RSI > 70'],
+    reliability: 'Goed in zijwaartse markt, vals signaal bij sterke trend',
+    color: '#6382ff'
+  },
+  {
+    name: 'MACD Signal Cross',
+    type: 'macd',
+    tf: '1h',
+    pairs: 'BTCUSDT, ETHUSDT',
+    maxpos: 75,
+    params: { fast:12, slow:26, signal:9 },
+    source: 'Gerald Appel — Technical Analysis: Power Tools for Active Investors (1979)',
+    desc: 'Koop wanneer de MACD-lijn de signaallijn van onder kruist (bullish cross). Verkoop bij bearish cross. Standaard 12/26/9 parameters. Trend-volgend systeem.',
+    signals: ['▲ Buy: MACD-lijn kruist boven signaallijn', '▼ Sell: MACD-lijn kruist onder signaallijn'],
+    reliability: 'Goed voor trend-volgen, vertraagd signaal bij keerpunten',
+    color: '#f59e0b'
+  },
+  {
+    name: 'Bollinger Band Squeeze',
+    type: 'bb',
+    tf: '4h',
+    pairs: 'BTCUSDT, ETHUSDT, SOLUSDT',
+    maxpos: 60,
+    params: { period:20, std:2 },
+    source: 'John Bollinger — Bollinger on Bollinger Bands (2001)',
+    desc: 'Wanneer de bands heel smal worden (squeeze) volgt vaak een grote beweging. Koop bij uitbraak boven upper band met verhoogd volume. Verkoop bij doorbraak onder lower band.',
+    signals: ['▲ Buy: Squeeze + uitbraak boven upper BB', '▼ Sell: Squeeze + uitbraak onder lower BB'],
+    reliability: 'Krachtige signalen na squeeze, richting moeilijk te voorspellen',
+    color: '#00d4aa'
+  },
+  {
+    name: 'Three EMA System',
+    type: 'ma',
+    tf: '1h',
+    pairs: 'BTCUSDT, ETHUSDT, XRPUSDT',
+    maxpos: 75,
+    params: { fast:9, slow:21 },
+    notes: 'Extra filter: EMA50 als trendbevestiging. Bullish = EMA9 > EMA21 > EMA50',
+    source: 'Perry Kaufman — Trading Systems and Methods (1998)',
+    desc: 'Bullish wanneer EMA9 > EMA21 > EMA50 én prijs boven alle drie. Verkoopsignaal wanneer EMA9 onder EMA21 duikt. Combineert kortetermijn momentum met langetermijn trend.',
+    signals: ['▲ Buy: EMA9 > EMA21 > EMA50 + prijs erboven', '▼ Sell: EMA9 < EMA21'],
+    reliability: 'Sterk in trending markten, geeft iets late signalen',
+    color: '#6382ff'
+  },
+  {
+    name: 'RSI Divergentie',
+    type: 'rsi',
+    tf: '4h',
+    pairs: 'BTCUSDT, ETHUSDT',
+    maxpos: 50,
+    params: { period:14, oversold:35, overbought:65 },
+    notes: 'Bullish divergentie: prijs lagere bodem, RSI hogere bodem. Bearish: prijs hogere top, RSI lagere top.',
+    source: 'Constance Brown — Technical Analysis for the Trading Professional (1999)',
+    desc: 'Bullish divergentie: prijs maakt lagere bodem maar RSI maakt hogere bodem → sterke keerpunt-indicator. Bearish omgekeerd. Krachtig reversal signaal, vooral op 4H en Daily.',
+    signals: ['▲ Buy: Bullish RSI-divergentie (prijs ↓, RSI ↑)', '▼ Sell: Bearish RSI-divergentie (prijs ↑, RSI ↓)'],
+    reliability: 'Hoge nauwkeurigheid bij reversal, niet automatiseerbaar zonder custom code',
+    color: '#f59e0b'
+  },
+  {
+    name: 'Stochastic RSI',
+    type: 'rsi',
+    tf: '15m',
+    pairs: 'ETHUSDT, SOLUSDT, BNBUSDT',
+    maxpos: 30,
+    params: { period:14, oversold:20, overbought:80 },
+    notes: 'StochRSI = RSI van RSI. Sneller maar meer ruis. Gebruik als bevestiging, niet als enige indicator.',
+    source: 'Tushar Chande & Stanley Kroll — The New Technical Trader (1994)',
+    desc: 'RSI van de RSI — reageert sneller op koersveranderingen. Koop wanneer StochRSI uit oversold (<20) omhoog kruist. Verkoop wanneer uit overbought (>80) omlaag kruist. Ideaal voor scalping.',
+    signals: ['▲ Buy: StochRSI < 20, kruist omhoog', '▼ Sell: StochRSI > 80, kruist omlaag'],
+    reliability: 'Snel maar veel valse signalen — gebruik altijd met trend-filter',
+    color: '#ff5555'
+  },
+  {
+    name: 'MACD + RSI Bevestiging',
+    type: 'macd',
+    tf: '4h',
+    pairs: 'BTCUSDT, ETHUSDT',
+    maxpos: 100,
+    params: { fast:12, slow:26, signal:9 },
+    notes: 'Bevestig MACD bullish cross met RSI tussen 45-55. Hogere kwaliteit signalen, minder frequent.',
+    source: 'Meerdere bronnen — gecombineerde strategie',
+    desc: 'Koop alleen wanneer MACD een bullish cross maakt EN RSI op dat moment tussen 45-55 staat (niet overbought). Dubbele bevestiging filtert slechte signalen er grotendeels uit.',
+    signals: ['▲ Buy: MACD bullish cross + RSI 45-55', '▼ Sell: MACD bearish cross of RSI > 70'],
+    reliability: 'Minder signalen maar significant hogere precisie',
+    color: '#00d4aa'
+  },
+  {
+    name: 'Bollinger + EMA Trend Bounce',
+    type: 'bb',
+    tf: '1d',
+    pairs: 'BTCUSDT, ETHUSDT, SOLUSDT',
+    maxpos: 150,
+    params: { period:20, std:2 },
+    notes: 'Alleen kopen wanneer prijs boven EMA200 staat (uptrend bevestigd).',
+    source: 'Olivier Seban — Tous les secrets de l\'investissement',
+    desc: 'Koop wanneer de prijs de lower Bollinger Band aanraakt EN de prijs boven EMA200 staat (uptrend). Werkt als "pull-back kopen in bull-trend". Bij downtrend (< EMA200) negeer je het koopsignaal.',
+    signals: ['▲ Buy: Prijs raakt lower BB in uptrend (boven EMA200)', '▼ Sell: Prijs raakt upper BB of breekt onder EMA200'],
+    reliability: 'Werkt sterk in bull-markten, gevaarlijk bij downtrend',
+    color: '#6382ff'
+  },
+  {
+    name: 'Volume Surge Breakout',
+    type: 'bb',
+    tf: '1h',
+    pairs: 'BTCUSDT, SOLUSDT, AVAXUSDT',
+    maxpos: 75,
+    params: { period:20, std:2.5 },
+    notes: 'Volume moet ≥2× het 20-perioden gemiddelde zijn bij de uitbraak.',
+    source: 'Jack Schwager — Market Wizards (1989)',
+    desc: 'Wanneer het volume ≥2× normaal is én de prijs een Bollinger Band uitbraak maakt, is de kans op een grote beweging hoog. Bevestig met dalend volume bij pullback.',
+    signals: ['▲ Buy: Volume spike (≥2×) + BB upper doorbraak', '▼ Sell: Volume droogt op + koers zakt terug'],
+    reliability: 'Krachtige follow-through kans, maar vals bij gemanipuleerde pump',
+    color: '#f59e0b'
+  },
+  {
+    name: 'Scalping EMA 5/13',
+    type: 'ma',
+    tf: '5m',
+    pairs: 'BTCUSDT, ETHUSDT',
+    maxpos: 25,
+    params: { fast:5, slow:13 },
+    notes: 'Alleen traden in richting van EMA50 op 15m chart. Stop-loss 0.5%.',
+    source: 'BabyPips.com — Scalping strategies',
+    desc: 'Snelle scalping op 5m chart: EMA5 kruist EMA13. Gebruik EMA50 als trendfilter — trade alleen in dezelfde richting. Vereist strakke stop-loss (0.5%) vanwege hoge frequentie.',
+    signals: ['▲ Buy: EMA5 kruist boven EMA13 (in opwaartse trend)', '▼ Sell: EMA5 kruist onder EMA13 (in neerwaartse trend)'],
+    reliability: 'Hoge frequentie, transactiekosten eten winst op — alleen voor lage-fee exchanges',
+    color: '#ff5555'
+  }
+];
+
+function renderStrategyLibrary(){
+  const q = (document.getElementById('lib-search')?.value||'').toLowerCase();
+  const grid = document.getElementById('library-grid');
+  if(!grid) return;
+  const items = STRATEGY_LIBRARY.filter(s=>
+    !q || s.name.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q) || s.type.includes(q)
+  );
+  grid.innerHTML = items.map((s,i)=>`
+    <div class="card" style="border-left:3px solid ${s.color};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:8px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#fff;">${s.name}</div>
+          <div style="font-size:11px;color:#7878a0;margin-top:2px;">${s.type.toUpperCase()} · ${s.tf} · ${s.pairs.split(',').length} pairs</div>
+        </div>
+        <button class="btn btn-primary" onclick="addStrategyFromLibrary(${i})" style="font-size:11px;padding:5px 12px;white-space:nowrap;"><i class="fas fa-plus fa-xs"></i> Toevoegen</button>
+      </div>
+      <div style="font-size:12px;color:#7878a0;line-height:1.6;margin-bottom:10px;">${s.desc}</div>
+      <div style="background:#252540;border-radius:6px;padding:8px 10px;margin-bottom:8px;">
+        ${s.signals.map(sig=>`<div style="font-size:11px;color:#e0e0e0;margin-bottom:2px;">${sig}</div>`).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+        <div style="font-size:11px;color:#7878a0;"><i class="fas fa-graduation-cap fa-xs"></i> ${s.source}</div>
+        <div style="font-size:10px;background:rgba(0,0,0,.3);border-radius:4px;padding:3px 8px;color:#7878a0;">${s.reliability}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addStrategyFromLibrary(libIdx){
+  const s = STRATEGY_LIBRARY[libIdx];
+  const strats = loadStrategies();
+  if(strats.find(x=>x.name===s.name)){
+    alert(`"${s.name}" staat al in jouw strategieën.`);
+    return;
+  }
+  strats.push({
+    name: s.name,
+    type: s.type,
+    params: s.params,
+    pairs: s.pairs.split(',').map(p=>p.trim()),
+    tf: s.tf,
+    maxpos: s.maxpos,
+    notes: (s.notes||'') + '\nBron: ' + s.source,
+    active: false,
+    created: new Date().toISOString(),
+    fromLibrary: true
+  });
+  saveStrategies(strats);
+  renderStrategiesPage();
+  renderStrategyLibrary();
+  renderKPIs();
+  // Scroll to top of strategies grid
+  document.getElementById('strategies-grid').scrollIntoView({behavior:'smooth'});
+}
+
+// ══════════════════════════════════════════════════════════
 //  MODAL UTILS
 // ══════════════════════════════════════════════════════════
 function closeModal(id){ document.getElementById(id).style.display='none'; }
@@ -2589,6 +3452,7 @@ renderWeightsDisplay();
 renderPredHistory();
 renderAiKPIs();
 renderAccuracyChart();
+renderStrategyLibrary();
 loadDemoData();
 updateLivePrices();
 setInterval(updateLivePrices, 15000);
