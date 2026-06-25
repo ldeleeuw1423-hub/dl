@@ -6,6 +6,7 @@
 <title>TradingBot Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -365,94 +366,148 @@ input[type=file] { display:none; }
 ════════════════════════════════════════════════════════ -->
 <div class="page" id="page-activetrading">
 
+  <!-- Auto-trade status banner (shown when enabled) -->
+  <div id="auto-trade-banner" style="display:none;background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:none;align-items:center;gap:12px;">
+    <div style="width:8px;height:8px;border-radius:50%;background:#00d4aa;box-shadow:0 0 8px #00d4aa;animation:pulse 1.5s infinite;"></div>
+    <div style="font-size:13px;font-weight:600;color:#00d4aa;">Auto Trading ACTIEF</div>
+    <div style="font-size:12px;color:#7878a0;flex:1;" id="at-banner-info">Wacht op volgende AI-scan...</div>
+    <button class="btn btn-ghost" onclick="toggleAutoTradeEnabled(false)" style="font-size:11px;padding:4px 10px;">Stoppen</button>
+  </div>
+  <style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}</style>
+
   <!-- Live pair prices bar -->
-  <div id="at-prices-bar" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px;"></div>
+  <div id="at-prices-bar" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:14px;"></div>
 
-  <!-- Chart + Portfolio in 2-col grid -->
-  <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;margin-bottom:14px;">
+  <!-- Main layout: chart + right panel -->
+  <div style="display:grid;grid-template-columns:1fr 330px;gap:14px;margin-bottom:14px;">
 
-    <!-- TradingView Chart -->
+    <!-- Live Chart (lightweight-charts + Kraken data) -->
     <div class="card" style="padding:0;overflow:hidden;">
-      <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #252540;flex-wrap:wrap;">
-        <i class="fas fa-chart-candlestick" style="color:#00d4aa;font-size:13px;"></i>
-        <select class="filter-input" id="at-symbol" onchange="updateTradingViewChart()" style="width:170px;">
-          <option value="BINANCE:BTCUSDT">BTC/USDT (Binance)</option>
-          <option value="BINANCE:ETHUSDT">ETH/USDT (Binance)</option>
-          <option value="BINANCE:SOLUSDT">SOL/USDT (Binance)</option>
-          <option value="BINANCE:BNBUSDT">BNB/USDT (Binance)</option>
-          <option value="BINANCE:XRPUSDT">XRP/USDT (Binance)</option>
-          <option value="BINANCE:ADAUSDT">ADA/USDT (Binance)</option>
-          <option value="BINANCE:AVAXUSDT">AVAX/USDT (Binance)</option>
-          <option value="BINANCE:DOGEUSDT">DOGE/USDT (Binance)</option>
-          <option value="KRAKEN:XBTUSD">BTC/USD (Kraken)</option>
-          <option value="KRAKEN:ETHUSD">ETH/USD (Kraken)</option>
-          <option value="KRAKEN:SOLUSD">SOL/USD (Kraken)</option>
+      <div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid #252540;flex-wrap:wrap;">
+        <select class="filter-input" id="at-symbol" onchange="loadLiveChart()" style="width:180px;">
+          <option value="XXBTZUSD">BTC/USD</option>
+          <option value="XETHZUSD">ETH/USD</option>
+          <option value="SOLUSD">SOL/USD</option>
+          <option value="XRPUSD">XRP/USD</option>
+          <option value="ADAUSD">ADA/USD</option>
+          <option value="DOGEUSD">DOGE/USD</option>
+          <option value="AVAXUSD">AVAX/USD</option>
+          <option value="DOTUSD">DOT/USD</option>
+          <option value="LINKUSD">LINK/USD</option>
+          <option value="BNBUSD">BNB/USD</option>
         </select>
-        <select class="filter-input" id="at-interval" onchange="updateTradingViewChart()" style="width:110px;">
+        <select class="filter-input" id="at-interval" onchange="loadLiveChart()" style="width:105px;">
           <option value="1">1 minuut</option>
           <option value="5">5 minuten</option>
           <option value="15" selected>15 minuten</option>
           <option value="60">1 uur</option>
           <option value="240">4 uur</option>
-          <option value="D">1 dag</option>
+          <option value="1440">1 dag</option>
         </select>
-        <div style="font-size:11px;color:#7878a0;margin-left:auto;">Powered by TradingView</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:6px;">
+          <label style="font-size:11px;color:#7878a0;cursor:pointer;">
+            <input type="checkbox" id="at-show-ema" checked onchange="loadLiveChart()" style="accent-color:#00d4aa;"> EMA
+          </label>
+          <label style="font-size:11px;color:#7878a0;cursor:pointer;">
+            <input type="checkbox" id="at-show-bb" onchange="loadLiveChart()" style="accent-color:#6382ff;"> BB
+          </label>
+        </div>
+        <button class="btn btn-ghost" onclick="loadLiveChart()" style="font-size:11px;padding:4px 10px;margin-left:auto;"><i class="fas fa-sync fa-xs" id="at-chart-spin"></i> Verversen</button>
+        <div id="at-chart-status" style="font-size:11px;color:#7878a0;"></div>
       </div>
-      <div id="tradingview-chart-container" style="height:420px;background:#131722;"></div>
+      <div id="live-chart-container" style="height:400px;background:#131722;"></div>
+      <!-- RSI panel below chart -->
+      <div id="live-rsi-container" style="height:80px;background:#0f0f1a;border-top:1px solid #1e1e38;"></div>
     </div>
 
-    <!-- Right column: portfolio + signals -->
+    <!-- Right column -->
     <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Auto Trading control -->
+      <div class="card" style="border:1px solid rgba(0,212,170,.2);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-robot" style="color:#00d4aa;"></i> Auto Trading (Paper)</div>
+          <label class="toggle"><input type="checkbox" id="auto-trade-toggle" onchange="toggleAutoTradeEnabled(this.checked)"><div class="toggle-slider"></div></label>
+        </div>
+        <div style="font-size:12px;color:#7878a0;margin-bottom:12px;line-height:1.6;">Het systeem plaatst automatisch paper orders op basis van AI-scores na elke scan.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Koop drempel (score)</label>
+            <input class="form-input" id="at-buy-thresh" type="number" value="60" min="10" max="99" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Verkoop drempel</label>
+            <input class="form-input" id="at-sell-thresh" type="number" value="-50" max="-10" min="-99" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Positie (USDT)</label>
+            <input class="form-input" id="at-pos-size" type="number" value="50" min="15" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Max posities</label>
+            <input class="form-input" id="at-max-pos" type="number" value="5" min="1" max="20" style="padding:6px 10px;">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Stop Loss %</label>
+            <input class="form-input" id="at-sl-pct" type="number" value="3" min="0.5" max="20" step="0.5" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Take Profit %</label>
+            <input class="form-input" id="at-tp-pct" type="number" value="6" min="1" max="50" step="0.5" style="padding:6px 10px;">
+          </div>
+        </div>
+        <div id="at-auto-status" style="font-size:12px;color:#7878a0;margin-bottom:8px;">Status: inactief</div>
+        <button class="btn btn-ghost" onclick="runAiScan()" style="width:100%;justify-content:center;font-size:12px;"><i class="fas fa-satellite-dish fa-xs"></i> AI-scan nu uitvoeren</button>
+      </div>
 
       <!-- Portfolio snapshot -->
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-wallet" style="color:#00d4aa;"></i> Paper Portfolio</div>
-          <button class="btn btn-ghost" onclick="refreshActivePrices()" style="font-size:11px;padding:4px 10px;"><i class="fas fa-sync fa-xs" id="at-refresh-icon"></i> Ververs</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-wallet" style="color:#f59e0b;"></i> Portfolio</div>
+          <button class="btn btn-ghost" onclick="refreshActivePrices()" style="font-size:11px;padding:3px 8px;"><i class="fas fa-sync fa-xs" id="at-refresh-icon"></i></button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-          <div style="background:#252540;border-radius:7px;padding:10px;text-align:center;">
-            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.8px;">Vrij Saldo</div>
-            <div id="at-free" style="font-size:17px;font-weight:700;margin-top:3px;" class="neu">—</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px;">
+          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
+            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Vrij Saldo</div>
+            <div id="at-free" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
           </div>
-          <div style="background:#252540;border-radius:7px;padding:10px;text-align:center;">
-            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.8px;">Ongerealiseerde P&L</div>
-            <div id="at-upnl" style="font-size:17px;font-weight:700;margin-top:3px;" class="neu">—</div>
+          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
+            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">U-PnL</div>
+            <div id="at-upnl" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
           </div>
-          <div style="background:#252540;border-radius:7px;padding:10px;text-align:center;">
-            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.8px;">Totaal waarde</div>
-            <div id="at-total" style="font-size:17px;font-weight:700;margin-top:3px;" class="neu">—</div>
+          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
+            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Totaal</div>
+            <div id="at-total" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
           </div>
-          <div style="background:#252540;border-radius:7px;padding:10px;text-align:center;">
-            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.8px;">Open posities</div>
-            <div id="at-poscount" style="font-size:17px;font-weight:700;margin-top:3px;" class="neu">—</div>
+          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
+            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Posities</div>
+            <div id="at-poscount" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
           </div>
         </div>
-        <div id="at-positions" style="font-size:12px;max-height:200px;overflow-y:auto;"></div>
-      </div>
-
-      <!-- Active strategy signals -->
-      <div class="card">
-        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;"><i class="fas fa-robot" style="color:#6382ff;"></i> Strategie Signalen</div>
-        <div id="at-signals" style="font-size:12px;"></div>
+        <div id="at-positions" style="font-size:12px;max-height:180px;overflow-y:auto;"></div>
       </div>
 
     </div>
   </div>
 
-  <!-- Top AI signals -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+  <!-- Bottom: top signals + auto trade log -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
     <div class="card">
-      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:12px;"><i class="fas fa-arrow-trend-up" style="color:#00d4aa;"></i> Sterkste Koop Signalen (AI)</div>
-      <div id="at-top-buys">
-        <div style="color:#7878a0;font-size:12px;padding:12px 0;">Run een AI-scan om signalen te laden.</div>
-      </div>
+      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;"><i class="fas fa-arrow-trend-up" style="color:#00d4aa;"></i> Top Koop Signalen (AI)</div>
+      <div id="at-top-buys"><div style="color:#7878a0;font-size:12px;">Run AI-scan om te laden.</div></div>
     </div>
     <div class="card">
-      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:12px;"><i class="fas fa-arrow-trend-down" style="color:#ff5555;"></i> Sterkste Verkoop Signalen (AI)</div>
-      <div id="at-top-sells">
-        <div style="color:#7878a0;font-size:12px;padding:12px 0;">Run een AI-scan om signalen te laden.</div>
+      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;"><i class="fas fa-arrow-trend-down" style="color:#ff5555;"></i> Top Verkoop Signalen (AI)</div>
+      <div id="at-top-sells"><div style="color:#7878a0;font-size:12px;">Run AI-scan om te laden.</div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-history" style="color:#6382ff;"></i> Auto Trade Log</div>
+        <button class="btn btn-ghost" onclick="clearAutoTradeLog()" style="font-size:10px;padding:2px 7px;"><i class="fas fa-trash fa-xs"></i></button>
       </div>
+      <div id="at-trade-log" style="font-size:11px;max-height:200px;overflow-y:auto;"><div style="color:#7878a0;">Nog geen auto-trades uitgevoerd.</div></div>
     </div>
   </div>
 
@@ -2010,6 +2065,12 @@ async function _runAiScanCore(){
   document.getElementById('ai-scan-status').textContent=`${aiResults.length} paren geanalyseerd · ${new Date().toLocaleTimeString('nl')}`;
   btn.disabled=false; btn.innerHTML='<i class="fas fa-satellite-dish fa-xs"></i> Scan Kraken';
   renderAiKPIs(); renderWeightsDisplay(); renderPredHistory(); renderAccuracyChart();
+  // Auto-trading: place/close paper orders based on AI results
+  await checkAutoTrades();
+  // Refresh active trading page if visible
+  if(document.getElementById('page-activetrading').classList.contains('active')){
+    renderAtTopSignals(); renderAtPortfolio(); renderAutoTradeLog();
+  }
 }
 
 function renderAiRow(r){
@@ -2751,31 +2812,46 @@ function toggleSocialAuto(el){
 // ══════════════════════════════════════════════════════════
 //  ACTIEVE TRADING PAGE
 // ══════════════════════════════════════════════════════════
-let tvWidgetLoaded = false;
-let tvCurrentSymbol = 'BINANCE:BTCUSDT';
-let tvCurrentInterval = '15';
-
 const AT_TRACKED = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','AVAXUSDT','DOGEUSDT'];
+
+// Kraken pair → display name
+const KRAKEN_DISPLAY = {
+  'XXBTZUSD':'BTC/USD','XETHZUSD':'ETH/USD','SOLUSD':'SOL/USD','XRPUSD':'XRP/USD',
+  'ADAUSD':'ADA/USD','DOGEUSD':'DOGE/USD','AVAXUSD':'AVAX/USD','DOTUSD':'DOT/USD',
+  'LINKUSD':'LINK/USD','BNBUSD':'BNB/USD'
+};
 
 function renderActiveTradingPage(){
   renderAtPricesBar();
   renderAtPortfolio();
-  renderAtSignals();
   renderAtTopSignals();
-  loadTradingViewChart(
-    document.getElementById('at-symbol').value,
-    document.getElementById('at-interval').value
-  );
+  renderAutoTradeLog();
+  loadLiveChart();
+  // Sync toggle state
+  const s = loadAutoTradeSettings();
+  document.getElementById('auto-trade-toggle').checked = s.enabled;
+  document.getElementById('at-buy-thresh').value  = s.buyThreshold;
+  document.getElementById('at-sell-thresh').value = s.sellThreshold;
+  document.getElementById('at-pos-size').value    = s.positionSize;
+  document.getElementById('at-max-pos').value     = s.maxPositions;
+  document.getElementById('at-sl-pct').value      = s.slPct;
+  document.getElementById('at-tp-pct').value      = s.tpPct;
+  const banner = document.getElementById('auto-trade-banner');
+  banner.style.display = s.enabled ? 'flex' : 'none';
 }
 
 function renderAtPricesBar(){
   const bar = document.getElementById('at-prices-bar');
-  bar.innerHTML = AT_TRACKED.map(pair=>{
-    const pr = livePrices[pair];
-    const sym = pair.replace('USDT','');
-    return `<div class="kpi" style="border-left-color:#252540;padding:12px 14px;cursor:pointer;" onclick="document.getElementById('at-symbol').value='BINANCE:${pair}';updateTradingViewChart()">
-      <div class="form-label">${sym}/USDT</div>
-      <div style="font-size:18px;font-weight:700;color:${pr?'#fff':'#3a3a5c'};font-family:monospace;margin-top:4px;">${pr?pr.toLocaleString('nl',{maximumFractionDigits:4}):'—'}</div>
+  const krakenPairs = Object.keys(KRAKEN_DISPLAY);
+  bar.innerHTML = krakenPairs.map(kp=>{
+    const dp = KRAKEN_DISPLAY[kp];
+    const sym = dp.split('/')[0];
+    // Try to find price in livePrices (Binance format)
+    const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+    const pr = livePrices[bPair]||null;
+    return `<div class="kpi" style="border-left-color:#252540;padding:10px 12px;cursor:pointer;" onclick="document.getElementById('at-symbol').value='${kp}';loadLiveChart()">
+      <div class="form-label" style="font-size:10px;">${dp}</div>
+      <div style="font-size:16px;font-weight:700;color:${pr?'#fff':'#3a3a5c'};font-family:monospace;margin-top:3px;">${pr?pr.toLocaleString('nl',{maximumFractionDigits:pr>100?2:6}):'—'}</div>
     </div>`;
   }).join('');
 }
@@ -2784,79 +2860,62 @@ function renderAtPortfolio(){
   const paper = loadPaper();
   let upnl = 0;
   paper.positions.forEach(pos=>{
-    const cur = livePrices[pos.pair]||pos.entry;
+    const sym = pos.pair.replace('USDT','');
+    const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+    const cur = livePrices[bPair]||livePrices[pos.pair]||pos.entry;
     upnl += pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
   });
   const totalVal = calcPaperTotal(paper);
-  const c = upnl>=0?'pos':'neg';
 
-  document.getElementById('at-free').textContent = paper.balance.toFixed(2)+' USDT';
+  document.getElementById('at-free').textContent = paper.balance.toFixed(2);
   const upnlEl = document.getElementById('at-upnl');
-  upnlEl.textContent = (upnl>=0?'+':'')+upnl.toFixed(4)+' USDT';
-  upnlEl.className = c;
-  document.getElementById('at-total').textContent = totalVal.toFixed(2)+' USDT';
+  upnlEl.textContent = (upnl>=0?'+':'')+upnl.toFixed(2);
+  upnlEl.className = upnl>=0?'pos':'neg';
+  document.getElementById('at-total').textContent = totalVal.toFixed(2);
   document.getElementById('at-poscount').textContent = paper.positions.length;
 
   const posDiv = document.getElementById('at-positions');
   if(!paper.positions.length){
-    posDiv.innerHTML = '<div style="color:#7878a0;text-align:center;padding:12px;">Geen open posities</div>';
+    posDiv.innerHTML = '<div style="color:#7878a0;text-align:center;padding:10px;font-size:12px;">Geen open posities</div>';
     return;
   }
   posDiv.innerHTML = paper.positions.map((pos,i)=>{
-    const cur = livePrices[pos.pair]||pos.entry;
+    const sym = pos.pair.replace('USDT','');
+    const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+    const cur = livePrices[bPair]||livePrices[pos.pair]||pos.entry;
     const pnl = pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
     const pc = pnl>=0?'#00d4aa':'#ff5555';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #252540;">
-      <div style="font-weight:700;font-size:12px;flex:1;">${pos.pair}</div>
-      ${sideBadge(pos.side)}
-      <div style="font-family:monospace;font-size:11px;color:#7878a0;">${pos.entry.toLocaleString()}</div>
-      <div style="font-size:12px;font-weight:700;color:${pc};">${pnl>=0?'+':''}${pnl.toFixed(3)}</div>
-      <button onclick="openClosePosModal(${i});showPage('paper')" style="background:rgba(255,85,85,.1);border:none;color:#ff5555;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">✕</button>
+    const autoTag = pos.autoTrade?'<span style="font-size:9px;background:rgba(99,130,255,.15);color:#6382ff;border-radius:3px;padding:1px 5px;">AUTO</span>':'';
+    return `<div style="display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid #1e1e38;">
+      <div style="font-weight:700;font-size:12px;flex:1;">${pos.pair} ${autoTag}</div>
+      <div style="font-family:monospace;font-size:10px;color:#7878a0;">${pos.entry.toLocaleString('nl',{maximumFractionDigits:4})}</div>
+      <div style="font-size:12px;font-weight:700;color:${pc};">${pnl>=0?'+':''}${pnl.toFixed(2)}</div>
+      <button onclick="openClosePosModal(${i})" style="background:rgba(255,85,85,.1);border:none;color:#ff5555;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;">✕</button>
     </div>`;
   }).join('');
 }
 
-function renderAtSignals(){
-  const strats = loadStrategies().filter(s=>s.active);
-  const div = document.getElementById('at-signals');
-  if(!strats.length){
-    div.innerHTML = '<div style="color:#7878a0;">Activeer een strategie om signalen te zien. <span onclick="showPage(\'strategies\')" style="color:#00d4aa;cursor:pointer;">→ Naar Strategieën</span></div>';
-    return;
-  }
-  const rows = [];
-  strats.forEach(s=>{
-    (s.pairs||[]).forEach(pair=>{
-      const price = livePrices[pair]||null;
-      const sig = price&&s.type==='rsi'?(price%100<(s.params.oversold||30)?'BUY':price%100>(s.params.overbought||70)?'SELL':'HOLD'):'HOLD';
-      rows.push(`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #252540;">
-        <div style="font-size:11px;color:#7878a0;flex:1;">${s.name}</div>
-        <div style="font-size:11px;font-weight:700;">${pair}</div>
-        ${sig==='BUY'?'<span class="badge badge-buy">BUY</span>':sig==='SELL'?'<span class="badge badge-sell">SELL</span>':'<span class="badge badge-open">HOLD</span>'}
-      </div>`);
-    });
-  });
-  div.innerHTML = rows.join('') || '<div style="color:#7878a0;font-size:12px;">Geen pairs geconfigureerd.</div>';
-}
-
 function renderAtTopSignals(){
+  const noData = '<div style="color:#7878a0;font-size:12px;">Run AI-scan. <span onclick="showPage(\'ai\')" style="color:#00d4aa;cursor:pointer;">→ AI pagina</span></div>';
   if(!aiResults.length){
-    document.getElementById('at-top-buys').innerHTML = '<div style="color:#7878a0;font-size:12px;padding:8px 0;">Geen AI-resultaten. <span onclick="showPage(\'ai\')" style="color:#00d4aa;cursor:pointer;">→ Run AI Scan</span></div>';
-    document.getElementById('at-top-sells').innerHTML = document.getElementById('at-top-buys').innerHTML;
+    document.getElementById('at-top-buys').innerHTML = noData;
+    document.getElementById('at-top-sells').innerHTML = noData;
     return;
   }
   const sorted = [...aiResults].sort((a,b)=>b.score-a.score);
-  const buys = sorted.filter(r=>r.score>0).slice(0,5);
-  const sells = sorted.filter(r=>r.score<0).reverse().slice(0,5);
+  const buys  = sorted.filter(r=>r.score>0).slice(0,6);
+  const sells = [...sorted].reverse().filter(r=>r.score<0).slice(0,6);
   const fmt = r=>{
     const dp = r.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD').replace('ZEUR','EUR');
-    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #252540;">
+    const krakenKey = Object.keys(KRAKEN_DISPLAY).find(k=>k===r.pair)||null;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1e1e38;">
       <div style="font-size:12px;font-weight:700;flex:1;">${dp}</div>
       ${scoreBar(r.score)}
-      <button onclick="document.getElementById('at-symbol').value='BINANCE:${r.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USDT').replace('ZEUR','USDT')}';updateTradingViewChart()" style="background:rgba(0,212,170,.1);border:none;color:#00d4aa;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;"><i class="fas fa-chart-line fa-xs"></i></button>
+      ${krakenKey?`<button onclick="document.getElementById('at-symbol').value='${krakenKey}';loadLiveChart()" style="background:rgba(0,212,170,.1);border:none;color:#00d4aa;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;"><i class="fas fa-chart-line fa-xs"></i></button>`:''}
     </div>`;
   };
-  document.getElementById('at-top-buys').innerHTML  = buys.length  ? buys.map(fmt).join('')  : '<div style="color:#7878a0;font-size:12px;">Geen buy signalen gevonden.</div>';
-  document.getElementById('at-top-sells').innerHTML = sells.length ? sells.map(fmt).join('') : '<div style="color:#7878a0;font-size:12px;">Geen sell signalen gevonden.</div>';
+  document.getElementById('at-top-buys').innerHTML  = buys.length  ? buys.map(fmt).join('')  : noData;
+  document.getElementById('at-top-sells').innerHTML = sells.length ? sells.map(fmt).join('') : noData;
 }
 
 async function refreshActivePrices(){
@@ -2868,59 +2927,296 @@ async function refreshActivePrices(){
   icon.classList.remove('fa-spin');
 }
 
-// ── TradingView Widget ──────────────────────────────────
-function loadTradingViewChart(symbol, interval){
-  tvCurrentSymbol = symbol || 'BINANCE:BTCUSDT';
-  tvCurrentInterval = interval || '15';
-  const container = document.getElementById('tradingview-chart-container');
-  container.innerHTML = '';
+// ── Live Chart (lightweight-charts + Kraken OHLCV) ──────
+let liveChartObj = null;
+let liveRsiChartObj = null;
 
-  if(typeof TradingView !== 'undefined'){
-    createTVWidget();
-  } else if(!tvWidgetLoaded){
-    tvWidgetLoaded = true;
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/tv.js';
-    script.onload = createTVWidget;
-    script.onerror = ()=>{
-      container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:12px;color:#7878a0;">
-        <i class="fas fa-chart-candlestick" style="font-size:32px;color:#252540;"></i>
-        <div style="font-size:13px;">TradingView kon niet laden.</div>
-        <a href="https://www.tradingview.com/chart/?symbol=${tvCurrentSymbol}" target="_blank" style="color:#00d4aa;font-size:13px;">Open op TradingView ↗</a>
-      </div>`;
-    };
-    document.head.appendChild(script);
-  } else {
-    // Script is still loading
-    setTimeout(()=>{ if(typeof TradingView!=='undefined') createTVWidget(); }, 1500);
+async function loadLiveChart(){
+  const pair     = document.getElementById('at-symbol')?.value || 'XXBTZUSD';
+  const interval = parseInt(document.getElementById('at-interval')?.value || '15');
+  const showEma  = document.getElementById('at-show-ema')?.checked;
+  const showBb   = document.getElementById('at-show-bb')?.checked;
+
+  const spin = document.getElementById('at-chart-spin');
+  const stat = document.getElementById('at-chart-status');
+  if(spin) spin.classList.add('fa-spin');
+  if(stat) stat.textContent = 'Laden…';
+
+  // Destroy old charts
+  if(liveChartObj)    { try{ liveChartObj.remove();    }catch(e){} liveChartObj    = null; }
+  if(liveRsiChartObj) { try{ liveRsiChartObj.remove(); }catch(e){} liveRsiChartObj = null; }
+
+  let candles = [];
+  try {
+    candles = await getOHLCV(pair, interval);
+  } catch(e) {
+    if(stat) stat.textContent = 'Fout bij laden: '+pair;
+    if(spin) spin.classList.remove('fa-spin');
+    return;
   }
-}
 
-function createTVWidget(){
-  const container = document.getElementById('tradingview-chart-container');
-  if(!container) return;
-  container.innerHTML = '';
-  new TradingView.widget({
-    autosize: true,
-    symbol: tvCurrentSymbol,
-    interval: tvCurrentInterval,
-    timezone: 'Europe/Amsterdam',
-    theme: 'dark',
-    style: '1',
-    locale: 'nl_NL',
-    toolbar_bg: '#13132a',
-    enable_publishing: false,
-    hide_side_toolbar: false,
-    allow_symbol_change: true,
-    studies: ['RSI@tv-basicstudies','MACD@tv-basicstudies','BB@tv-basicstudies'],
-    container_id: 'tradingview-chart-container'
+  if(candles.length < 5){
+    if(stat) stat.textContent = 'Te weinig data voor '+pair;
+    if(spin) spin.classList.remove('fa-spin');
+    return;
+  }
+
+  const closes = candles.map(c=>c.close);
+
+  // ── Main candlestick chart ──────────────────────────
+  const mainContainer = document.getElementById('live-chart-container');
+  mainContainer.innerHTML = '';
+
+  liveChartObj = LightweightCharts.createChart(mainContainer, {
+    width:  mainContainer.clientWidth,
+    height: 400,
+    layout: { background:{ type:'solid', color:'#131722' }, textColor:'#d1d4dc' },
+    grid:   { vertLines:{ color:'rgba(42,46,57,.4)' }, horzLines:{ color:'rgba(42,46,57,.4)' } },
+    crosshair: { mode:1 },
+    rightPriceScale: { borderColor:'#485c7b' },
+    timeScale: { borderColor:'#485c7b', timeVisible:true, secondsVisible:false },
   });
+
+  // Candlesticks
+  const candleSeries = liveChartObj.addCandlestickSeries({
+    upColor:'#00d4aa', downColor:'#ff5555',
+    borderUpColor:'#00d4aa', borderDownColor:'#ff5555',
+    wickUpColor:'#00d4aa', wickDownColor:'#ff5555',
+  });
+  candleSeries.setData(candles.map(c=>({ time:c.t, open:c.open, high:c.high, low:c.low, close:c.close })));
+
+  // Volume histogram
+  const volSeries = liveChartObj.addHistogramSeries({
+    priceFormat:{ type:'volume' }, priceScaleId:'vol',
+    scaleMargins:{ top:0.85, bottom:0 },
+  });
+  volSeries.setData(candles.map(c=>({ time:c.t, value:c.vol, color: c.close>=c.open?'rgba(0,212,170,.3)':'rgba(255,85,85,.3)' })));
+  liveChartObj.priceScale('vol').applyOptions({ scaleMargins:{ top:0.85, bottom:0 } });
+
+  // EMA lines
+  if(showEma && closes.length >= 21){
+    const ema9Data  = candles.slice(8).map((c,i)=>({ time:c.t, value:+calcEMA(closes.slice(0,i+9),9).toFixed(6) }));
+    const ema21Data = candles.slice(20).map((c,i)=>({ time:c.t, value:+calcEMA(closes.slice(0,i+21),21).toFixed(6) }));
+    const ema9Line  = liveChartObj.addLineSeries({ color:'#00d4aa', lineWidth:1, priceLineVisible:false });
+    const ema21Line = liveChartObj.addLineSeries({ color:'#f59e0b', lineWidth:1, priceLineVisible:false });
+    ema9Line.setData(ema9Data);
+    ema21Line.setData(ema21Data);
+    if(closes.length >= 50){
+      const ema50Data = candles.slice(49).map((c,i)=>({ time:c.t, value:+calcEMA(closes.slice(0,i+50),50).toFixed(6) }));
+      const ema50Line = liveChartObj.addLineSeries({ color:'#6382ff', lineWidth:1, priceLineVisible:false });
+      ema50Line.setData(ema50Data);
+    }
+  }
+
+  // Bollinger Bands
+  if(showBb && closes.length >= 20){
+    const bbUpper = liveChartObj.addLineSeries({ color:'rgba(99,130,255,.6)', lineWidth:1, priceLineVisible:false, lineStyle:2 });
+    const bbMid   = liveChartObj.addLineSeries({ color:'rgba(99,130,255,.3)', lineWidth:1, priceLineVisible:false });
+    const bbLower = liveChartObj.addLineSeries({ color:'rgba(99,130,255,.6)', lineWidth:1, priceLineVisible:false, lineStyle:2 });
+    const bbData  = candles.slice(19).map((c,i)=>{
+      const sl = closes.slice(i, i+20);
+      const mid = sl.reduce((a,b)=>a+b,0)/20;
+      const std = Math.sqrt(sl.reduce((s,x)=>s+(x-mid)**2,0)/20)*2;
+      return { t:c.t, upper:mid+std, mid, lower:mid-std };
+    });
+    bbUpper.setData(bbData.map(d=>({ time:d.t, value:+d.upper.toFixed(6) })));
+    bbMid.setData(bbData.map(d=>({ time:d.t, value:+d.mid.toFixed(6) })));
+    bbLower.setData(bbData.map(d=>({ time:d.t, value:+d.lower.toFixed(6) })));
+  }
+
+  liveChartObj.timeScale().fitContent();
+
+  // ── RSI panel ─────────────────────────────────────
+  const rsiContainer = document.getElementById('live-rsi-container');
+  rsiContainer.innerHTML = '';
+  liveRsiChartObj = LightweightCharts.createChart(rsiContainer, {
+    width: rsiContainer.clientWidth,
+    height: 80,
+    layout: { background:{ type:'solid', color:'#0f0f1a' }, textColor:'#7878a0' },
+    grid:   { vertLines:{ color:'rgba(42,46,57,.2)' }, horzLines:{ color:'rgba(42,46,57,.2)' } },
+    rightPriceScale: { borderColor:'#485c7b', scaleMargins:{ top:0.1, bottom:0.1 } },
+    timeScale: { visible:false },
+    crosshair: { mode:0 },
+  });
+  const rsiSeries = liveRsiChartObj.addLineSeries({ color:'#6382ff', lineWidth:1, priceLineVisible:false });
+  const ob70 = liveRsiChartObj.addLineSeries({ color:'rgba(255,85,85,.4)', lineWidth:1, priceLineVisible:false, lineStyle:2 });
+  const os30 = liveRsiChartObj.addLineSeries({ color:'rgba(0,212,170,.4)', lineWidth:1, priceLineVisible:false, lineStyle:2 });
+  if(closes.length > 15){
+    const rsiData = candles.slice(14).map((c,i)=>({ time:c.t, value:+calcRSI(closes.slice(0,i+15)).toFixed(2) }));
+    rsiSeries.setData(rsiData);
+    ob70.setData(rsiData.map(d=>({ time:d.time, value:70 })));
+    os30.setData(rsiData.map(d=>({ time:d.time, value:30 })));
+  }
+
+  // Sync crosshair time scales
+  liveRsiChartObj.timeScale().setVisibleRange(liveChartObj.timeScale().getVisibleRange()||{ from:0, to:Date.now()/1000 });
+
+  const dp = KRAKEN_DISPLAY[pair]||pair;
+  if(stat) stat.textContent = `${dp} · ${candles.length} kaarsen · ${new Date().toLocaleTimeString('nl')}`;
+  if(spin) spin.classList.remove('fa-spin');
+
+  // Auto-resize
+  const resizer = new ResizeObserver(()=>{
+    if(liveChartObj) liveChartObj.applyOptions({ width: mainContainer.clientWidth });
+    if(liveRsiChartObj) liveRsiChartObj.applyOptions({ width: rsiContainer.clientWidth });
+  });
+  resizer.observe(mainContainer);
 }
 
-function updateTradingViewChart(){
-  const sym = document.getElementById('at-symbol').value;
-  const ivl = document.getElementById('at-interval').value;
-  loadTradingViewChart(sym, ivl);
+// ══════════════════════════════════════════════════════════
+//  AUTO TRADING ENGINE
+// ══════════════════════════════════════════════════════════
+const AUTO_TRADE_KEY     = 'tb_auto_trade_settings';
+const AUTO_TRADE_LOG_KEY = 'tb_auto_trade_log';
+
+function loadAutoTradeSettings(){
+  return Object.assign(
+    { enabled:false, buyThreshold:60, sellThreshold:-50, positionSize:50, maxPositions:5, slPct:3, tpPct:6 },
+    JSON.parse(localStorage.getItem(AUTO_TRADE_KEY)||'{}')
+  );
+}
+function saveAutoTradeSettings(s){ localStorage.setItem(AUTO_TRADE_KEY, JSON.stringify(s)); }
+function loadAutoTradeLog(){ return JSON.parse(localStorage.getItem(AUTO_TRADE_LOG_KEY)||'[]'); }
+function saveAutoTradeLog(l){ localStorage.setItem(AUTO_TRADE_LOG_KEY, JSON.stringify(l.slice(-150))); }
+
+function toggleAutoTradeEnabled(enabled){
+  const s = loadAutoTradeSettings();
+  s.enabled         = enabled;
+  s.buyThreshold    = parseFloat(document.getElementById('at-buy-thresh')?.value)  || 60;
+  s.sellThreshold   = parseFloat(document.getElementById('at-sell-thresh')?.value) || -50;
+  s.positionSize    = parseFloat(document.getElementById('at-pos-size')?.value)    || 50;
+  s.maxPositions    = parseInt(document.getElementById('at-max-pos')?.value)        || 5;
+  s.slPct           = parseFloat(document.getElementById('at-sl-pct')?.value)      || 3;
+  s.tpPct           = parseFloat(document.getElementById('at-tp-pct')?.value)      || 6;
+  saveAutoTradeSettings(s);
+
+  const toggle = document.getElementById('auto-trade-toggle');
+  if(toggle) toggle.checked = enabled;
+  const banner = document.getElementById('auto-trade-banner');
+  if(banner) banner.style.display = enabled?'flex':'none';
+  const stat = document.getElementById('at-auto-status');
+  if(stat) stat.textContent = enabled?'Status: ACTIEF — traden op volgende AI-scan':'Status: inactief';
+}
+
+// Called automatically at end of every AI scan
+async function checkAutoTrades(){
+  const s = loadAutoTradeSettings();
+  if(!s.enabled || !aiResults.length) return;
+
+  const paper = loadPaper();
+  const log   = loadAutoTradeLog();
+  let changed = false;
+
+  for(const res of aiResults){
+    // Convert Kraken pair → Binance USDT format for paper trading
+    const displayPair = res.pair
+      .replace('XXBT','BTC').replace('XETH','ETH')
+      .replace('ZUSD','USDT').replace('ZEUR','USDT')
+      .replace('USD','USDT').replace('USDTUSDT','USDT'); // dedupe
+
+    const price      = res.price;
+    const hasPos     = paper.positions.findIndex(p=>p.pair===displayPair);
+    const openCount  = paper.positions.length;
+
+    // ── BUY signal ──────────────────────────────────
+    if(res.score >= s.buyThreshold && hasPos === -1 && openCount < s.maxPositions){
+      const qty  = s.positionSize / price;
+      const cost = price * qty;
+      if(paper.balance >= cost){
+        paper.balance -= cost;
+        paper.positions.push({
+          pair:      displayPair,
+          side:      'BUY',
+          entry:     price,
+          qty:       qty,
+          sl:        price * (1 - s.slPct/100),
+          tp:        price * (1 + s.tpPct/100),
+          ts:        new Date().toISOString().replace('T',' ').slice(0,19),
+          autoTrade: true
+        });
+        log.push({
+          ts:     new Date().toISOString(),
+          pair:   displayPair,
+          action: 'AUTO BUY',
+          price:  price,
+          qty:    +qty.toFixed(6),
+          score:  res.score,
+          reason: `Score +${res.score} (${res.signal}) · SL ${s.slPct}% TP ${s.tpPct}%`
+        });
+        changed = true;
+      }
+    }
+
+    // ── SELL signal (close existing position) ───────
+    if(res.score <= s.sellThreshold && hasPos !== -1){
+      const pos  = paper.positions[hasPos];
+      const pnl  = (price - pos.entry) * pos.qty;
+      paper.balance += pos.entry * pos.qty + pnl;
+      paper.realizedPnl = (paper.realizedPnl||0) + pnl;
+      paper.closedTrades.push({
+        pair:  displayPair, side: pos.side,
+        entry: pos.entry,   exit: price,
+        qty:   pos.qty,     pnl:  +pnl.toFixed(4),
+        ts:    new Date().toISOString().replace('T',' ').slice(0,19),
+        autoTrade: true
+      });
+      paper.positions.splice(hasPos, 1);
+      log.push({
+        ts:     new Date().toISOString(),
+        pair:   displayPair,
+        action: 'AUTO SELL',
+        price:  price,
+        qty:    +pos.qty.toFixed(6),
+        score:  res.score,
+        reason: `Score ${res.score} (${res.signal}) · PnL ${pnl>=0?'+':''}${pnl.toFixed(4)}`
+      });
+      changed = true;
+    }
+  }
+
+  if(changed){
+    savePaper(paper);
+    saveAutoTradeLog(log);
+    renderKPIs();
+    // Update banner
+    const info = document.getElementById('at-banner-info');
+    if(info) info.textContent = `Laatste actie: ${log[log.length-1]?.action} ${log[log.length-1]?.pair} @ ${log[log.length-1]?.price?.toLocaleString()}`;
+    // Refresh active page
+    if(document.getElementById('page-activetrading').classList.contains('active')){
+      renderAtPortfolio();
+      renderAutoTradeLog();
+    }
+  }
+
+  const stat = document.getElementById('at-auto-status');
+  if(stat) stat.textContent = `Status: ACTIEF · ${aiResults.length} pairs gescand · ${log.length} trades uitgevoerd`;
+}
+
+function renderAutoTradeLog(){
+  const log = loadAutoTradeLog().slice().reverse().slice(0,30);
+  const div = document.getElementById('at-trade-log');
+  if(!div) return;
+  if(!log.length){
+    div.innerHTML = '<div style="color:#7878a0;">Nog geen auto-trades uitgevoerd.</div>';
+    return;
+  }
+  div.innerHTML = log.map(e=>{
+    const isBuy = e.action.includes('BUY');
+    const color = isBuy?'#00d4aa':'#ff5555';
+    return `<div style="padding:5px 0;border-bottom:1px solid #1e1e38;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-weight:700;color:${color};font-size:11px;">${e.action}</span>
+        <span style="font-weight:700;font-size:11px;">${e.pair}</span>
+        <span style="color:#7878a0;font-size:10px;margin-left:auto;">${e.ts.slice(5,16)}</span>
+      </div>
+      <div style="font-size:10px;color:#7878a0;margin-top:2px;">${e.reason}</div>
+    </div>`;
+  }).join('');
+}
+
+function clearAutoTradeLog(){
+  saveAutoTradeLog([]);
+  renderAutoTradeLog();
 }
 
 // ══════════════════════════════════════════════════════════
