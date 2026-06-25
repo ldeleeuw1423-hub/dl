@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SlaapCoach AI – Jouw kind slaapt beter</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { background: #0f0a1e; color: #e8e0ff; min-height: 100vh; overflow-x: hidden; }
+
+  /* Screens */
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* Gradient backgrounds */
+  .bg-night { background: linear-gradient(160deg, #0f0a1e 0%, #1a0f3a 50%, #0f1a2e 100%); }
+  .bg-coach { background: linear-gradient(160deg, #0a1628 0%, #1a0d35 60%, #0f1825 100%); }
+
+  /* Cards */
+  .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; backdrop-filter: blur(10px); }
+  .card-glow { background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); border-radius: 20px; }
+
+  /* Buttons */
+  .btn-primary {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    border-radius: 16px; padding: 18px 32px;
+    font-weight: 700; font-size: 18px; color: white;
+    border: none; cursor: pointer; width: 100%;
+    transition: all 0.2s; box-shadow: 0 8px 32px rgba(124,58,237,0.4);
+  }
+  .btn-primary:active { transform: scale(0.97); box-shadow: 0 4px 16px rgba(124,58,237,0.3); }
+
+  .btn-secondary {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px; padding: 14px 24px;
+    font-weight: 600; font-size: 15px; color: #c4b5fd;
+    cursor: pointer; width: 100%; transition: all 0.2s;
+  }
+  .btn-secondary:active { background: rgba(255,255,255,0.14); }
+
+  .btn-icon {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 12px 20px;
+    font-weight: 600; font-size: 14px; color: #a78bfa;
+    cursor: pointer; transition: all 0.2s;
+  }
+
+  /* Start button pulse */
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 8px 40px rgba(124,58,237,0.5), 0 0 0 0 rgba(124,58,237,0.3); }
+    50% { box-shadow: 0 8px 40px rgba(124,58,237,0.7), 0 0 0 16px rgba(124,58,237,0); }
+  }
+  .btn-start {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    border-radius: 24px; padding: 24px 40px;
+    font-weight: 800; font-size: 22px; color: white;
+    border: none; cursor: pointer; width: 100%;
+    animation: pulse-glow 2.5s ease-in-out infinite;
+    transition: transform 0.2s;
+  }
+  .btn-start:active { transform: scale(0.96); animation: none; }
+
+  /* Moon animation */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+  .moon { animation: float 4s ease-in-out infinite; }
+
+  /* Stars */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+  .star { position: absolute; border-radius: 50%; background: white; animation: twinkle 2s ease-in-out infinite; }
+
+  /* Progress bar */
+  .progress-bar { background: rgba(255,255,255,0.1); border-radius: 8px; height: 6px; }
+  .progress-fill { background: linear-gradient(90deg, #7c3aed, #4f46e5); border-radius: 8px; height: 6px; transition: width 0.5s ease; }
+
+  /* Chat bubbles */
+  .bubble-ai {
+    background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.25);
+    border-radius: 20px 20px 20px 4px; padding: 16px 20px;
+    max-width: 88%; align-self: flex-start;
+  }
+  .bubble-user {
+    background: rgba(79,70,229,0.2); border: 1px solid rgba(79,70,229,0.3);
+    border-radius: 20px 20px 4px 20px; padding: 16px 20px;
+    max-width: 80%; align-self: flex-end;
+  }
+
+  /* Routine step */
+  .step-item {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 14px 18px;
+    transition: all 0.3s;
+  }
+  .step-item.done {
+    background: rgba(139,92,246,0.12); border-color: rgba(139,92,246,0.3);
+  }
+  .step-item.active-step {
+    background: rgba(139,92,246,0.2); border-color: rgba(139,92,246,0.5);
+    box-shadow: 0 0 20px rgba(139,92,246,0.2);
+  }
+
+  /* Check circle */
+  .check-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0; transition: all 0.3s;
+  }
+  .check-circle.done { background: #7c3aed; border-color: #7c3aed; }
+
+  /* Intake options */
+  .intake-option {
+    background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 14px; padding: 14px 18px;
+    cursor: pointer; transition: all 0.2s; text-align: center;
+  }
+  .intake-option.selected {
+    background: rgba(124,58,237,0.2); border-color: #7c3aed;
+    color: #c4b5fd;
+  }
+  .intake-option:hover { border-color: rgba(124,58,237,0.4); }
+
+  /* Notification */
+  .notif {
+    background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3);
+    border-radius: 14px; padding: 14px 18px;
+  }
+
+  /* Typing indicator */
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+  }
+  .typing-dot { width: 8px; height: 8px; border-radius: 50%; background: #a78bfa; display: inline-block; margin: 0 2px; animation: bounce 1.2s ease-in-out infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+  /* Stat card */
+  .stat-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; text-align: center; }
+
+  /* Nav */
+  .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 16px; border-radius: 12px; transition: all 0.2s; color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 500; }
+  .nav-btn.active-nav { color: #a78bfa; background: rgba(139,92,246,0.1); }
+
+  /* Slider */
+  input[type=range] { -webkit-appearance: none; width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #7c3aed; cursor: pointer; box-shadow: 0 2px 8px rgba(124,58,237,0.5); }
+
+  /* Smooth transitions */
+  .fade-in { animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Scroll */
+  .overflow-y-scroll::-webkit-scrollbar { width: 0; }
+  .coach-chat { overflow-y: auto; flex: 1; }
+  .coach-chat::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body class="bg-night">
+
+<!-- ========== SCREEN: SPLASH ========== -->
+<div id="screen-splash" class="screen active bg-night items-center justify-center px-6">
+  <div class="relative text-center fade-in">
+    <!-- Stars -->
+    <div class="star" style="width:3px;height:3px;top:20px;left:40px;animation-delay:0s"></div>
+    <div class="star" style="width:2px;height:2px;top:60px;right:30px;animation-delay:0.5s"></div>
+    <div class="star" style="width:4px;height:4px;top:10px;right:80px;animation-delay:1s"></div>
+    <div class="star" style="width:2px;height:2px;top:100px;left:20px;animation-delay:1.5s"></div>
+
+    <div class="moon text-8xl mb-6">🌙</div>
+    <h1 class="text-4xl font-800 text-white mb-3" style="font-weight:800">SlaapCoach AI</h1>
+    <p class="text-purple-300 text-lg mb-2">Jouw kind slaapt beter</p>
+    <p class="text-purple-400 text-sm mb-12">Persoonlijke begeleiding voor ouders</p>
+
+    <button class="btn-primary mb-4" onclick="startIntake()">Gratis starten →</button>
+    <button class="btn-secondary" onclick="loadDemo()">Demo bekijken</button>
+
+    <p class="text-purple-500 text-xs mt-6">Voor kinderen 0–12 jaar · Geen creditcard nodig</p>
+  </div>
+</div>
+
+<!-- ========== SCREEN: INTAKE ========== -->
+<div id="screen-intake" class="screen bg-night px-5 py-6">
+  <div class="flex items-center gap-3 mb-6">
+    <button onclick="goBack()" class="text-purple-400 text-2xl">←</button>
+    <div class="flex-1">
+      <div class="progress-bar">
+        <div class="progress-fill" id="intake-progress" style="width:20%"></div>
+      </div>
+    </div>
+    <span class="text-purple-400 text-sm" id="intake-step-label">1/5</span>
+  </div>
+
+  <!-- Step 1: Leeftijd -->
+  <div id="intake-1" class="fade-in">
+    <div class="text-4xl mb-4">👶</div>
+    <h2 class="text-2xl font-bold text-white mb-2">Hoe oud is je kind?</h2>
+    <p class="text-purple-300 text-sm mb-8">We maken een plan op maat voor de leeftijdsfase.</p>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="intake-option" onclick="selectAge('0-1', this)">👼 0–1 jaar<br><span class="text-xs text-purple-400">Baby</span></div>
+      <div class="intake-option" onclick="selectAge('1-3', this)">🐥 1–3 jaar<br><span class="text-xs text-purple-400">Peuter</span></div>
+      <div class="intake-option" onclick="selectAge('3-6', this)">🧒 3–6 jaar<br><span class="text-xs text-purple-400">Kleuter</span></div>
+      <div class="intake-option" onclick="selectAge('6-12', this)">👦 6–12 jaar<br><span class="text-xs text-purple-400">Schoolkind</span></div>
+    </div>
+    <button class="btn-primary mt-8" id="next-1" onclick="nextIntake(2)" style="display:none">Volgende →</button>
+  </div>
+
+  <!-- Step 2: Bedtijd probleem -->
+  <div id="intake-2" class="fade-in" style="display:none">
+    <div class="text-4xl mb-4">😩</div>
+    <h2 class="text-2xl font-bold text-white mb-2">Wat is het grootste probleem?</h2>
+    <p class="text-purple-300 text-sm mb-8">Selecteer alles wat van toepassing is.</p>
+    <div class="flex flex-col gap-3" id="problem-options">
+      <div class="intake-option text-left" onclick="toggleProblem('inslapen', this)">😴 Moeite met inslapen</div>
+      <div class="intake-option text-left" onclick="toggleProblem('wakker', this)">🌃 Nachtelijk wakker worden</div>
+      <div class="intake-option text-left" onclick="toggleProblem('bedtijd', this)">😤 Weerstand bij bedtijd</div>
+      <div class="intake-option text-left" onclick="toggleProblem('ritme', this)">🔄 Geen consistent ritme</div>
+      <div class="intake-option text-left" onclick="toggleProblem('scherm', this)">📱 Te veel schermgebruik</div>
+    </div>
+    <button class="btn-primary mt-8" onclick="nextIntake(3)">Volgende →</button>
+  </div>
+
+  <!-- Step 3: Huidige bedtijd -->
+  <div id="intake-3" class="fade-in" style="display:none">
+    <div class="text-4xl mb-4">⏰</div>
+    <h2 class="text-2xl font-bold text-white mb-2">Hoe laat gaat je kind nu naar bed?</h2>
+    <p class="text-purple-300 text-sm mb-8">De werkelijke tijd, niet de gewenste.</p>
+    <div class="card p-6 mb-4">
+      <div class="text-center text-5xl font-bold text-white mb-4" id="bedtime-display">20:30</div>
+      <input type="range" min="18" max="23" step="0.5" value="20.5" id="bedtime-slider" oninput="updateBedtime(this.value)">
+      <div class="flex justify-between text-xs text-purple-400 mt-2">
+        <span>18:00</span><span>23:00</span>
+      </div>
+    </div>
+    <div class="card p-4 mb-6">
+      <p class="text-sm text-purple-300">⏱️ Hoe lang duurt het inslapen?</p>
+      <div class="grid grid-cols-3 gap-2 mt-3">
+        <div class="intake-option text-sm" onclick="selectSleep('5-15', this)">&lt;15 min</div>
+        <div class="intake-option text-sm" onclick="selectSleep('15-45', this)">15–45 min</div>
+        <div class="intake-option text-sm" onclick="selectSleep('45+', this)">&gt;45 min</div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="nextIntake(4)">Volgende →</button>
+  </div>
+
+  <!-- Step 4: Schermgebruik & stress -->
+  <div id="intake-4" class="fade-in" style="display:none">
+    <div class="text-4xl mb-4">📱</div>
+    <h2 class="text-2xl font-bold text-white mb-2">Schermgebruik voor bedtijd</h2>
+    <p class="text-purple-300 text-sm mb-6">Hoelang voor het slapen stopt schermgebruik?</p>
+    <div class="grid grid-cols-2 gap-3 mb-8">
+      <div class="intake-option" onclick="selectScreen('geen', this)">✅ Geen scherm</div>
+      <div class="intake-option" onclick="selectScreen('30min', this)">30 min ervoor</div>
+      <div class="intake-option" onclick="selectScreen('1uur', this)">1 uur ervoor</div>
+      <div class="intake-option" onclick="selectScreen('geen-grens', this)">😬 Geen grens</div>
+    </div>
+    <p class="text-purple-300 text-sm mb-3">Hoe gestrest ben jij als ouder 's avonds?</p>
+    <div class="grid grid-cols-5 gap-2 mb-8">
+      <div class="intake-option text-lg" onclick="selectStress(1, this)">😊</div>
+      <div class="intake-option text-lg" onclick="selectStress(2, this)">🙂</div>
+      <div class="intake-option text-lg" onclick="selectStress(3, this)">😐</div>
+      <div class="intake-option text-lg" onclick="selectStress(4, this)">😟</div>
+      <div class="intake-option text-lg" onclick="selectStress(5, this)">😰</div>
+    </div>
+    <button class="btn-primary" onclick="nextIntake(5)">Volgende →</button>
+  </div>
+
+  <!-- Step 5: Naam kind -->
+  <div id="intake-5" class="fade-in" style="display:none">
+    <div class="text-4xl mb-4">✨</div>
+    <h2 class="text-2xl font-bold text-white mb-2">Hoe heet je kind?</h2>
+    <p class="text-purple-300 text-sm mb-8">Zodat we het plan persoonlijk kunnen maken.</p>
+    <input type="text" id="child-name-input"
+      placeholder="Naam van je kind"
+      class="w-full bg-white/10 border border-white/20 rounded-2xl px-5 py-4 text-white text-lg placeholder-purple-400 outline-none focus:border-purple-500 mb-4"
+      style="background: rgba(255,255,255,0.08)"
+      onkeyup="if(event.key==='Enter')finishIntake()">
+    <p class="text-purple-400 text-sm mb-8">Of laat leeg voor "je kind".</p>
+    <button class="btn-primary" onclick="finishIntake()">Plan maken 🚀</button>
+  </div>
+</div>
+
+<!-- ========== SCREEN: LOADING PLAN ========== -->
+<div id="screen-loading" class="screen bg-night items-center justify-center px-6">
+  <div class="text-center fade-in">
+    <div class="text-6xl moon mb-6">🌙</div>
+    <h2 class="text-2xl font-bold text-white mb-3">Plan wordt gemaakt...</h2>
+    <div class="flex flex-col gap-3 text-left mt-8" id="loading-steps">
+      <div class="notif opacity-0" id="ls1">✅ Slaapprofiel geanalyseerd</div>
+      <div class="notif opacity-0" id="ls2">✅ Bedtijd geoptimaliseerd</div>
+      <div class="notif opacity-0" id="ls3">✅ 7-daags plan aangemaakt</div>
+      <div class="notif opacity-0" id="ls4">✅ Avondroutine gepland</div>
+      <div class="notif opacity-0" id="ls5">✅ Agenda items klaargezet</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SCREEN: HOME ========== -->
+<div id="screen-home" class="screen bg-night flex-col">
+  <!-- Header -->
+  <div class="px-5 pt-6 pb-4">
+    <div class="flex items-center justify-between mb-1">
+      <div>
+        <p class="text-purple-400 text-sm">Goede avond 👋</p>
+        <h1 class="text-2xl font-bold text-white">Vanavond plan klaar</h1>
+      </div>
+      <div class="text-3xl">🌙</div>
+    </div>
+  </div>
+
+  <!-- Scrollable content -->
+  <div class="flex-1 overflow-y-auto px-5 pb-4" style="padding-bottom: 90px">
+
+    <!-- Tonight card -->
+    <div class="card-glow p-5 mb-5">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="text-purple-300 text-sm font-semibold">VANAVOND VOOR</span>
+        <span class="text-white font-bold text-sm" id="home-child-name">je kind</span>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-1">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-white" id="home-leeftijd">4 jaar</div>
+          <div class="text-xs text-purple-400 mt-1">Leeftijd</div>
+        </div>
+        <div class="text-center border-x border-white/10">
+          <div class="text-2xl font-bold text-white" id="home-bedtijd">19:30</div>
+          <div class="text-xs text-purple-400 mt-1">Bedtijd</div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-white" id="home-inslaap">12 min</div>
+          <div class="text-xs text-purple-400 mt-1">Doel inslaap</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Countdown to bedtime -->
+    <div class="card p-4 mb-5 flex items-center gap-4">
+      <div class="text-4xl">⏱️</div>
+      <div>
+        <div class="text-white font-bold text-lg" id="countdown-display">Nog 2u 15m</div>
+        <div class="text-purple-400 text-sm" id="routine-start-msg">Start routine om 18:45</div>
+      </div>
+    </div>
+
+    <!-- BIG START BUTTON -->
+    <button class="btn-start mb-5" onclick="showScreen('screen-coach')">
+      👉 START BEDTIJD PLAN
+    </button>
+
+    <!-- Tonight routine -->
+    <div class="card p-5 mb-5">
+      <h3 class="text-purple-300 text-sm font-semibold mb-4">VANAVOND BESTAAT UIT:</h3>
+      <div class="flex flex-col gap-3" id="routine-preview">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="grid grid-cols-2 gap-3 mb-5">
+      <button class="btn-icon text-left" onclick="showCheckin()">
+        😴 Hoe ging gisteren?
+      </button>
+      <button class="btn-icon text-left" onclick="showScreen('screen-plan')">
+        ✏️ Plan aanpassen
+      </button>
+    </div>
+
+    <!-- Agenda today -->
+    <div class="card p-5 mb-5">
+      <h3 class="text-purple-300 text-sm font-semibold mb-4">📅 AGENDA VANAVOND</h3>
+      <div class="flex flex-col gap-2" id="agenda-preview">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Tip of the day -->
+    <div class="notif flex gap-3">
+      <div class="text-2xl">💡</div>
+      <div>
+        <p class="text-white font-semibold text-sm mb-1">Tip van vandaag</p>
+        <p class="text-purple-300 text-sm" id="daily-tip">Dezelfde volgorde elke avond geeft je kind voorspelbaarheid. Dat verlaagt stress.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-lg border-t border-white/10 px-4 py-2 flex justify-around" style="max-width:500px;margin:0 auto">
+    <button class="nav-btn active-nav" onclick="switchNav('home', this)">
+      <span class="text-xl">🏠</span>
+      <span>Home</span>
+    </button>
+    <button class="nav-btn" onclick="switchNav('coach', this)">
+      <span class="text-xl">🧠</span>
+      <span>Coach</span>
+    </button>
+    <button class="nav-btn" onclick="switchNav('progress', this)">
+      <span class="text-xl">📊</span>
+      <span>Voortgang</span>
+    </button>
+    <button class="nav-btn" onclick="switchNav('plan', this)">
+      <span class="text-xl">📋</span>
+      <span>Plan</span>
+    </button>
+  </div>
+</div>
+
+<!-- ========== SCREEN: COACH ========== -->
+<div id="screen-coach" class="screen bg-coach flex-col" style="max-height: 100vh">
+  <!-- Header -->
+  <div class="px-5 pt-5 pb-3 flex items-center gap-3 border-b border-white/10">
+    <button onclick="showScreen('screen-home')" class="text-purple-400 text-xl">←</button>
+    <div class="flex-1">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-sm">🤖</div>
+        <div>
+          <p class="text-white font-bold text-sm">SlaapCoach AI</p>
+          <p class="text-green-400 text-xs">● Online</p>
+        </div>
+      </div>
+    </div>
+    <div class="text-purple-300 text-sm" id="coach-step-indicator">Stap 1/6</div>
+  </div>
+
+  <!-- Current step banner -->
+  <div class="px-5 pt-3 pb-2">
+    <div class="card p-3 flex items-center gap-3">
+      <div class="text-2xl" id="coach-current-emoji">📵</div>
+      <div>
+        <p class="text-purple-300 text-xs">ACTIEVE STAP</p>
+        <p class="text-white font-semibold text-sm" id="coach-current-step">Scherm uitzetten</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div class="coach-chat px-5 py-3 flex flex-col gap-4" id="coach-chat">
+    <!-- messages filled by JS -->
+  </div>
+
+  <!-- Input area -->
+  <div class="px-5 py-4 border-t border-white/10" style="background: rgba(0,0,0,0.3)">
+    <div class="flex gap-3 mb-3" id="coach-actions">
+      <!-- action buttons filled by JS -->
+    </div>
+    <div class="flex gap-2">
+      <input type="text" id="coach-input" placeholder="Typ een bericht..."
+        class="flex-1 bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-white text-sm placeholder-purple-400 outline-none"
+        style="background: rgba(255,255,255,0.08)"
+        onkeyup="if(event.key==='Enter')sendCoachMessage()">
+      <button onclick="sendCoachMessage()" class="bg-purple-600 rounded-2xl px-4 py-3 text-white font-bold text-sm">Stuur</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SCREEN: PROGRESS ========== -->
+<div id="screen-progress" class="screen bg-night flex-col">
+  <div class="px-5 pt-6 pb-4">
+    <h1 class="text-2xl font-bold text-white">📊 Voortgang</h1>
+    <p class="text-purple-400 text-sm">Afgelopen 7 nachten</p>
+  </div>
+  <div class="flex-1 overflow-y-auto px-5" style="padding-bottom: 90px">
+
+    <!-- 3 key stats -->
+    <div class="grid grid-cols-3 gap-3 mb-6">
+      <div class="stat-card">
+        <div class="text-3xl font-bold text-white mb-1" id="stat-consistent">5/7</div>
+        <div class="text-xs text-purple-400">Consistent</div>
+      </div>
+      <div class="stat-card">
+        <div class="text-3xl font-bold text-green-400 mb-1" id="stat-inslaap">−18m</div>
+        <div class="text-xs text-purple-400">Inslaaptijd</div>
+      </div>
+      <div class="stat-card">
+        <div class="text-3xl font-bold text-blue-400 mb-1" id="stat-wakker">−30%</div>
+        <div class="text-xs text-purple-400">Wakker worden</div>
+      </div>
+    </div>
+
+    <!-- Week view -->
+    <div class="card p-5 mb-5">
+      <h3 class="text-purple-300 text-sm font-semibold mb-4">WEEK OVERZICHT</h3>
+      <div class="flex justify-between gap-2" id="week-dots">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Achievements -->
+    <div class="card p-5 mb-5">
+      <h3 class="text-purple-300 text-sm font-semibold mb-4">🏆 PRESTATIES</h3>
+      <div class="flex flex-col gap-3" id="achievements">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- AI feedback -->
+    <div class="card-glow p-5">
+      <div class="flex gap-3">
+        <div class="text-2xl">🤖</div>
+        <div>
+          <p class="text-white font-semibold text-sm mb-2">AI Analyse</p>
+          <p class="text-purple-300 text-sm" id="ai-analysis">
+            Geweldig! Je bent consistent bezig. De inslaaptijd is al flink verbeterd. Blijf de routine aanhouden, ook in het weekend.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav (same) -->
+  <div class="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-lg border-t border-white/10 px-4 py-2 flex justify-around" style="max-width:500px;margin:0 auto">
+    <button class="nav-btn" onclick="switchNav('home', this)"><span class="text-xl">🏠</span><span>Home</span></button>
+    <button class="nav-btn" onclick="switchNav('coach', this)"><span class="text-xl">🧠</span><span>Coach</span></button>
+    <button class="nav-btn active-nav" onclick="switchNav('progress', this)"><span class="text-xl">📊</span><span>Voortgang</span></button>
+    <button class="nav-btn" onclick="switchNav('plan', this)"><span class="text-xl">📋</span><span>Plan</span></button>
+  </div>
+</div>
+
+<!-- ========== SCREEN: PLAN ========== -->
+<div id="screen-plan" class="screen bg-night flex-col">
+  <div class="px-5 pt-6 pb-4">
+    <h1 class="text-2xl font-bold text-white">📋 Slaapplan</h1>
+    <p class="text-purple-400 text-sm">7-daags persoonlijk plan</p>
+  </div>
+  <div class="flex-1 overflow-y-auto px-5" style="padding-bottom: 90px">
+
+    <!-- Bedtijd instelling -->
+    <div class="card p-5 mb-5">
+      <h3 class="text-purple-300 text-sm font-semibold mb-4">⏰ TIJDEN</h3>
+      <div class="flex justify-between items-center mb-3">
+        <span class="text-white text-sm">Scherm uit</span>
+        <span class="text-purple-300 font-bold" id="plan-scherm">18:30</span>
+      </div>
+      <div class="flex justify-between items-center mb-3">
+        <span class="text-white text-sm">Start routine</span>
+        <span class="text-purple-300 font-bold" id="plan-routine-start">18:45</span>
+      </div>
+      <div class="flex justify-between items-center mb-3">
+        <span class="text-white text-sm">Bedtijd</span>
+        <span class="text-purple-300 font-bold" id="plan-bedtijd">19:30</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-white text-sm">Doelinslaaptijd</span>
+        <span class="text-green-400 font-bold">12 min</span>
+      </div>
+    </div>
+
+    <!-- Avondroutine stappen -->
+    <div class="card p-5 mb-5">
+      <h3 class="text-purple-300 text-sm font-semibold mb-4">🌙 AVONDROUTINE</h3>
+      <div class="flex flex-col gap-3" id="plan-routine">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- 7-daags plan -->
+    <div class="card p-5 mb-5">
+      <h3 class="text-purple-300 text-sm font-semibold mb-4">📅 7-DAAGS PLAN</h3>
+      <div class="flex flex-col gap-3" id="plan-days">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Tips -->
+    <div class="card p-5 mb-5">
+      <h3 class="text-purple-300 text-sm font-semibold mb-4">💡 SLAAPADVIEZEN</h3>
+      <div class="flex flex-col gap-3" id="plan-tips">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <button class="btn-secondary" onclick="resetApp()">Opnieuw beginnen</button>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-lg border-t border-white/10 px-4 py-2 flex justify-around" style="max-width:500px;margin:0 auto">
+    <button class="nav-btn" onclick="switchNav('home', this)"><span class="text-xl">🏠</span><span>Home</span></button>
+    <button class="nav-btn" onclick="switchNav('coach', this)"><span class="text-xl">🧠</span><span>Coach</span></button>
+    <button class="nav-btn" onclick="switchNav('progress', this)"><span class="text-xl">📊</span><span>Voortgang</span></button>
+    <button class="nav-btn active-nav" onclick="switchNav('plan', this)"><span class="text-xl">📋</span><span>Plan</span></button>
+  </div>
+</div>
+
+<!-- ========== SCREEN: CHECKIN ========== -->
+<div id="screen-checkin" class="screen bg-night items-center justify-center px-5">
+  <div class="w-full max-w-sm fade-in">
+    <button onclick="showScreen('screen-home')" class="text-purple-400 mb-6 block">← Terug</button>
+    <h2 class="text-2xl font-bold text-white mb-2">Hoe ging gisternacht?</h2>
+    <p class="text-purple-300 text-sm mb-8" id="checkin-child-label">Voor je kind</p>
+
+    <div class="grid grid-cols-3 gap-3 mb-8">
+      <div class="intake-option flex flex-col items-center gap-2" onclick="selectCheckin('goed', this)">
+        <span class="text-4xl">😍</span>
+        <span class="text-xs">Geweldig</span>
+      </div>
+      <div class="intake-option flex flex-col items-center gap-2" onclick="selectCheckin('ok', this)">
+        <span class="text-4xl">🙂</span>
+        <span class="text-xs">Oké</span>
+      </div>
+      <div class="intake-option flex flex-col items-center gap-2" onclick="selectCheckin('slecht', this)">
+        <span class="text-4xl">😴</span>
+        <span class="text-xs">Moeilijk</span>
+      </div>
+    </div>
+
+    <div id="checkin-followup" style="display:none" class="fade-in">
+      <p class="text-purple-300 text-sm mb-3" id="checkin-followup-text">Wat ging er mis?</p>
+      <div class="flex flex-col gap-2 mb-6" id="checkin-details"></div>
+      <button class="btn-primary" onclick="submitCheckin()">AI stuurt aanpassing 🤖</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SCREEN: AI ADJUSTMENT ========== -->
+<div id="screen-adjustment" class="screen bg-night items-center justify-center px-5">
+  <div class="w-full max-w-sm fade-in text-center">
+    <div class="text-5xl mb-4">🤖</div>
+    <h2 class="text-2xl font-bold text-white mb-2">AI past plan aan</h2>
+    <p class="text-purple-300 text-sm mb-8">Op basis van jouw feedback</p>
+    <div class="card-glow p-5 mb-6 text-left">
+      <p class="text-purple-300 text-xs font-semibold mb-3">AANPASSING VAN VANDAAG:</p>
+      <p class="text-white text-sm" id="adjustment-text">We beginnen 15 minuten eerder met de routine. En we voegen een rustige activiteit toe voor het bad.</p>
+    </div>
+    <button class="btn-primary mb-3" onclick="showScreen('screen-home')">Plan bijgewerkt ✓</button>
+    <button class="btn-secondary" onclick="showScreen('screen-home')">Nee, houd het zo</button>
+  </div>
+</div>
+
+<!-- ========== MODAL: PREMIUM ========== -->
+<div id="modal-premium" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px)" class="flex items-end justify-center">
+  <div class="bg-gradient-to-t from-purple-950 to-indigo-950 border border-purple-500/30 rounded-t-3xl p-6 w-full max-w-md fade-in">
+    <div class="text-center mb-6">
+      <div class="text-4xl mb-3">⭐</div>
+      <h2 class="text-2xl font-bold text-white">SlaapCoach Premium</h2>
+      <p class="text-purple-300 text-sm mt-1">Unlock alle features</p>
+    </div>
+    <div class="flex flex-col gap-3 mb-6">
+      <div class="flex items-center gap-3"><span class="text-green-400">✓</span><span class="text-white text-sm">AI live coach tijdens bedtijd</span></div>
+      <div class="flex items-center gap-3"><span class="text-green-400">✓</span><span class="text-white text-sm">Automatische agenda-integratie</span></div>
+      <div class="flex items-center gap-3"><span class="text-green-400">✓</span><span class="text-white text-sm">Realtime bedtijd assistent</span></div>
+      <div class="flex items-center gap-3"><span class="text-green-400">✓</span><span class="text-white text-sm">Adaptieve slaapplannen</span></div>
+      <div class="flex items-center gap-3"><span class="text-green-400">✓</span><span class="text-white text-sm">Slaapverhalen & audio</span></div>
+    </div>
+    <div class="text-center mb-4">
+      <span class="text-3xl font-bold text-white">€9,99</span>
+      <span class="text-purple-300 text-sm"> /maand</span>
+      <p class="text-purple-400 text-xs mt-1">Annuleer altijd · Eerste week gratis</p>
+    </div>
+    <button class="btn-primary mb-3" onclick="hidePremium()">Start gratis week →</button>
+    <button class="btn-secondary" onclick="hidePremium()">Nee dank je</button>
+  </div>
+</div>
+
+<script>
+// ===================== STATE =====================
+const state = {
+  childName: '',
+  age: '',
+  problems: [],
+  bedtime: '19:30',
+  sleepDuration: '15-45',
+  screen: 'geen-grens',
+  stress: 3,
+  coachStep: 0,
+  coachDone: [],
+  checkin: null,
+  days: [null, null, null, null, null, null, null],
+  currentDayIndex: 6,
+};
+
+// ===================== ROUTINE DATA =====================
+const routineByAge = {
+  '0-1': [
+    { emoji: '🛁', name: 'Warm bad', duration: 15, time: '' },
+    { emoji: '🍼', name: 'Voeding', duration: 15, time: '' },
+    { emoji: '🎵', name: 'Slaapliedje', duration: 5, time: '' },
+    { emoji: '🌙', name: 'Slaap', duration: 0, time: '' },
+  ],
+  '1-3': [
+    { emoji: '📵', name: 'Scherm uit', duration: 0, time: '' },
+    { emoji: '🛁', name: 'Bad of wassen', duration: 15, time: '' },
+    { emoji: '🧸', name: 'Rustig spel', duration: 10, time: '' },
+    { emoji: '📚', name: 'Verhaaltje', duration: 10, time: '' },
+    { emoji: '🌙', name: 'Slapen', duration: 0, time: '' },
+  ],
+  '3-6': [
+    { emoji: '📵', name: 'Scherm uit', duration: 0, time: '' },
+    { emoji: '🧘', name: 'Rustige activiteit', duration: 15, time: '' },
+    { emoji: '🛁', name: 'Bad', duration: 15, time: '' },
+    { emoji: '🪥', name: 'Tanden poetsen', duration: 5, time: '' },
+    { emoji: '📚', name: 'Boek lezen', duration: 15, time: '' },
+    { emoji: '🌙', name: 'Slapen', duration: 0, time: '' },
+  ],
+  '6-12': [
+    { emoji: '📵', name: 'Scherm uit', duration: 0, time: '' },
+    { emoji: '🧘', name: 'Rustige activiteit', duration: 20, time: '' },
+    { emoji: '🚿', name: 'Douchen', duration: 10, time: '' },
+    { emoji: '🪥', name: 'Tanden poetsen', duration: 5, time: '' },
+    { emoji: '📚', name: 'Lezen of dagboek', duration: 15, time: '' },
+    { emoji: '💡', name: 'Licht dimmen', duration: 5, time: '' },
+    { emoji: '🌙', name: 'Slapen', duration: 0, time: '' },
+  ],
+};
+
+const tips = [
+  'Dezelfde volgorde elke avond geeft je kind voorspelbaarheid.',
+  'Dim het licht 30 minuten voor bedtijd — dat maakt melatonine aan.',
+  'Maak een fysiek schema en hang dat zichtbaar op de slaapkamerdeur.',
+  'Geen scherm na 18:30 verbetert inslaaptijd met gemiddeld 20 minuten.',
+  'Positieve aandacht bij goed gedrag werkt beter dan straffen bij weerstand.',
+  'Consistent wakker worden op dezelfde tijd is even belangrijk als bedtijd.',
+  'Gebruik altijd dezelfde laatste zin: "Ik hou van je, welterusten."',
+];
+
+const weekDays = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+
+// ===================== COACH SCRIPTS =====================
+const coachScripts = {
+  '0-1': [
+    {
+      step: 'Voorbereiding',
+      emoji: '✅',
+      intro: 'Goed dat je begint! Bereid de slaapkamer voor: dim het licht en leg alles klaar voor de routine.',
+      action: 'Klaar →',
+      responses: {
+        done: 'Super! Start nu met het bad. Gebruik lauw water — niet te warm.',
+        struggle: 'Geen probleem. Dim de lichten alvast en begin rustig. Je hoeft niet alles perfect te doen.',
+      },
+    },
+    {
+      step: 'Warm bad',
+      emoji: '🛁',
+      intro: 'Tijd voor het bad! Houd het kalm en rustig. Praat zacht met je baby.',
+      action: 'Bad gedaan →',
+      responses: {
+        done: 'Geweldig. Pak hem/haar in een zachte handdoek en geef de voeding.',
+        struggle: 'Dat klopt, soms huilt een baby tijdens het bad. Probeer hem/haar kalm te spreken. Als hij/zij heel onrustig is, sla het bad dan over vandaag.',
+      },
+    },
+    {
+      step: 'Voeding',
+      emoji: '🍼',
+      intro: 'Geef nu rustig de voeding. Dit is een kalmerend moment. Geen stimulatie, zachte aanraking.',
+      action: 'Voeding klaar →',
+      responses: {
+        done: 'Perfect! Leg hem/haar nu neer terwijl hij/zij nog wakker maar slaperig is. Zing een slaapliedje.',
+        struggle: 'Normaal dat het even duurt. Neem de tijd. Geen haast.',
+      },
+    },
+    {
+      step: 'Slaapliedje',
+      emoji: '🎵',
+      intro: 'Zing rustig een slaapliedje of speel zachte muziek. Leg hem/haar in bed en blijf kort bij.',
+      action: 'Kind in bed →',
+      responses: {
+        done: '🌙 Goed gedaan! Verlaat nu rustig de kamer. Blijf stil als hij/zij even pruilt — wacht 2–3 minuten voor je ingrijpt.',
+        struggle: 'Blijf rustig. Een vaste melodie elke avond werkt na 3–5 dagen. Houd vol.',
+      },
+    },
+  ],
+  default: [
+    {
+      step: 'Scherm uitzetten',
+      emoji: '📵',
+      intro: 'Het is tijd! Zeg rustig maar duidelijk: "Schermen gaan nu uit. Het is bijna bedtijd."\n\nGeef geen discussie ruimte — zeg het één keer en zet het scherm daadwerkelijk uit.',
+      action: 'Scherm uit ✓',
+      responses: {
+        done: 'Goed gedaan! Scherm is uit. Geef je kind nu 10–15 minuten voor een rustige activiteit.',
+        struggle: 'Je kind protesteert? Dat is normaal. Zeg rustig: "Ik begrijp dat je verdrietig bent. Het scherm gaat nu echt uit."\nNiet onderhandelen. Wacht het uit.',
+        'geen-reactie': 'Geen reactie van je kind? Dan ging het goed! Ga door naar de rustige activiteit.',
+      },
+    },
+    {
+      step: 'Rustige activiteit',
+      emoji: '🧘',
+      intro: 'Start nu een rustige activiteit. Dit kan zijn:\n• Tekenen of kleuren\n• Rustig puzzelen\n• Zacht spelen met een knuffel\n\nGeen actieve spelletjes, geen opwinding.',
+      action: 'Activiteit klaar ✓',
+      responses: {
+        done: 'Top! Je kind is rustig. Nu is het tijd voor het bad of wassen.',
+        struggle: 'Kind wil niet rustig spelen? Ga naast hem/haar zitten en doe zelf rustig iets. Jouw kalmte werkt aanstekelijk.',
+      },
+    },
+    {
+      step: 'Bad / wassen',
+      emoji: '🛁',
+      intro: 'Tijd voor het bad! Zeg:\n"Nu gaan we lekker in bad."\n\nHoud het bad kort en kalm — geen speeltijd met water spetteren.',
+      action: 'Bad klaar ✓',
+      responses: {
+        done: 'Perfect! Na het bad direct naar het tanden poetsen. Houd het tempo erin.',
+        struggle: 'Kind wil niet? Geef een keuze: "Ga je zelf of help ik je?" — altijd bad, alleen de manier mag kiezen.',
+      },
+    },
+    {
+      step: 'Tanden poetsen',
+      emoji: '🪥',
+      intro: 'Tanden poetsen! Gebruik een timer van 2 minuten. Je kunt een liedje zingen of tellen.',
+      action: 'Tanden gepoetst ✓',
+      responses: {
+        done: 'Goed! Nu is het tijd voor het boek. Laat je kind één boek kiezen.',
+        struggle: 'Kind weigert? Jij poetst dan — houd zijn/haar hoofd rustig vast. Dit hoeft niet perfect, maar het moet elke avond.',
+      },
+    },
+    {
+      step: 'Boek lezen',
+      emoji: '📚',
+      intro: 'Lees samen een boek. Maximaal 2 boeken.\n\nLees rustig en zacht. Dit is verbindingstijd én overgang naar slaap.',
+      action: 'Klaar met lezen ✓',
+      responses: {
+        done: 'Geweldig moment! Nu komt de laatste stap: in bed leggen.',
+        struggle: 'Kind wil meer boeken? Zeg: "Dit was het laatste boekje voor vanavond." Houd je eraan.',
+      },
+    },
+    {
+      step: 'In bed leggen',
+      emoji: '🌙',
+      intro: 'Dit is het moment. Zeg altijd dezelfde zin:\n\n"Ik hou van je. Welterusten. Tot morgen."\n\nEén kus, dan verlaat je de kamer.',
+      action: 'Kind ligt in bed ✓',
+      responses: {
+        done: '🌟 GELUKT! Fantastisch gedaan! Je kind ligt in bed.\n\nAls hij/zij uitkomt: breng rustig terug, herhaal dezelfde zin. Geen gesprek, geen discussie.',
+        struggle: 'Kind wil niet liggen? Ga niet mee in de discussie. Leg rustig neer, geef een kus, verlaat de kamer. Herhaal zo nodig.',
+        'komt-uit-bed': 'Kind komt uit bed?\n\n→ Zeg niets\n→ Pak bij de hand\n→ Breng rustig terug\n→ Zeg: "Welterusten."\n→ Verlaat kamer\n\nHerhaal zo vaak als nodig, altijd hetzelfde.',
+      },
+    },
+  ],
+};
+
+const adjustments = {
+  goed: 'Geweldig! Plan blijft zoals het is. Ga zo door — je bent op de goede weg!',
+  ok: 'We houden het plan hetzelfde maar voegen 5 minuten rustige activiteit toe voor het bad.',
+  slecht: 'We starten 15 minuten eerder met de routine en voegen een extra rustig moment toe voor het slapen.',
+};
+
+// ===================== INTAKE LOGIC =====================
+let intakeStep = 1;
+
+function startIntake() {
+  showScreen('screen-intake');
+}
+
+function loadDemo() {
+  state.childName = 'Emma';
+  state.age = '3-6';
+  state.problems = ['inslapen', 'scherm'];
+  state.bedtime = '19:30';
+  state.days = ['goed', 'ok', 'goed', 'goed', 'slecht', 'goed', null];
+  initHome();
+  showScreen('screen-home');
+}
+
+function selectAge(age, el) {
+  state.age = age;
+  document.querySelectorAll('#intake-1 .intake-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('next-1').style.display = 'block';
+}
+
+function toggleProblem(p, el) {
+  el.classList.toggle('selected');
+  if (state.problems.includes(p)) {
+    state.problems = state.problems.filter(x => x !== p);
+  } else {
+    state.problems.push(p);
+  }
+}
+
+function selectSleep(val, el) {
+  state.sleepDuration = val;
+  document.querySelectorAll('#intake-3 .intake-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function selectScreen(val, el) {
+  state.screen = val;
+  document.querySelectorAll('#intake-4 .grid .intake-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function selectStress(val, el) {
+  state.stress = val;
+  document.querySelectorAll('#intake-4 .grid:last-of-type .intake-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function updateBedtime(val) {
+  const h = Math.floor(val);
+  const m = (val % 1) === 0.5 ? '30' : '00';
+  state.bedtime = `${h}:${m}`;
+  document.getElementById('bedtime-display').textContent = state.bedtime;
+}
+
+function nextIntake(step) {
+  if (step > 5) return;
+  document.getElementById(`intake-${intakeStep}`).style.display = 'none';
+  intakeStep = step;
+  document.getElementById(`intake-${step}`).style.display = 'block';
+  document.getElementById('intake-progress').style.width = `${step * 20}%`;
+  document.getElementById('intake-step-label').textContent = `${step}/5`;
+}
+
+function goBack() {
+  if (intakeStep > 1) {
+    document.getElementById(`intake-${intakeStep}`).style.display = 'none';
+    intakeStep--;
+    document.getElementById(`intake-${intakeStep}`).style.display = 'block';
+    document.getElementById('intake-progress').style.width = `${intakeStep * 20}%`;
+    document.getElementById('intake-step-label').textContent = `${intakeStep}/5`;
+  } else {
+    showScreen('screen-splash');
+  }
+}
+
+function finishIntake() {
+  const nameInput = document.getElementById('child-name-input').value.trim();
+  state.childName = nameInput || 'je kind';
+  showScreen('screen-loading');
+  runLoadingAnimation();
+}
+
+function runLoadingAnimation() {
+  const steps = ['ls1','ls2','ls3','ls4','ls5'];
+  steps.forEach((id, i) => {
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      el.style.opacity = '1';
+      el.style.transition = 'opacity 0.4s';
+    }, 600 * (i + 1));
+  });
+  setTimeout(() => {
+    initHome();
+    showScreen('screen-home');
+  }, 4200);
+}
+
+// ===================== HOME INIT =====================
+function initHome() {
+  const routine = getRoutine();
+  computeRoutineTimes(routine);
+
+  const childLabel = state.childName !== 'je kind' ? state.childName : 'je kind';
+  document.getElementById('home-child-name').textContent = childLabel;
+  document.getElementById('home-leeftijd').textContent = state.age ? state.age.replace('-', '–') + ' jaar' : '4 jaar';
+  document.getElementById('home-bedtijd').textContent = state.bedtime || '19:30';
+
+  const inslaapTarget = state.sleepDuration === '45+' ? '20 min' : state.sleepDuration === '15-45' ? '15 min' : '10 min';
+  document.getElementById('home-inslaap').textContent = inslaapTarget;
+
+  // countdown
+  updateCountdown();
+
+  // routine preview
+  const rp = document.getElementById('routine-preview');
+  rp.innerHTML = routine.slice(0, 5).map(s => `
+    <div class="flex items-center gap-3">
+      <span class="text-xl">${s.emoji}</span>
+      <span class="text-white text-sm flex-1">${s.name}</span>
+      <span class="text-purple-400 text-xs">${s.time}</span>
+    </div>
+  `).join('');
+
+  // agenda
+  const ap = document.getElementById('agenda-preview');
+  ap.innerHTML = routine.map(s => `
+    <div class="flex items-center gap-3 py-1 border-b border-white/5">
+      <span class="text-purple-300 text-xs w-12 font-mono">${s.time}</span>
+      <span class="text-lg">${s.emoji}</span>
+      <span class="text-white text-sm">${s.name}</span>
+    </div>
+  `).join('');
+
+  // tip
+  const today = new Date().getDay();
+  document.getElementById('daily-tip').textContent = tips[today % tips.length];
+
+  // plan screen
+  initPlanScreen(routine);
+
+  // progress
+  initProgress();
+
+  // checkin label
+  document.getElementById('checkin-child-label').textContent = `Voor ${childLabel}`;
+}
+
+function getRoutine() {
+  const age = state.age || '3-6';
+  return JSON.parse(JSON.stringify(routineByAge[age] || routineByAge['3-6']));
+}
+
+function computeRoutineTimes(routine) {
+  const [bh, bm] = (state.bedtime || '19:30').split(':').map(Number);
+  let totalMins = 0;
+  for (let i = routine.length - 2; i >= 0; i--) {
+    totalMins += (routine[i+1].duration || 0);
+  }
+  let cur = bh * 60 + bm - totalMins;
+  routine.forEach((step, i) => {
+    const h = Math.floor(cur / 60) % 24;
+    const m = cur % 60;
+    step.time = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    cur += step.duration || 0;
+  });
+  return routine;
+}
+
+function updateCountdown() {
+  const now = new Date();
+  const [bh, bm] = (state.bedtime || '19:30').split(':').map(Number);
+  const target = new Date();
+  target.setHours(bh - 1, bm - 15, 0); // routine start = 45 min before bed
+
+  const diff = target - now;
+  if (diff > 0) {
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    document.getElementById('countdown-display').textContent = h > 0 ? `Nog ${h}u ${m}m` : `Nog ${m} minuten`;
+    document.getElementById('routine-start-msg').textContent = `Start routine om ${String(bh-1).padStart(2,'0')}:${String(bm >= 15 ? bm-15 : 45).padStart(2,'0')}`;
+  } else {
+    document.getElementById('countdown-display').textContent = '🔔 Start nu!';
+    document.getElementById('routine-start-msg').textContent = 'Het is tijd voor de avondroutine';
+  }
+}
+
+// ===================== PLAN SCREEN =====================
+function initPlanScreen(routine) {
+  const [bh, bm] = (state.bedtime || '19:30').split(':').map(Number);
+  document.getElementById('plan-bedtijd').textContent = state.bedtime;
+
+  const screenOffMins = bh * 60 + bm - 60;
+  const screenH = Math.floor(screenOffMins / 60);
+  const screenM = screenOffMins % 60;
+  document.getElementById('plan-scherm').textContent = `${String(screenH).padStart(2,'0')}:${String(screenM).padStart(2,'0')}`;
+
+  const routineStartMins = bh * 60 + bm - 45;
+  const rsH = Math.floor(routineStartMins / 60);
+  const rsM = routineStartMins % 60;
+  document.getElementById('plan-routine-start').textContent = `${String(rsH).padStart(2,'0')}:${String(rsM).padStart(2,'0')}`;
+
+  const pr = document.getElementById('plan-routine');
+  pr.innerHTML = routine.map((s, i) => `
+    <div class="step-item flex items-center gap-3">
+      <span class="text-xl">${s.emoji}</span>
+      <div class="flex-1">
+        <p class="text-white text-sm font-semibold">${s.name}</p>
+        ${s.duration ? `<p class="text-purple-400 text-xs">${s.duration} minuten</p>` : ''}
+      </div>
+      <span class="text-purple-300 text-sm font-mono">${s.time}</span>
+    </div>
+  `).join('');
+
+  const pd = document.getElementById('plan-days');
+  const dayPlans = [
+    'Focus op schermafbouw',
+    'Avondroutine starten',
+    'Consequent zijn bij weerstand',
+    'Evaluatie na 3 nachten',
+    'Bedtijd 5 min eerder',
+    'Weekend: zelfde tijden',
+    'Volledige routine beheersen',
+  ];
+  pd.innerHTML = weekDays.map((d, i) => `
+    <div class="flex items-center gap-3 py-2 border-b border-white/5">
+      <span class="text-purple-400 text-xs w-6">${d}</span>
+      <div class="w-2 h-2 rounded-full ${state.days[i] === 'goed' ? 'bg-green-400' : state.days[i] === 'ok' ? 'bg-yellow-400' : state.days[i] === 'slecht' ? 'bg-red-400' : 'bg-white/20'}"></div>
+      <span class="text-white text-sm flex-1">${dayPlans[i]}</span>
+    </div>
+  `).join('');
+
+  const pt = document.getElementById('plan-tips');
+  const ageTips = {
+    '0-1': ['Slaap als de baby slaapt', 'Wiemelbeweging helpt bij inslapen', 'Witte ruis kan wonderen doen'],
+    '1-3': ['Geef altijd dezelfde knuffel mee', 'Bedtijdritueel max 20 minuten', 'Peuters testen grenzen — houd vol'],
+    '3-6': ['Laat je kind 1 keuze maken in de routine', 'Gebruik een slaapfee of beloningssysteem', 'Nachtlampje mag, maar dim het na slaap'],
+    '6-12': ['Bespreek het slaapplan samen', 'Lees of schrijf dagboek voor het slapen', 'Wekker op zelfde tijd ook in weekend'],
+  };
+  const tipList = ageTips[state.age] || ageTips['3-6'];
+  pt.innerHTML = tipList.map(t => `
+    <div class="flex gap-2"><span class="text-purple-400">•</span><span class="text-white text-sm">${t}</span></div>
+  `).join('');
+}
+
+// ===================== PROGRESS =====================
+function initProgress() {
+  const days = state.days || Array(7).fill(null);
+  const done = days.filter(d => d === 'goed' || d === 'ok').length;
+  document.getElementById('stat-consistent').textContent = `${done}/7`;
+
+  const wd = document.getElementById('week-dots');
+  wd.innerHTML = weekDays.map((d, i) => {
+    const val = days[i];
+    const color = val === 'goed' ? '#4ade80' : val === 'ok' ? '#facc15' : val === 'slecht' ? '#f87171' : 'rgba(255,255,255,0.15)';
+    const emoji = val === 'goed' ? '😍' : val === 'ok' ? '🙂' : val === 'slecht' ? '😴' : '·';
+    return `
+      <div class="text-center flex-1">
+        <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:16px;margin:0 auto">${emoji}</div>
+        <p class="text-xs text-purple-400 mt-1">${d}</p>
+      </div>
+    `;
+  }).join('');
+
+  const ach = document.getElementById('achievements');
+  const earned = [];
+  if (done >= 1) earned.push({ emoji: '🌱', name: 'Eerste nacht', desc: 'Eerste routine voltooid' });
+  if (done >= 3) earned.push({ emoji: '🔥', name: '3 nachten op rij', desc: 'Ritme begint te vormen' });
+  if (done >= 5) earned.push({ emoji: '⭐', name: '5/7 consistent', desc: 'Bijna een volledige week!' });
+  if (earned.length === 0) earned.push({ emoji: '🎯', name: 'Begin vanavond', desc: 'Voltooi je eerste routine' });
+
+  ach.innerHTML = earned.map(a => `
+    <div class="flex items-center gap-3 py-2 border-b border-white/5">
+      <span class="text-2xl">${a.emoji}</span>
+      <div>
+        <p class="text-white text-sm font-semibold">${a.name}</p>
+        <p class="text-purple-400 text-xs">${a.desc}</p>
+      </div>
+    </div>
+  `).join('');
+
+  const analyses = {
+    high: 'Fantastisch werk! Je kind heeft een sterk ritme opgebouwd. Houd de tijden consistent, ook in het weekend.',
+    mid: 'Goed bezig! Je ziet al verbetering. Focus deze week op consequent zijn bij weerstand.',
+    low: 'Je bent net begonnen — dat is goed! De eerste 3–5 dagen zijn het moeilijkst. Houd vol, het wordt beter.',
+  };
+  document.getElementById('ai-analysis').textContent = done >= 5 ? analyses.high : done >= 3 ? analyses.mid : analyses.low;
+}
+
+// ===================== COACH MODE =====================
+let coachMessages = [];
+let currentCoachScript = [];
+let currentScriptIndex = 0;
+
+function initCoach() {
+  const age = state.age || '3-6';
+  currentCoachScript = coachScripts[age] || coachScripts.default;
+  currentScriptIndex = 0;
+  coachMessages = [];
+
+  const chat = document.getElementById('coach-chat');
+  chat.innerHTML = '';
+
+  addAIMessage(`Hallo! Ik ben je SlaapCoach. Vanavond begeleid ik je stap voor stap.\n\nKind: ${state.childName || 'je kind'} · Bedtijd: ${state.bedtime}\n\nKlaar om te starten? 🌙`);
+
+  setTimeout(() => showCoachStep(0), 800);
+}
+
+function showCoachStep(index) {
+  if (index >= currentCoachScript.length) {
+    finishCoach();
+    return;
+  }
+  const step = currentCoachScript[index];
+  currentScriptIndex = index;
+
+  document.getElementById('coach-step-indicator').textContent = `Stap ${index + 1}/${currentCoachScript.length}`;
+  document.getElementById('coach-current-emoji').textContent = step.emoji;
+  document.getElementById('coach-current-step').textContent = step.step;
+
+  addAIMessage(step.intro);
+  renderCoachActions(step);
+}
+
+function renderCoachActions(step) {
+  const actions = document.getElementById('coach-actions');
+  const buttons = [
+    { label: step.action, key: 'done', style: 'btn-primary' },
+    { label: '😓 Lukt niet', key: 'struggle', style: 'btn-secondary' },
+  ];
+  if (step.responses['komt-uit-bed']) {
+    buttons.push({ label: '🚶 Komt uit bed', key: 'komt-uit-bed', style: 'btn-secondary' });
+  }
+  actions.innerHTML = buttons.map(b => `
+    <button class="${b.style}" style="${b.style === 'btn-primary' ? 'flex:2' : 'flex:1;font-size:13px;padding:12px'}"
+      onclick="handleCoachAction('${b.key}')">
+      ${b.label}
+    </button>
+  `).join('');
+}
+
+function handleCoachAction(key) {
+  const step = currentCoachScript[currentScriptIndex];
+  const labels = { done: step.action.replace(' →','').replace(' ✓',''), struggle: '😓 Lukt niet', 'komt-uit-bed': '🚶 Komt uit bed', 'geen-reactie': '✅ Geen reactie' };
+  addUserMessage(labels[key] || key);
+
+  const response = step.responses[key] || step.responses.done;
+  showTyping(() => {
+    addAIMessage(response);
+    if (key === 'done' || key === 'geen-reactie') {
+      setTimeout(() => {
+        state.coachDone.push(currentScriptIndex);
+        showCoachStep(currentScriptIndex + 1);
+      }, 1200);
+    } else {
+      renderCoachActions(step);
+    }
+  });
+}
+
+function finishCoach() {
+  document.getElementById('coach-actions').innerHTML = `
+    <button class="btn-primary" onclick="showScreen('screen-home')">🏠 Terug naar home</button>
+  `;
+  document.getElementById('coach-step-indicator').textContent = 'Klaar! 🎉';
+  document.getElementById('coach-current-emoji').textContent = '🌟';
+  document.getElementById('coach-current-step').textContent = 'Routine voltooid!';
+
+  state.days[6] = 'goed';
+  initProgress();
+}
+
+function addAIMessage(text) {
+  const chat = document.getElementById('coach-chat');
+  const div = document.createElement('div');
+  div.className = 'bubble-ai fade-in';
+  div.innerHTML = `<p class="text-white text-sm" style="white-space:pre-line">${text}</p>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addUserMessage(text) {
+  const chat = document.getElementById('coach-chat');
+  const div = document.createElement('div');
+  div.className = 'bubble-user fade-in';
+  div.innerHTML = `<p class="text-white text-sm">${text}</p>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function showTyping(callback) {
+  const chat = document.getElementById('coach-chat');
+  const typing = document.createElement('div');
+  typing.className = 'bubble-ai';
+  typing.id = 'typing-indicator';
+  typing.innerHTML = `<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
+  chat.appendChild(typing);
+  chat.scrollTop = chat.scrollHeight;
+  setTimeout(() => {
+    typing.remove();
+    callback();
+  }, 1400);
+}
+
+function sendCoachMessage() {
+  const input = document.getElementById('coach-input');
+  const text = input.value.trim();
+  if (!text) return;
+  addUserMessage(text);
+  input.value = '';
+  const responses = [
+    'Goed dat je dat deelt. Blijf de routine volgen, ook als het niet perfect gaat.',
+    'Begrijpelijk! Houd het simpel en consistent. Dat werkt het beste.',
+    'Normaal! De eerste nachten zijn het moeilijkst. Je doet het goed.',
+    'Focus op één stap tegelijk. Wat is de volgende actie die je kunt doen?',
+    'Dat klinkt als vooruitgang! Blijf zo doorgaan.',
+  ];
+  showTyping(() => {
+    addAIMessage(responses[Math.floor(Math.random() * responses.length)]);
+  });
+}
+
+// ===================== CHECKIN =====================
+function showCheckin() { showScreen('screen-checkin'); }
+
+function selectCheckin(val, el) {
+  state.checkin = val;
+  document.querySelectorAll('#screen-checkin .intake-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+
+  const fu = document.getElementById('checkin-followup');
+  fu.style.display = 'block';
+  const fup = document.getElementById('checkin-followup-text');
+  const details = document.getElementById('checkin-details');
+
+  if (val === 'goed') {
+    fup.textContent = 'Wat ging er goed? (optioneel)';
+    details.innerHTML = `
+      <div class="intake-option text-sm" onclick="this.classList.toggle('selected')">Inslapen ging snel</div>
+      <div class="intake-option text-sm" onclick="this.classList.toggle('selected')">Geen weerstand bij bedtijd</div>
+      <div class="intake-option text-sm" onclick="this.classList.toggle('selected')">Hele nacht doorgeslagen</div>
+    `;
+  } else {
+    fup.textContent = 'Wat was er lastig?';
+    details.innerHTML = `
+      <div class="intake-option text-sm" onclick="this.classList.toggle('selected')">Lang inslapen</div>
+      <div class="intake-option text-sm" onclick="this.classList.toggle('selected')">Weerstand bij bedtijd</div>
+      <div class="intake-option text-sm" onclick="this.classList.toggle('selected')">Nachtelijk wakker worden</div>
+      <div class="intake-option text-sm" onclick="this.classList.toggle('selected')">Vroeg wakker</div>
+    `;
+  }
+}
+
+function submitCheckin() {
+  const val = state.checkin;
+  if (!val) return;
+  const today = state.days.findIndex(d => d === null);
+  if (today !== -1) state.days[today] = val;
+
+  document.getElementById('adjustment-text').textContent = adjustments[val];
+  showScreen('screen-adjustment');
+}
+
+// ===================== NAVIGATION =====================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const screen = document.getElementById(id);
+  if (screen) {
+    screen.classList.add('active');
+    if (id === 'screen-coach') {
+      initCoach();
+    }
+  }
+}
+
+function switchNav(tab, el) {
+  const screens = { home: 'screen-home', coach: 'screen-coach', progress: 'screen-progress', plan: 'screen-plan' };
+  showScreen(screens[tab]);
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-nav'));
+  if (el) el.classList.add('active-nav');
+}
+
+function showPremium() {
+  document.getElementById('modal-premium').style.display = 'flex';
+}
+
+function hidePremium() {
+  document.getElementById('modal-premium').style.display = 'none';
+}
+
+function resetApp() {
+  if (confirm('Wil je opnieuw beginnen? Dit wist je huidige plan.')) {
+    Object.assign(state, { childName: '', age: '', problems: [], bedtime: '19:30', sleepDuration: '15-45', screen: 'geen-grens', stress: 3, coachStep: 0, coachDone: [], checkin: null, days: [null,null,null,null,null,null,null] });
+    intakeStep = 1;
+    document.getElementById('intake-1').style.display = 'block';
+    for (let i = 2; i <= 5; i++) document.getElementById(`intake-${i}`).style.display = 'none';
+    document.getElementById('next-1').style.display = 'none';
+    document.getElementById('child-name-input').value = '';
+    showScreen('screen-splash');
+  }
+}
+
+// ===================== AUTO-SAVE & LOAD =====================
+function saveState() {
+  try { localStorage.setItem('sleepcoach_state', JSON.stringify(state)); } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('sleepcoach_state');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      Object.assign(state, parsed);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+// Periodically save
+setInterval(saveState, 5000);
+
+// ===================== INIT =====================
+window.addEventListener('load', () => {
+  const hasState = loadState();
+  if (hasState && state.childName && state.age) {
+    initHome();
+    showScreen('screen-home');
+  } else {
+    showScreen('screen-splash');
+  }
+
+  // Show premium after 60 seconds
+  setTimeout(() => {
+    if (document.getElementById('screen-home').classList.contains('active')) {
+      showPremium();
+    }
+  }, 60000);
+});
+</script>
+</body>
+</html>
