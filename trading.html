@@ -462,13 +462,15 @@ body.help-mode * { cursor: help !important; }
           </div>
         </div>
         <!-- Strategy selector -->
-        <div style="margin-bottom:12px;">
+        <div style="margin-bottom:10px;">
           <label style="font-size:11px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:5px;">Strategie</label>
-          <select class="filter-input" id="at-strategy-sel" style="width:100%;margin-bottom:8px;" onchange="onStrategySelect()">
+          <select class="filter-input" id="at-strategy-sel" style="width:100%;margin-bottom:7px;" onchange="onStrategySelect()">
             <option value="ai">AI Auto (leergedrag + scores)</option>
           </select>
-          <div id="at-strat-desc" style="font-size:11px;color:#7878a0;line-height:1.5;min-height:28px;"></div>
+          <div id="at-strat-desc" style="font-size:11px;color:#7878a0;line-height:1.5;min-height:24px;"></div>
         </div>
+        <!-- Strategy challenger result (updated after every scan) -->
+        <div id="at-strat-check" style="display:none;border-radius:7px;padding:9px 11px;margin-bottom:10px;font-size:12px;line-height:1.55;"></div>
         <!-- Status line -->
         <div id="at-auto-status" style="font-size:12px;color:#7878a0;margin-bottom:10px;padding:8px 10px;background:#0f0f1a;border-radius:6px;">Status: inactief</div>
         <button class="btn btn-ghost" onclick="runAiScan()" style="width:100%;justify-content:center;font-size:12px;"><i class="fas fa-satellite-dish fa-xs"></i> Nu scannen</button>
@@ -2139,6 +2141,8 @@ async function _runAiScanCore(){
   renderAiKPIs(); renderWeightsDisplay(); renderPredHistory(); renderAccuracyChart();
   // Auto-trading: place/close paper orders based on AI results
   await checkAutoTrades();
+  // Always challenge the strategy after every scan (even if auto-trade is off)
+  challengeCurrentStrategy();
   // Refresh active trading page if visible
   if(document.getElementById('page-activetrading').classList.contains('active')){
     renderAtTopSignals(); renderAtPortfolio(); renderAutoTradeLog();
@@ -2902,6 +2906,7 @@ function renderActiveTradingPage(){
   renderAutoTradeLog();
   loadLiveChart();
   populateStrategySelector();
+  challengeCurrentStrategy();
   // Sync toggle state
   const s = loadAutoTradeSettings();
   const toggle = document.getElementById('auto-trade-toggle');
@@ -3242,63 +3247,118 @@ function onStrategySelect(){
   saveAutoTradeSettings(s);
 }
 
-// AI strategy suggestion after scan
+// ── Strategy Challenger ──────────────────────────────────
+// Scores each strategy against current aiResults, always reports (good or better)
 let _suggestedStratIdx = null;
-function checkAiStrategySuggestion(){
-  if(!aiResults.length) return;
-  // Find which strategy type is most represented in current signals
-  const rsiCount  = aiResults.filter(r=>r.rsi<=32||r.rsi>=68).length;
-  const macdCount = aiResults.filter(r=>Math.abs(r.macdHist)>0.001).length;
-  const bbCount   = aiResults.filter(r=>r.bbPct<=0.2||r.bbPct>=0.8).length;
-  const emaCount  = aiResults.filter(r=>r.ema&&r.ema.score!==0).length;
-  const maxCount  = Math.max(rsiCount, macdCount, bbCount, emaCount);
-  if(maxCount < 3) return; // Not enough signal
-  let suggestType = 'ai';
-  if(rsiCount===maxCount)  suggestType='rsi';
-  else if(bbCount===maxCount)  suggestType='bb';
-  else if(macdCount===maxCount) suggestType='macd';
-  else suggestType='ma';
-  const strat = STRATEGY_LIBRARY.find(s=>s.type===suggestType);
+
+function scoreStrategyFit(strat, results){
+  if(!results.length) return 0;
+  let n = 0;
+  switch(strat.type){
+    case 'rsi':     n = results.filter(r=>r.rsi<=33||r.rsi>=67).length; break;
+    case 'macd':    n = results.filter(r=>Math.abs(r.macdHist)>0.002).length; break;
+    case 'bb':      n = results.filter(r=>r.bbPct<=0.22||r.bbPct>=0.78).length; break;
+    case 'ma':      n = results.filter(r=>r.ema&&Math.abs(r.ema.score)>=1).length; break;
+    case 'hybrid':  n = results.filter(r=>Math.abs(r.score)>=45).length; break;
+    default:        n = results.filter(r=>Math.abs(r.score)>=30).length; break;
+  }
+  return n / results.length;
+}
+
+function scoreAiFit(results){
+  if(!results.length) return 0;
+  const avgAbs = results.reduce((s,r)=>s+Math.abs(r.score),0)/results.length;
+  return avgAbs/100;
+}
+
+function challengeCurrentStrategy(){
+  const box  = document.getElementById('at-strat-check');
+  if(!box) return;
+  const ts   = new Date().toLocaleTimeString('nl',{hour:'2-digit',minute:'2-digit'});
+  const s    = loadAutoTradeSettings();
+  const cur  = s.strategy||'ai';
+
+  if(!aiResults.length){
+    box.style.display='block';
+    box.style.background='rgba(255,255,255,.04)';
+    box.style.border='1px solid #252540';
+    box.innerHTML=`<span style="color:#7878a0;"><i class="fas fa-clock fa-xs"></i> ${ts} — Wacht op eerste scan om strategie te beoordelen</span>`;
+    return;
+  }
+
+  // Score all strategies
+  const scores = [
+    { key:'ai', name:'AI Auto', score: scoreAiFit(aiResults) }
+  ].concat(STRATEGY_LIBRARY.map(st=>({ key:st.name, name:st.name, type:st.type, score: scoreStrategyFit(st,aiResults) })));
+
+  scores.sort((a,b)=>b.score-a.score);
+  const best       = scores[0];
+  const bestFit    = Math.round(best.score*100);
+  const curScore   = scores.find(s=>s.key===cur);
+  const curFit     = curScore ? Math.round(curScore.score*100) : 0;
+  const stillBest  = best.key===cur;
+
+  if(stillBest){
+    // Current strategy is still the best — green check
+    box.style.display='block';
+    box.style.background='rgba(0,212,170,.07)';
+    box.style.border='1px solid rgba(0,212,170,.25)';
+    box.innerHTML=`
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">
+        <i class="fas fa-check-circle" style="color:#00d4aa;font-size:13px;"></i>
+        <span style="font-weight:700;color:#00d4aa;font-size:12px;">Strategie gecontroleerd · ${ts}</span>
+      </div>
+      <div style="color:#c0c0d0;font-size:11px;padding-left:20px;"><strong style="color:#fff;">${cur==='ai'?'AI Auto':cur}</strong> is nog steeds de beste keuze voor de huidige markt <span style="color:#00d4aa;">(${bestFit}% signaalsterkte)</span></div>`;
+  } else {
+    // A better strategy exists — amber warning with switch button
+    _suggestedStratIdx = STRATEGY_LIBRARY.findIndex(st=>st.name===best.key);
+    const gap = bestFit - curFit;
+    box.style.display='block';
+    box.style.background='rgba(245,158,11,.07)';
+    box.style.border='1px solid rgba(245,158,11,.3)';
+    box.innerHTML=`
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;">
+        <i class="fas fa-arrow-right-arrow-left" style="color:#f59e0b;font-size:12px;"></i>
+        <span style="font-weight:700;color:#f59e0b;font-size:12px;">Strategie gecontroleerd · ${ts}</span>
+      </div>
+      <div style="color:#c0c0d0;font-size:11px;padding-left:20px;margin-bottom:8px;">
+        <strong style="color:#f59e0b;">${best.name==='ai'?'AI Auto':best.name}</strong> past nu beter bij de markt
+        <span style="color:#f59e0b;">(+${gap}% signaalsterkte vs. ${cur==='ai'?'AI Auto':cur})</span>
+      </div>
+      <div style="display:flex;gap:7px;padding-left:20px;">
+        <button class="btn btn-warning" onclick="switchToSuggestedStrategy()" style="font-size:11px;padding:4px 11px;">
+          <i class="fas fa-bolt fa-xs"></i> Overschakelen
+        </button>
+        <button class="btn btn-ghost" onclick="dismissStrategyChallenge()" style="font-size:11px;padding:4px 11px;">Houd huidige</button>
+      </div>`;
+  }
+}
+
+function switchToSuggestedStrategy(){
+  if(_suggestedStratIdx===null||_suggestedStratIdx<0) return;
+  const strat = STRATEGY_LIBRARY[_suggestedStratIdx];
   if(!strat) return;
-  // Don't suggest if already selected or recently dismissed
-  const current = loadAutoTradeSettings().strategy;
-  if(current===strat.name) return;
-  const dismissed = JSON.parse(localStorage.getItem('tb_dismissed_strat_suggest')||'[]');
-  if(dismissed.includes(strat.name)) return;
-  _suggestedStratIdx = STRATEGY_LIBRARY.indexOf(strat);
-  const bodyEl = document.getElementById('ai-strat-suggest-body');
-  const modal  = document.getElementById('ai-strat-suggest-modal');
-  if(!bodyEl||!modal) return;
-  bodyEl.innerHTML = `Op basis van de huidige marktdata ziet het AI-model <strong style="color:#f59e0b;">${maxCount} van ${aiResults.length} paren</strong> met een signaal dat past bij de <strong style="color:#00d4aa;">${strat.name}</strong> strategie.<br><br><em style="color:#7878a0;">${strat.desc.slice(0,160)}…</em><br><br>Wil je deze strategie activeren?`;
-  modal.style.display = 'flex';
-}
-
-function dismissStratSuggest(){
-  const modal = document.getElementById('ai-strat-suggest-modal');
-  if(modal) modal.style.display='none';
-  if(_suggestedStratIdx===null) return;
-  const strat = STRATEGY_LIBRARY[_suggestedStratIdx];
-  const dismissed = JSON.parse(localStorage.getItem('tb_dismissed_strat_suggest')||'[]');
-  dismissed.push(strat.name);
-  localStorage.setItem('tb_dismissed_strat_suggest', JSON.stringify(dismissed.slice(-10)));
-  _suggestedStratIdx = null;
-}
-
-function addSuggestedStrat(){
-  const modal = document.getElementById('ai-strat-suggest-modal');
-  if(modal) modal.style.display='none';
-  if(_suggestedStratIdx===null) return;
-  const strat = STRATEGY_LIBRARY[_suggestedStratIdx];
-  // Set as active strategy
   const s = loadAutoTradeSettings();
   s.strategy = strat.name;
   saveAutoTradeSettings(s);
   const sel = document.getElementById('at-strategy-sel');
   if(sel){ sel.value=strat.name; onStrategySelect(); }
   _suggestedStratIdx = null;
-  // Also add to user strategies
   addStrategyFromLibrary(STRATEGY_LIBRARY.indexOf(strat));
+  challengeCurrentStrategy(); // re-render as "still best"
 }
+
+function dismissStrategyChallenge(){
+  _suggestedStratIdx = null;
+  const box = document.getElementById('at-strat-check');
+  if(!box) return;
+  box.style.background='rgba(255,255,255,.04)';
+  box.style.border='1px solid #252540';
+  box.innerHTML=`<span style="color:#7878a0;font-size:11px;"><i class="fas fa-check fa-xs"></i> Huidige strategie behouden</span>`;
+}
+
+function dismissStratSuggest(){ dismissStrategyChallenge(); }
+function addSuggestedStrat(){ switchToSuggestedStrategy(); }
 
 // Convert Kraken raw pair name → display pair (e.g. XXBTZUSD → BTCUSDT)
 function krakenPairToDisplay(pair){
@@ -3423,7 +3483,7 @@ async function checkAutoTrades(){
   const stat = document.getElementById('at-auto-status');
   const stratName = s.strategy||'ai';
   if(stat) stat.textContent = `Status: ACTIEF · ${stratName} · ${aiResults.length} pairs gescand · ${log.length} trades`;
-  checkAiStrategySuggestion();
+  challengeCurrentStrategy();
 }
 
 function renderAutoTradeLog(){
