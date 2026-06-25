@@ -538,14 +538,14 @@ body.help-mode * { cursor: help !important; }
         <div id="risk-max-loss-pct" style="font-size:10px;color:#7878a0;margin-top:2px;">als alle SL's raken</div>
       </div>
       <div style="background:#0f0f1a;border-radius:8px;padding:10px;text-align:center;">
-        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Positiegrotte</div>
-        <div id="risk-pos-size-auto" style="font-size:17px;font-weight:700;color:#6382ff;font-family:monospace;">$—</div>
-        <div style="font-size:10px;color:#7878a0;margin-top:2px;">auto (% saldo)</div>
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Volgende Trade</div>
+        <div id="risk-pos-size-auto" style="font-size:14px;font-weight:700;color:#6382ff;font-family:monospace;">$—</div>
+        <div style="font-size:10px;color:#7878a0;margin-top:2px;">basis – hoge conf.</div>
       </div>
       <div style="background:#0f0f1a;border-radius:8px;padding:10px;text-align:center;">
-        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Open / Max</div>
-        <div id="risk-pos-count" style="font-size:17px;font-weight:700;color:#fff;font-family:monospace;">0 / 5</div>
-        <div style="font-size:10px;color:#7878a0;margin-top:2px;">posities</div>
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Posities</div>
+        <div id="risk-pos-count" style="font-size:17px;font-weight:700;color:#fff;font-family:monospace;">0 open</div>
+        <div style="font-size:10px;color:#7878a0;margin-top:2px;">onbeperkt</div>
       </div>
     </div>
     <div id="risk-warnings" style="display:none;font-size:11px;line-height:1.7;padding:8px 10px;background:#1a1208;border:1px solid rgba(245,158,11,.3);border-radius:6px;color:#f59e0b;"></div>
@@ -3261,21 +3261,32 @@ function getRiskSLTP(riskLevel, baseSl, baseTp){
 }
 
 // ── Auto Position Sizing ─────────────────────────────────────────────────────
-// Position size = % of total portfolio value, scaled by risk level
-const RISK_POS_PCT  = { low:0.01, medium:0.02, high:0.04, aggressive:0.08 };
-const RISK_MAX_EXP  = { low:0.20, medium:0.40, high:0.60, aggressive:0.80 };
-const RISK_MAX_POS  = { low:3,    medium:5,    high:6,    aggressive:8    };
+// Position size = % of FREE BALANCE, scaled by risk level × signal strength.
+// No hard position caps — the goal is to deploy capital into good signals.
+const RISK_BASE_PCT = { low:0.05, medium:0.12, high:0.25, aggressive:0.45 };
 const RISK_LABELS   = {
-  low:        { label:'Laag',     color:'#6382ff', desc:'1% per trade · max 20% belegd · max 3 posities · SL 1.8% / TP 3.6%' },
-  medium:     { label:'Middel',   color:'#00d4aa', desc:'2% per trade · max 40% belegd · max 5 posities · SL 3% / TP 6%' },
-  high:       { label:'Hoog',     color:'#f59e0b', desc:'4% per trade · max 60% belegd · max 6 posities · SL 5.1% / TP 10.2%' },
-  aggressive: { label:'Agressief',color:'#ff5555', desc:'8% per trade · max 80% belegd · max 8 posities · SL 8.4% / TP 16.8%' },
+  low:        { label:'Laag',     color:'#6382ff', desc:'5% vrij saldo per signaal · sterkere signalen krijgen meer · SL 1.8% / TP 3.6%' },
+  medium:     { label:'Middel',   color:'#00d4aa', desc:'12% vrij saldo per signaal · sterkere signalen krijgen meer · SL 3% / TP 6%' },
+  high:       { label:'Hoog',     color:'#f59e0b', desc:'25% vrij saldo per signaal · sterkere signalen krijgen meer · SL 5.1% / TP 10.2%' },
+  aggressive: { label:'Agressief',color:'#ff5555', desc:'45% vrij saldo per signaal · sterkere signalen krijgen meer · SL 8.4% / TP 16.8%' },
 };
 
-function calculateAutoPositionSize(paper, riskLevel){
-  const total = calcPaperTotal(paper);
-  const pct = RISK_POS_PCT[riskLevel||'medium'] || 0.02;
-  return Math.max(10, +(total * pct).toFixed(2));
+// Signal strength multiplier: high confidence = bigger bet
+function signalStrengthMult(score){
+  const abs = Math.abs(score||55);
+  if(abs >= 90) return 3.0;
+  if(abs >= 80) return 2.0;
+  if(abs >= 70) return 1.5;
+  return 1.0;
+}
+
+// Position size based on free balance × risk level × signal strength
+function calculateAutoPositionSize(paper, riskLevel, score){
+  const free = paper.balance;
+  const pct  = RISK_BASE_PCT[riskLevel||'medium'] || 0.12;
+  const mult = signalStrengthMult(score);
+  // Cap at 95% of free balance so there's always a small buffer
+  return Math.max(10, Math.min(free * 0.95, +(free * pct * mult).toFixed(2)));
 }
 
 function calcCurrentExposure(paper){
@@ -3345,42 +3356,37 @@ function renderRiskPanel(){
   const exposed = calcCurrentExposure(paper);
   const maxLoss = calcMaxLossIfAllSLHit(paper);
   const exposurePct = total > 0 ? (exposed / total * 100) : 0;
-  const maxExp = (RISK_MAX_EXP[rl] || 0.4) * 100;
-  const maxPos = RISK_MAX_POS[rl] || 5;
-  const posSize = calculateAutoPositionSize(paper, rl);
 
-  const expEl = document.getElementById('risk-exposure-pct');
+  // Next trade size: based on current free balance × risk level (score 55 = 1× mult)
+  const nextSize = calculateAutoPositionSize(paper, rl, 55);
+  // High-confidence trade size (score 80+)
+  const highConfSize = calculateAutoPositionSize(paper, rl, 80);
+
+  const expEl    = document.getElementById('risk-exposure-pct');
   const expLimEl = document.getElementById('risk-exposure-limit');
-  const lossEl = document.getElementById('risk-max-loss');
-  const lossPctEl = document.getElementById('risk-max-loss-pct');
-  const sizeEl = document.getElementById('risk-pos-size-auto');
-  const countEl = document.getElementById('risk-pos-count');
-  const warnEl = document.getElementById('risk-warnings');
-  const badgeEl = document.getElementById('risk-health-badge');
+  const lossEl   = document.getElementById('risk-max-loss');
+  const lossPctEl= document.getElementById('risk-max-loss-pct');
+  const sizeEl   = document.getElementById('risk-pos-size-auto');
+  const countEl  = document.getElementById('risk-pos-count');
+  const warnEl   = document.getElementById('risk-warnings');
+  const badgeEl  = document.getElementById('risk-health-badge');
   if(!expEl) return;
 
-  const overExposed = exposurePct > maxExp;
   expEl.textContent = exposurePct.toFixed(1) + '%';
-  expEl.style.color = overExposed ? '#ff5555' : exposurePct > maxExp * 0.8 ? '#f59e0b' : '#f59e0b';
-  if(expLimEl) expLimEl.textContent = `max ${maxExp.toFixed(0)}%`;
+  expEl.style.color = exposurePct > 85 ? '#f59e0b' : '#f59e0b';
+  if(expLimEl) expLimEl.textContent = `vrij: $${paper.balance.toFixed(0)}`;
   if(lossEl) lossEl.textContent = '$' + maxLoss.toFixed(0);
   if(lossPctEl) lossPctEl.textContent = total > 0 ? `${(maxLoss/total*100).toFixed(1)}% van portfolio` : 'als alle SL\'s raken';
-  if(sizeEl) sizeEl.textContent = '$' + posSize.toFixed(0);
-  if(countEl) countEl.textContent = paper.positions.length + ' / ' + maxPos;
+  if(sizeEl) sizeEl.textContent = `$${nextSize.toFixed(0)} – $${highConfSize.toFixed(0)}`;
+  if(countEl) countEl.textContent = paper.positions.length + ' open';
   // Keep hidden at-pos-size in sync
   const posEl = document.getElementById('at-pos-size');
-  if(posEl) posEl.value = posSize;
+  if(posEl) posEl.value = nextSize;
 
-  // Warnings
+  // Only warn on things that truly block trading
   const warnings = [];
-  if(overExposed) warnings.push(`Overbelicht: ${exposurePct.toFixed(1)}% belegd, maximum is ${maxExp.toFixed(0)}% voor niveau ${RISK_LABELS[rl].label}`);
-  if(paper.positions.length >= maxPos) warnings.push(`Maximum posities bereikt (${maxPos}) — geen nieuwe trades totdat een positie sluit`);
-  if(maxLoss / (total||1) > 0.12) warnings.push(`Hoog potentieel verlies: alle stop-losses kunnen ${(maxLoss/total*100).toFixed(1)}% van portfolio uitnemen`);
-  if(paper.balance < 100) warnings.push(`Laag vrij saldo ($${paper.balance.toFixed(0)}) — minimum $100 vereist voor nieuwe trades`);
-  // Concentration warning
-  const sectors = {};
-  paper.positions.forEach(p => { const b = p.pair.replace('USDT',''); sectors[b] = (sectors[b]||0)+1; });
-  Object.entries(sectors).forEach(([asset,cnt]) => { if(cnt>1) warnings.push(`Concentratierisico: meerdere posities in ${asset}`); });
+  if(paper.balance < 10) warnings.push(`Vrij saldo bijna op ($${paper.balance.toFixed(2)}) — wacht tot een positie sluit via TP/SL`);
+  if(maxLoss > total * 0.3) warnings.push(`Hoge SL-exposure: alle stop-losses kunnen $${maxLoss.toFixed(0)} (${(maxLoss/total*100).toFixed(0)}%) uitnemen`);
 
   if(warnEl){
     if(warnings.length){
@@ -3391,9 +3397,9 @@ function renderRiskPanel(){
     }
   }
   if(badgeEl){
-    if(warnings.length >= 2){ badgeEl.textContent = 'RISICO'; badgeEl.style.background='#2a1010'; badgeEl.style.color='#ff5555'; badgeEl.style.borderColor='rgba(255,85,85,.3)'; }
-    else if(warnings.length === 1){ badgeEl.textContent = 'LET OP'; badgeEl.style.background='#1a1208'; badgeEl.style.color='#f59e0b'; badgeEl.style.borderColor='rgba(245,158,11,.3)'; }
-    else { badgeEl.textContent = 'OK'; badgeEl.style.background='#0a1a0a'; badgeEl.style.color='#00d4aa'; badgeEl.style.borderColor='rgba(0,212,170,.3)'; }
+    if(paper.balance < 10){ badgeEl.textContent = 'VOL'; badgeEl.style.background='#2a1010'; badgeEl.style.color='#ff5555'; badgeEl.style.borderColor='rgba(255,85,85,.3)'; }
+    else if(warnings.length){ badgeEl.textContent = 'LET OP'; badgeEl.style.background='#1a1208'; badgeEl.style.color='#f59e0b'; badgeEl.style.borderColor='rgba(245,158,11,.3)'; }
+    else { badgeEl.textContent = 'ACTIEF'; badgeEl.style.background='#0a1a0a'; badgeEl.style.color='#00d4aa'; badgeEl.style.borderColor='rgba(0,212,170,.3)'; }
   }
 }
 
@@ -3406,8 +3412,8 @@ function getStrategyTradeParams(strategyKey, res){
   const cfg = loadAutoTradeSettings();
   const paper = loadPaper();
   const risk    = cfg.riskLevel||'medium';
-  const posSize = calculateAutoPositionSize(paper, risk);
-  const maxpos  = RISK_MAX_POS[risk] || 5;
+  const posSize = calculateAutoPositionSize(paper, risk, res.score);
+  const maxpos  = 50; // no artificial cap — limited only by free balance
 
   if(strategyKey === 'ai' || !strategyKey){
     const {sl,tp} = getRiskSLTP(risk,3,6);
@@ -3716,30 +3722,17 @@ async function checkAutoTrades(){
     const hasPos     = paper.positions.findIndex(p=>p.pair===displayPair);
     const openCount  = paper.positions.length;
 
-    // ── Pre-trade risk checks ────────────────────────
-    // 1. Check minimum free balance ($100 floor)
-    const minBalance = 100;
-    if(tp_s.buySignal && paper.balance < minBalance) continue;
-    // 2. Check max exposure limit
-    const total = calcPaperTotal(paper);
-    const exposed = calcCurrentExposure(paper);
-    const maxExpAmt = total * (RISK_MAX_EXP[rl] || 0.4);
-    if(tp_s.buySignal && exposed >= maxExpAmt) continue;
-    // 3. Skip if this trade would push exposure over limit
-    if(tp_s.buySignal && (exposed + tp_s.pos) > maxExpAmt * 1.05) continue;
-    // 4. Concentration check: skip if already have position in same base asset
-    const baseAsset = displayPair.replace('USDT','').replace('USD','');
-    const alreadyInSameAsset = paper.positions.some(p => p.pair.replace('USDT','').replace('USD','') === baseAsset && p !== paper.positions[hasPos]);
-    if(tp_s.buySignal && hasPos === -1 && alreadyInSameAsset) continue;
     // ── BUY signal ──────────────────────────────────
-    if(tp_s.buySignal && hasPos === -1 && openCount < tp_s.maxpos){
+    // Only hard blocker: no free balance left, or already have this exact pair
+    if(tp_s.buySignal && hasPos === -1 && paper.balance >= 10){
       const qty  = tp_s.pos / price;
       const cost = price * qty;
       if(paper.balance >= cost){
-        // Volatility-adjusted SL: widen SL if price moved fast recently
+        // Volatility-adjusted SL: widen SL slightly if market is wide (high BB width)
         const volatilityFactor = (res.bbWidth && res.bbWidth > 0.06) ? 1.2 : 1.0;
         const adjSl = tp_s.sl * volatilityFactor;
-        const adjTp = tp_s.tp * (volatilityFactor * 0.8 + 0.2); // TP scales less
+        const adjTp = tp_s.tp;
+        const smult = signalStrengthMult(res.score);
         paper.balance -= cost;
         paper.positions.push({
           pair:      displayPair,
@@ -3755,9 +3748,9 @@ async function checkAutoTrades(){
           posSize:   tp_s.pos,
         });
         const rationale = buildTradeRationale(res, s.strategy||'ai', 'BUY', tp_s);
-        rationale.push(`Positiegrootte auto-berekend: $${tp_s.pos.toFixed(0)} (${(RISK_POS_PCT[rl]*100).toFixed(0)}% van $${total.toFixed(0)} portfolio, risico: ${RISK_LABELS[rl].label})`);
-        rationale.push(`SL: ${adjSl.toFixed(1)}% onder entry${volatilityFactor>1?' (verhoogd i.v.m. hoge volatiliteit)':''} · TP: ${adjTp.toFixed(1)}% boven entry`);
-        rationale.push(`Blootstelling na trade: ${((exposed+tp_s.pos)/total*100).toFixed(1)}% (max ${(RISK_MAX_EXP[rl]*100).toFixed(0)}% voor ${RISK_LABELS[rl].label})`);
+        const pctOfFree = (tp_s.pos / (paper.balance + cost) * 100).toFixed(0);
+        rationale.push(`Positiegrootte: $${tp_s.pos.toFixed(0)} — ${(RISK_BASE_PCT[rl]*100).toFixed(0)}% vrij saldo × ${smult}× signaalsterkte (score ${res.score})`);
+        rationale.push(`SL: ${adjSl.toFixed(1)}% onder entry${volatilityFactor>1?' (hoge volatiliteit)':''} · TP: ${adjTp.toFixed(1)}% boven entry · risico: ${RISK_LABELS[rl].label}`);
         log.push({
           ts:       new Date().toISOString(),
           pair:     displayPair,
