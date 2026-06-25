@@ -469,6 +469,22 @@ body.help-mode * { cursor: help !important; }
           </select>
           <div id="at-strat-desc" style="font-size:11px;color:#7878a0;line-height:1.5;min-height:24px;"></div>
         </div>
+        <!-- Position size + risk -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label style="font-size:11px;color:#7878a0;display:block;margin-bottom:4px;">Inzet per trade (USDT)</label>
+            <input class="form-input" id="at-pos-size" type="number" value="150" min="25" max="10000" step="25" oninput="savePositionSize()" style="width:100%;padding:5px 9px;font-size:13px;font-weight:700;">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#7878a0;display:block;margin-bottom:4px;">Risiconiveau</label>
+            <select class="filter-input" id="at-risk-level" onchange="saveRiskLevel()" style="width:100%;">
+              <option value="low">Laag (SL 2% TP 4%)</option>
+              <option value="medium" selected>Middel (SL 4% TP 8%)</option>
+              <option value="high">Hoog (SL 7% TP 15%)</option>
+              <option value="aggressive">Agressief (SL 10% TP 25%)</option>
+            </select>
+          </div>
+        </div>
         <!-- Strategy challenger result (updated after every scan) -->
         <div id="at-strat-check" style="display:none;border-radius:7px;padding:9px 11px;margin-bottom:10px;font-size:12px;line-height:1.55;"></div>
         <!-- Status line -->
@@ -506,8 +522,8 @@ body.help-mode * { cursor: help !important; }
     </div>
   </div>
 
-  <!-- Bottom: top signals + auto trade log -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+  <!-- AI signals row (2 col) -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
     <div class="card">
       <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;"><i class="fas fa-arrow-trend-up" style="color:#00d4aa;"></i> Top Koop Signalen (AI)</div>
       <div id="at-top-buys"><div style="color:#7878a0;font-size:12px;">Run AI-scan om te laden.</div></div>
@@ -516,13 +532,15 @@ body.help-mode * { cursor: help !important; }
       <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;"><i class="fas fa-arrow-trend-down" style="color:#ff5555;"></i> Top Verkoop Signalen (AI)</div>
       <div id="at-top-sells"><div style="color:#7878a0;font-size:12px;">Run AI-scan om te laden.</div></div>
     </div>
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-history" style="color:#6382ff;"></i> Auto Trade Log</div>
-        <button class="btn btn-ghost" onclick="clearAutoTradeLog()" style="font-size:10px;padding:2px 7px;"><i class="fas fa-trash fa-xs"></i></button>
-      </div>
-      <div id="at-trade-log" style="font-size:11px;max-height:200px;overflow-y:auto;"><div style="color:#7878a0;">Nog geen auto-trades uitgevoerd.</div></div>
+  </div>
+
+  <!-- Full-width trade log with reasoning -->
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:700;color:#fff;"><i class="fas fa-book-open" style="color:#6382ff;"></i> Trade Log <span style="font-size:11px;color:#7878a0;font-weight:400;">— elke beslissing met redenering</span></div>
+      <button class="btn btn-ghost" onclick="clearAutoTradeLog()" style="font-size:11px;padding:4px 10px;"><i class="fas fa-trash fa-xs"></i> Wissen</button>
     </div>
+    <div id="at-trade-log"><div style="color:#7878a0;font-size:13px;text-align:center;padding:20px 0;">Nog geen trades — schakel Auto Trading aan en run een scan.</div></div>
   </div>
 
   <!-- Auto-trade succes statistieken -->
@@ -2919,6 +2937,11 @@ function renderActiveTradingPage(){
   if(banner) banner.style.display = s.enabled ? 'flex' : 'none';
   const stat = document.getElementById('at-auto-status');
   if(stat) stat.textContent = s.enabled?`Status: ACTIEF · ${s.strategy||'ai'}`:'Status: inactief';
+  // Sync inputs
+  const posEl  = document.getElementById('at-pos-size');
+  const riskEl = document.getElementById('at-risk-level');
+  if(posEl && s.positionSize) posEl.value = s.positionSize;
+  if(riskEl && s.riskLevel)   riskEl.value = s.riskLevel;
 }
 
 function renderAtPricesBar(){
@@ -3152,9 +3175,30 @@ const AUTO_TRADE_LOG_KEY = 'tb_auto_trade_log';
 
 function loadAutoTradeSettings(){
   return Object.assign(
-    { enabled:false, strategy:'ai', positionSize:50, maxPositions:5 },
+    { enabled:false, strategy:'ai', positionSize:150, maxPositions:5, riskLevel:'medium' },
     JSON.parse(localStorage.getItem(AUTO_TRADE_KEY)||'{}')
   );
+}
+
+function savePositionSize(){
+  const v = parseFloat(document.getElementById('at-pos-size')?.value)||150;
+  const s = loadAutoTradeSettings();
+  s.positionSize = Math.max(25, v);
+  saveAutoTradeSettings(s);
+}
+
+function saveRiskLevel(){
+  const v = document.getElementById('at-risk-level')?.value||'medium';
+  const s = loadAutoTradeSettings();
+  s.riskLevel = v;
+  saveAutoTradeSettings(s);
+}
+
+// SL/TP multipliers per risk level
+function getRiskSLTP(riskLevel, baseSl, baseTp){
+  const mult = { low:0.6, medium:1.0, high:1.7, aggressive:2.8 };
+  const m = mult[riskLevel||'medium']||1;
+  return { sl: +(baseSl*m).toFixed(1), tp: +(baseTp*m).toFixed(1) };
 }
 function saveAutoTradeSettings(s){ localStorage.setItem(AUTO_TRADE_KEY, JSON.stringify(s)); }
 function loadAutoTradeLog(){ return JSON.parse(localStorage.getItem(AUTO_TRADE_LOG_KEY)||'[]'); }
@@ -3162,43 +3206,49 @@ function saveAutoTradeLog(l){ localStorage.setItem(AUTO_TRADE_LOG_KEY, JSON.stri
 
 // Per-strategy trade parameters (buy/sell logic + SL/TP)
 function getStrategyTradeParams(strategyKey, res){
-  const defaults = { sl:3, tp:6, pos:50, maxpos:5 };
+  const cfg = loadAutoTradeSettings();
+  const posSize = cfg.positionSize||150;
+  const maxpos  = cfg.maxPositions||5;
+  const risk    = cfg.riskLevel||'medium';
+
   if(strategyKey === 'ai' || !strategyKey){
-    const ai = loadAutoTradeSettings();
-    // AI score ≥ 55 → buy, ≤ -40 → sell
-    return { ...defaults, pos: ai.positionSize||50, maxpos: ai.maxPositions||5,
+    const {sl,tp} = getRiskSLTP(risk,3,6);
+    return { sl, tp, pos:posSize, maxpos,
       buySignal:  res.score >= 55,
       sellSignal: res.score <= -40
     };
   }
   const strat = STRATEGY_LIBRARY.find(s=>s.name===strategyKey);
-  if(!strat) return { ...defaults, buySignal: res.score>=55, sellSignal: res.score<=-40 };
-  const ai = loadAutoTradeSettings();
+  if(!strat){
+    const {sl,tp} = getRiskSLTP(risk,3,6);
+    return { sl, tp, pos:posSize, maxpos, buySignal:res.score>=55, sellSignal:res.score<=-40 };
+  }
   const p = strat.params||{};
-  let buySignal=false, sellSignal=false, sl=3, tp=6;
+  let buySignal=false, sellSignal=false, baseSl=3, baseTp=6;
   switch(strat.type){
     case 'rsi':
-      sl=4; tp=9;
+      baseSl=4; baseTp=9;
       buySignal  = res.rsi <= (p.oversold||30) && res.score >= 20;
       sellSignal = res.rsi >= (p.overbought||70) && res.score <= -20;
       break;
     case 'macd':
-      sl=3; tp=7;
+      baseSl=3; baseTp=7;
       buySignal  = res.macdHist > 0 && res.score >= 20;
       sellSignal = res.macdHist < 0 && res.score <= -20;
       break;
     case 'bb':
-      sl=3; tp=7;
+      baseSl=3; baseTp=7;
       buySignal  = res.bbPct <= 0.2 && res.score >= 20;
       sellSignal = res.bbPct >= 0.8 && res.score <= -20;
       break;
     case 'ma': case 'hybrid': default:
-      sl=4; tp=10;
-      buySignal  = res.ema.score > 0 && res.score >= 25;
-      sellSignal = res.ema.score < 0 && res.score <= -25;
+      baseSl=4; baseTp=10;
+      buySignal  = res.ema && res.ema.score > 0 && res.score >= 25;
+      sellSignal = res.ema && res.ema.score < 0 && res.score <= -25;
       break;
   }
-  return { sl, tp, pos: ai.positionSize||50, maxpos: ai.maxPositions||5, buySignal, sellSignal };
+  const {sl,tp} = getRiskSLTP(risk, baseSl, baseTp);
+  return { sl, tp, pos:posSize, maxpos, buySignal, sellSignal };
 }
 
 function toggleAutoTradeEnabled(enabled){
@@ -3379,6 +3429,69 @@ function krakenPairToDisplay(pair){
   return p;
 }
 
+// Build human-readable rationale for a buy or sell decision
+function buildTradeRationale(res, strategyKey, action, tp_s){
+  const lines = [];
+  const isBuy = action === 'BUY';
+
+  // RSI
+  if(res.rsi !== undefined){
+    if(res.rsi < 30)       lines.push(`RSI ${res.rsi} → sterk oververkocht — klassiek koopsignaal`);
+    else if(res.rsi < 40)  lines.push(`RSI ${res.rsi} → licht oververkocht — voorzichtig koopsignaal`);
+    else if(res.rsi > 70)  lines.push(`RSI ${res.rsi} → sterk overbought — verkoopsignaal`);
+    else if(res.rsi > 60)  lines.push(`RSI ${res.rsi} → licht overbought — oplopende druk`);
+    else                   lines.push(`RSI ${res.rsi} → neutraal`);
+  }
+
+  // MACD
+  if(res.macdHist !== undefined){
+    const mh = res.macdHist;
+    if(mh > 0.005)       lines.push(`MACD histogram +${mh.toFixed(4)} → sterk opwaarts momentum`);
+    else if(mh > 0)      lines.push(`MACD histogram +${mh.toFixed(4)} → licht positief momentum`);
+    else if(mh < -0.005) lines.push(`MACD histogram ${mh.toFixed(4)} → sterk neerwaarts momentum`);
+    else                  lines.push(`MACD histogram ${mh.toFixed(4)} → licht negatief`);
+  }
+
+  // Bollinger Band
+  if(res.bbPct !== undefined){
+    const bp = res.bbPct;
+    if(bp < 0.15)       lines.push(`Bollinger Band positie ${(bp*100).toFixed(0)}% → prijs dicht bij ondergrens (koopmogelijkheid)`);
+    else if(bp < 0.3)   lines.push(`Bollinger Band positie ${(bp*100).toFixed(0)}% → prijs laag in band`);
+    else if(bp > 0.85)  lines.push(`Bollinger Band positie ${(bp*100).toFixed(0)}% → prijs dicht bij bovengrens (verkoopsignaal)`);
+    else if(bp > 0.7)   lines.push(`Bollinger Band positie ${(bp*100).toFixed(0)}% → prijs hoog in band`);
+    else                 lines.push(`Bollinger Band positie ${(bp*100).toFixed(0)}% → midden van de band`);
+  }
+
+  // EMA
+  if(res.ema && res.ema.score !== undefined){
+    if(res.ema.score > 0)       lines.push(`EMA trend → opgaand (kortlopende EMA boven langlopende)`);
+    else if(res.ema.score < 0)  lines.push(`EMA trend → neergaand (kortlopende EMA onder langlopende)`);
+    else                         lines.push(`EMA trend → zijwaarts`);
+  }
+
+  // Volume
+  if(res.volTrend !== undefined){
+    if(res.volTrend > 0.15)      lines.push(`Volume +${(res.volTrend*100).toFixed(0)}% boven gemiddelde → sterke interesse`);
+    else if(res.volTrend > 0)    lines.push(`Volume licht boven gemiddelde`);
+    else if(res.volTrend < -0.15)lines.push(`Volume ${(res.volTrend*100).toFixed(0)}% onder gemiddelde → weinig interesse`);
+  }
+
+  // AI score verdict
+  const sc = res.score;
+  if(sc >= 70)       lines.push(`AI score +${sc} → zeer sterk koopsignaal`);
+  else if(sc >= 50)  lines.push(`AI score +${sc} → sterk koopsignaal`);
+  else if(sc >= 30)  lines.push(`AI score +${sc} → matig koopsignaal`);
+  else if(sc <= -60) lines.push(`AI score ${sc} → zeer sterk verkoopsignaal`);
+  else if(sc <= -40) lines.push(`AI score ${sc} → sterk verkoopsignaal`);
+  else if(sc <= -20) lines.push(`AI score ${sc} → matig verkoopsignaal`);
+
+  // Strategy & parameters
+  const stratLabel = strategyKey==='ai'?'AI Auto':strategyKey;
+  lines.push(`Strategie: ${stratLabel} · SL ${tp_s.sl}% · TP ${tp_s.tp}%`);
+
+  return lines;
+}
+
 // Called automatically at end of every AI scan
 async function checkAutoTrades(){
   const s = loadAutoTradeSettings();
@@ -3422,13 +3535,14 @@ async function checkAutoTrades(){
           strategy:  s.strategy||'ai'
         });
         log.push({
-          ts:     new Date().toISOString(),
-          pair:   displayPair,
-          action: 'AUTO BUY',
-          price:  price,
-          qty:    +qty.toFixed(6),
-          score:  res.score,
-          reason: `[${s.strategy||'ai'}] Score ${res.score} (${res.signal}) · SL ${tp_s.sl}% TP ${tp_s.tp}%`
+          ts:       new Date().toISOString(),
+          pair:     displayPair,
+          action:   'AUTO BUY',
+          price:    price,
+          qty:      +qty.toFixed(6),
+          score:    res.score,
+          value:    +(tp_s.pos).toFixed(2),
+          rationale: buildTradeRationale(res, s.strategy||'ai', 'BUY', tp_s)
         });
         changed = true;
       }
@@ -3448,14 +3562,17 @@ async function checkAutoTrades(){
         autoTrade: true
       });
       paper.positions.splice(hasPos, 1);
+      const sellLines = buildTradeRationale(res, s.strategy||'ai', 'SELL', tp_s);
+      sellLines.push(`PnL op deze positie: ${pnl>=0?'+':''}$${pnl.toFixed(2)} (${((pnl/(pos.entry*pos.qty))*100).toFixed(1)}%)`);
       log.push({
-        ts:     new Date().toISOString(),
-        pair:   displayPair,
-        action: 'AUTO SELL',
-        price:  price,
-        qty:    +pos.qty.toFixed(6),
-        score:  res.score,
-        reason: `[${s.strategy||'ai'}] Score ${res.score} (${res.signal}) · PnL ${pnl>=0?'+':''}${pnl.toFixed(4)}`
+        ts:       new Date().toISOString(),
+        pair:     displayPair,
+        action:   'AUTO SELL',
+        price:    price,
+        qty:      +pos.qty.toFixed(6),
+        score:    res.score,
+        pnl:      +pnl.toFixed(4),
+        rationale: sellLines
       });
       changed = true;
     }
@@ -3487,25 +3604,65 @@ async function checkAutoTrades(){
 }
 
 function renderAutoTradeLog(){
-  const log = loadAutoTradeLog().slice().reverse().slice(0,30);
+  const log = loadAutoTradeLog().slice().reverse().slice(0,50);
   const div = document.getElementById('at-trade-log');
   if(!div) return;
   if(!log.length){
-    div.innerHTML = '<div style="color:#7878a0;">Nog geen auto-trades uitgevoerd.</div>';
+    div.innerHTML = '<div style="color:#7878a0;font-size:13px;text-align:center;padding:20px 0;">Nog geen trades — schakel Auto Trading aan en run een scan.</div>';
     return;
   }
-  div.innerHTML = log.map(e=>{
-    const isBuy = e.action.includes('BUY');
-    const color = isBuy?'#00d4aa':'#ff5555';
-    return `<div style="padding:5px 0;border-bottom:1px solid #1e1e38;">
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-weight:700;color:${color};font-size:11px;">${e.action}</span>
-        <span style="font-weight:700;font-size:11px;">${e.pair}</span>
-        <span style="color:#7878a0;font-size:10px;margin-left:auto;">${e.ts.slice(5,16)}</span>
+  div.innerHTML = log.map((e,i)=>{
+    const isBuy  = e.action.includes('BUY');
+    const color  = isBuy ? '#00d4aa' : '#ff5555';
+    const icon   = isBuy ? 'fa-arrow-up' : 'fa-arrow-down';
+    const badge  = isBuy
+      ? `<span style="background:rgba(0,212,170,.15);color:#00d4aa;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">KOOP</span>`
+      : `<span style="background:rgba(255,85,85,.15);color:#ff5555;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">VERKOOP</span>`;
+    const pnlBadge = (!isBuy && e.pnl !== undefined)
+      ? `<span style="margin-left:6px;font-size:11px;font-weight:700;color:${e.pnl>=0?'#00d4aa':'#ff5555'};">${e.pnl>=0?'+':''}$${e.pnl.toFixed(2)}</span>`
+      : '';
+    const valText = isBuy && e.value ? `<span style="font-size:11px;color:#7878a0;">$${e.value.toFixed(0)} ingezet</span>` : '';
+    const priceStr = e.price >= 1 ? e.price.toLocaleString('nl',{maximumFractionDigits:2}) : e.price.toFixed(6);
+    const rationale = Array.isArray(e.rationale) ? e.rationale : (e.reason ? [e.reason] : []);
+    const uid = `tlog_${i}`;
+    return `<div style="border:1px solid #252540;border-radius:8px;margin-bottom:8px;overflow:hidden;">
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;background:#1a1a2e;"
+           onclick="toggleTradeLogEntry('${uid}')">
+        <i class="fas ${icon} fa-xs" style="color:${color};width:14px;text-align:center;"></i>
+        ${badge}
+        <span style="font-size:13px;font-weight:700;color:#fff;">${e.pair}</span>
+        <span style="font-size:12px;font-family:monospace;color:#c0c0d0;">@ $${priceStr}</span>
+        ${pnlBadge}
+        <span style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          ${valText}
+          <span style="font-size:11px;color:#7878a0;">${e.ts.slice(0,16).replace('T',' ')}</span>
+          <i class="fas fa-chevron-down fa-xs" style="color:#7878a0;" id="${uid}_chevron"></i>
+        </span>
       </div>
-      <div style="font-size:10px;color:#7878a0;margin-top:2px;">${e.reason}</div>
+      <!-- Reasoning (collapsed by default) -->
+      <div id="${uid}" style="display:none;padding:10px 14px;background:#13132a;border-top:1px solid #252540;">
+        <div style="font-size:11px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;">Redenering</div>
+        ${rationale.map(line=>{
+          const isStrat = line.startsWith('Strategie:');
+          const isPnl   = line.startsWith('PnL');
+          return `<div style="display:flex;gap:8px;margin-bottom:5px;font-size:12px;color:${isPnl?(e.pnl>=0?'#00d4aa':'#ff5555'):isStrat?'#6382ff':'#c0c0d0'};">
+            <i class="fas ${isStrat?'fa-bookmark':isPnl?'fa-coins':'fa-circle-dot'} fa-xs" style="margin-top:3px;flex-shrink:0;color:${isStrat?'#6382ff':isPnl?(e.pnl>=0?'#00d4aa':'#ff5555'):'#3a3a5c'};"></i>
+            <span>${line}</span>
+          </div>`;
+        }).join('')}
+      </div>
     </div>`;
   }).join('');
+}
+
+function toggleTradeLogEntry(uid){
+  const el = document.getElementById(uid);
+  const ch = document.getElementById(uid+'_chevron');
+  if(!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if(ch) ch.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
 }
 
 function clearAutoTradeLog(){
