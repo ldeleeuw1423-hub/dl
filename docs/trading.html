@@ -469,20 +469,13 @@ body.help-mode * { cursor: help !important; }
           </select>
           <div id="at-strat-desc" style="font-size:11px;color:#7878a0;line-height:1.5;min-height:24px;"></div>
         </div>
-        <!-- Risk level + auto position size -->
-        <div style="margin-bottom:10px;">
-          <label style="font-size:11px;color:#7878a0;display:block;margin-bottom:5px;">Risiconiveau</label>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px;">
-            <button id="risk-btn-low"        onclick="setRiskLevel('low')"        class="btn btn-ghost" style="font-size:10px;padding:5px 3px;text-align:center;border-radius:6px;">🛡 Laag</button>
-            <button id="risk-btn-medium"     onclick="setRiskLevel('medium')"     class="btn btn-ghost" style="font-size:10px;padding:5px 3px;text-align:center;border-radius:6px;background:rgba(0,212,170,.15);border-color:#00d4aa;color:#00d4aa;">⚖ Middel</button>
-            <button id="risk-btn-high"       onclick="setRiskLevel('high')"       class="btn btn-ghost" style="font-size:10px;padding:5px 3px;text-align:center;border-radius:6px;">🔥 Hoog</button>
-            <button id="risk-btn-aggressive" onclick="setRiskLevel('aggressive')" class="btn btn-ghost" style="font-size:10px;padding:5px 3px;text-align:center;border-radius:6px;">⚡ Max</button>
-          </div>
-          <div id="at-risk-desc" style="font-size:11px;color:#7878a0;line-height:1.5;padding:7px 10px;background:#0f0f1a;border-radius:6px;"></div>
+        <!-- Auto risk info (read-only, system determines everything) -->
+        <div id="at-risk-desc" style="font-size:11px;color:#7878a0;line-height:1.6;padding:7px 10px;background:#0f0f1a;border-radius:6px;margin-bottom:10px;">
+          Inzet wordt automatisch bepaald op basis van signaalsterkte en volatiliteit.
         </div>
         <!-- Hidden inputs kept for backward compat -->
         <input type="hidden" id="at-pos-size" value="150">
-        <input type="hidden" id="at-risk-level" value="medium">
+        <input type="hidden" id="at-risk-level" value="aggressive">
         <!-- Strategy challenger result (updated after every scan) -->
         <div id="at-strat-check" style="display:none;border-radius:7px;padding:9px 11px;margin-bottom:10px;font-size:12px;line-height:1.55;"></div>
         <!-- Status line -->
@@ -1905,31 +1898,41 @@ function renderTickerBar(){
   if(!bar) return;
   const paper=loadPaper();
   const positions=paper.positions||[];
+  const hasPrices=Object.keys(livePrices).length>0;
 
-  if(!positions.length){
-    // No holdings — show compact market prices
-    bar.innerHTML=TRACKED_PAIRS.slice(0,4).map(p=>{
-      const pr=livePrices[p];
-      if(!pr) return '';
-      return `<div style="font-size:12px;color:#7878a0;padding:2px 0;">${p.replace('USDT','')} <span style="color:#fff;font-weight:600;font-family:monospace;">${pr.toLocaleString('nl',{maximumFractionDigits:2})}</span></div>`;
+  if(positions.length){
+    // Show what you own: asset, current value, % P&L
+    bar.innerHTML=positions.slice(0,8).map(pos=>{
+      const sym=pos.pair.replace('USDT','').replace('USD','');
+      const bPair=sym==='BTC'?'BTCUSDT':sym+'USDT';
+      const cur=livePrices[bPair]||livePrices[pos.pair]||pos.entry;
+      const value=cur*pos.qty;
+      const pct=(cur-pos.entry)/pos.entry*100;
+      const color=pct>=0?'#00d4aa':'#ff5555';
+      const sign=pct>=0?'+':'';
+      return `<div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border-radius:6px;padding:3px 9px;border:1px solid ${pct>=0?'rgba(0,212,170,.2)':'rgba(255,85,85,.2)'};">
+        <span style="font-size:11px;font-weight:700;color:#e0e0e0;">${sym}</span>
+        <span style="font-size:12px;font-family:monospace;color:#fff;">$${value>=1?value.toLocaleString('nl',{maximumFractionDigits:0}):value.toFixed(2)}</span>
+        <span style="font-size:11px;font-weight:700;color:${color};">${sign}${pct.toFixed(1)}%</span>
+      </div>`;
     }).join('');
     return;
   }
 
-  // Show what you own: asset, current value, % P&L
-  bar.innerHTML=positions.slice(0,6).map(pos=>{
-    const cur=livePrices[pos.pair]||pos.entry;
-    const value=cur*pos.qty;
-    const pct=(cur-pos.entry)/pos.entry*100;
-    const color=pct>=0?'#00d4aa':'#ff5555';
-    const sign=pct>=0?'+':'';
-    const asset=pos.pair.replace('USDT','').replace('BTC','BTC');
-    return `<div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border-radius:6px;padding:3px 9px;border:1px solid ${pct>=0?'rgba(0,212,170,.2)':'rgba(255,85,85,.2)'};">
-      <span style="font-size:11px;font-weight:700;color:#e0e0e0;">${asset}</span>
-      <span style="font-size:12px;font-family:monospace;color:#fff;">$${value.toLocaleString('nl',{maximumFractionDigits:0})}</span>
-      <span style="font-size:11px;font-weight:700;color:${color};">${sign}${pct.toFixed(1)}%</span>
+  // No holdings — show market prices (or loading)
+  if(!hasPrices){
+    bar.innerHTML='<span style="font-size:11px;color:#5a5a7c;font-style:italic;">Marktprijzen laden…</span>';
+    return;
+  }
+  bar.innerHTML=TRACKED_PAIRS.slice(0,5).map(p=>{
+    const pr=livePrices[p];
+    if(!pr) return '';
+    const sym=p.replace('USDT','');
+    return `<div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
+      <span style="font-size:11px;color:#7878a0;">${sym}</span>
+      <span style="font-size:12px;font-weight:600;font-family:monospace;color:#c0c0d0;">${pr>=1?pr.toLocaleString('nl',{maximumFractionDigits:0}):pr.toFixed(4)}</span>
     </div>`;
-  }).join('');
+  }).join('<span style="color:#3a3a5c;">·</span>');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2729,10 +2732,31 @@ const REDDIT_SUBS = [
   { sub:'solana',          label:'r/solana',           minScore:10 },
 ];
 
+// ── Fear & Greed Index (alternative.me — altijd beschikbaar) ──
+let fearGreedValue = null;
+async function fetchFearGreed(){
+  try {
+    const r = await fetch('https://api.alternative.me/fng/?limit=7');
+    const d = await r.json();
+    const list = d.data||[];
+    if(!list.length) return null;
+    fearGreedValue = parseInt(list[0].value);
+    // Update KPI if visible
+    const el = document.getElementById('soc-mood');
+    if(el && fearGreedValue !== null){
+      const label = fearGreedValue<=20?'Extreme Fear':fearGreedValue<=40?'Fear':fearGreedValue<=60?'Neutraal':fearGreedValue<=80?'Greed':'Extreme Greed';
+      const color = fearGreedValue<=40?'#ff5555':fearGreedValue<=60?'#f59e0b':'#00d4aa';
+      el.innerHTML = `<span style="color:${color};">${fearGreedValue}</span> <span style="font-size:12px;color:${color};">${label}</span>`;
+    }
+    return list;
+  } catch(e){ return null; }
+}
+
 // ── Nieuws via CryptoCompare (gratis, CORS OK) ──────────
 async function fetchCryptoNews(){
   try {
     const r = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest&extraParams=TradingDashboard');
+    if(!r.ok) return [];
     const d = await r.json();
     return (d.Data||[]).slice(0,30).map(item=>({
       id: 'news_'+item.id,
@@ -2842,16 +2866,34 @@ function enrichItem(item){
 // ── Hoofd laad functie ──────────────────────────────────
 async function loadSocialFeed(){
   const icon=document.getElementById('social-refresh-icon');
-  icon.classList.add('fa-spin');
+  if(icon) icon.classList.add('fa-spin');
   document.getElementById('social-feed').innerHTML=`<div class="card" style="text-align:center;color:#7878a0;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:24px;color:#6382ff;margin-bottom:10px;display:block;"></i>Laden van bronnen...</div>`;
 
-  // Fetch alles parallel
-  const [newsItems,...redditArrays] = await Promise.all([
+  // Fetch Fear & Greed + news + reddit parallel
+  const [fng, newsItems,...redditArrays] = await Promise.all([
+    fetchFearGreed(),
     fetchCryptoNews(),
     ...REDDIT_SUBS.map(s=>fetchRedditSub(s.sub, s.minScore))
   ]);
   const redditItems = redditArrays.flat();
-  const raw = [...newsItems,...redditItems];
+  const raw = [...(newsItems||[]),...redditItems];
+
+  // Als alles leeg is — toon fallback met Fear & Greed
+  if(!raw.length){
+    const fgv = fearGreedValue;
+    const fgLabel = fgv===null?'—':fgv<=20?'Extreme Fear':fgv<=40?'Fear':fgv<=60?'Neutraal':fgv<=80?'Greed':'Extreme Greed';
+    const fgColor = fgv===null?'#7878a0':fgv<=40?'#ff5555':fgv<=60?'#f59e0b':'#00d4aa';
+    document.getElementById('social-feed').innerHTML=`
+      <div class="card" style="text-align:center;padding:30px;">
+        <div style="font-size:12px;color:#7878a0;margin-bottom:16px;">Nieuws-API's zijn tijdelijk onbereikbaar (CORS/rate-limit). Fear & Greed index werkt wel:</div>
+        <div style="font-size:48px;font-weight:700;color:${fgColor};font-family:monospace;">${fgv??'—'}</div>
+        <div style="font-size:18px;color:${fgColor};margin-top:8px;">${fgLabel}</div>
+        <div style="font-size:11px;color:#7878a0;margin-top:12px;">Bron: alternative.me/crypto/fear-and-greed-index</div>
+        <button class="btn btn-ghost" onclick="loadSocialFeed()" style="margin-top:20px;font-size:12px;"><i class="fas fa-redo fa-xs"></i> Opnieuw proberen</button>
+      </div>`;
+    if(icon) icon.classList.remove('fa-spin');
+    return;
+  }
 
   // Verrijken + dedupliceren
   const seen=new Set();
@@ -2957,7 +2999,11 @@ function formatAge(ms){
   return Math.round(diff/86400)+'d geleden';
 }
 
-function renderSocialPage(){ if(!allSocialItems.length) loadSocialFeed(); else applySocialFilters(); }
+function renderSocialPage(){
+  // Always fetch Fear & Greed immediately (fast, reliable)
+  fetchFearGreed();
+  if(!allSocialItems.length) loadSocialFeed(); else applySocialFilters();
+}
 
 function toggleSocialAuto(el){
   if(el.checked){ socialAutoInterval=setInterval(loadSocialFeed,SOCIAL_INTERVAL); }
@@ -2997,8 +3043,6 @@ function renderActiveTradingPage(){
   if(banner) banner.style.display = s.enabled ? 'flex' : 'none';
   const stat = document.getElementById('at-auto-status');
   if(stat) stat.textContent = s.enabled?`Status: ACTIEF · ${s.strategy||'ai'}`:'Status: inactief';
-  // Sync risk level buttons
-  syncRiskLevelButtons(s.riskLevel || 'medium');
   // Render risk dashboard
   renderRiskPanel();
 }
@@ -3362,6 +3406,19 @@ function renderRiskPanel(){
   // High-confidence trade size (score 80+)
   const highConfSize = calculateAutoPositionSize(paper, rl, 80);
 
+  // Update auto-desc with what the system will do on next trade
+  const descEl = document.getElementById('at-risk-desc');
+  if(descEl){
+    const baseSize = calculateAutoPositionSize(paper, 'aggressive', 55);
+    const highSize = calculateAutoPositionSize(paper, 'aggressive', 80);
+    const maxSize  = calculateAutoPositionSize(paper, 'aggressive', 90);
+    descEl.innerHTML = `<b style="color:#ff5555;">Automatisch — agressief winstgericht</b><br>
+      Signaal 55–69: <b style="color:#e0e0e0;">$${baseSize.toFixed(0)}</b> &nbsp;·&nbsp;
+      Signaal 70–89: <b style="color:#f59e0b;">$${highSize.toFixed(0)}</b> &nbsp;·&nbsp;
+      Signaal 90+: <b style="color:#ff5555;">$${maxSize.toFixed(0)}</b><br>
+      Vrij saldo: <b style="color:#00d4aa;">$${paper.balance.toFixed(0)}</b>`;
+  }
+
   const expEl    = document.getElementById('risk-exposure-pct');
   const expLimEl = document.getElementById('risk-exposure-limit');
   const lossEl   = document.getElementById('risk-max-loss');
@@ -3411,7 +3468,7 @@ function saveAutoTradeLog(l){ localStorage.setItem(AUTO_TRADE_LOG_KEY, JSON.stri
 function getStrategyTradeParams(strategyKey, res){
   const cfg = loadAutoTradeSettings();
   const paper = loadPaper();
-  const risk    = cfg.riskLevel||'medium';
+  const risk    = 'aggressive'; // system always uses max-profit mode
   const posSize = calculateAutoPositionSize(paper, risk, res.score);
   const maxpos  = 50; // no artificial cap — limited only by free balance
 
@@ -3710,7 +3767,7 @@ async function checkAutoTrades(){
 
   const paper = loadPaper();
   const log   = loadAutoTradeLog();
-  const rl = s.riskLevel || 'medium';
+  const rl = 'aggressive'; // system always goes for maximum profit
   let changed = false;
 
   for(const res of aiResults){
@@ -4589,7 +4646,7 @@ renderStrategyLibrary();
 try { loadDemoData(); } catch(e){ console.warn('loadDemoData:', e.message); showPage('activetrading'); } // also calls showPage('activetrading')
 updateClaudeChatUI();
 // Init risk level buttons and dashboard
-(()=>{ const s = loadAutoTradeSettings(); syncRiskLevelButtons(s.riskLevel||'medium'); renderRiskPanel(); })();
+renderRiskPanel();
 renderTickerBar(); // show positions immediately (uses entry price as fallback before live prices)
 updateLivePrices();
 setInterval(updateLivePrices, 15000);
