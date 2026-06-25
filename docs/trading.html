@@ -469,22 +469,20 @@ body.help-mode * { cursor: help !important; }
           </select>
           <div id="at-strat-desc" style="font-size:11px;color:#7878a0;line-height:1.5;min-height:24px;"></div>
         </div>
-        <!-- Position size + risk -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-          <div>
-            <label style="font-size:11px;color:#7878a0;display:block;margin-bottom:4px;">Inzet per trade (USDT)</label>
-            <input class="form-input" id="at-pos-size" type="number" value="150" min="25" max="10000" step="25" oninput="savePositionSize()" style="width:100%;padding:5px 9px;font-size:13px;font-weight:700;">
+        <!-- Risk level + auto position size -->
+        <div style="margin-bottom:10px;">
+          <label style="font-size:11px;color:#7878a0;display:block;margin-bottom:5px;">Risiconiveau</label>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px;">
+            <button id="risk-btn-low"        onclick="setRiskLevel('low')"        class="btn btn-ghost" style="font-size:10px;padding:5px 3px;text-align:center;border-radius:6px;">🛡 Laag</button>
+            <button id="risk-btn-medium"     onclick="setRiskLevel('medium')"     class="btn btn-ghost" style="font-size:10px;padding:5px 3px;text-align:center;border-radius:6px;background:rgba(0,212,170,.15);border-color:#00d4aa;color:#00d4aa;">⚖ Middel</button>
+            <button id="risk-btn-high"       onclick="setRiskLevel('high')"       class="btn btn-ghost" style="font-size:10px;padding:5px 3px;text-align:center;border-radius:6px;">🔥 Hoog</button>
+            <button id="risk-btn-aggressive" onclick="setRiskLevel('aggressive')" class="btn btn-ghost" style="font-size:10px;padding:5px 3px;text-align:center;border-radius:6px;">⚡ Max</button>
           </div>
-          <div>
-            <label style="font-size:11px;color:#7878a0;display:block;margin-bottom:4px;">Risiconiveau</label>
-            <select class="filter-input" id="at-risk-level" onchange="saveRiskLevel()" style="width:100%;">
-              <option value="low">Laag (SL 2% TP 4%)</option>
-              <option value="medium" selected>Middel (SL 4% TP 8%)</option>
-              <option value="high">Hoog (SL 7% TP 15%)</option>
-              <option value="aggressive">Agressief (SL 10% TP 25%)</option>
-            </select>
-          </div>
+          <div id="at-risk-desc" style="font-size:11px;color:#7878a0;line-height:1.5;padding:7px 10px;background:#0f0f1a;border-radius:6px;"></div>
         </div>
+        <!-- Hidden inputs kept for backward compat -->
+        <input type="hidden" id="at-pos-size" value="150">
+        <input type="hidden" id="at-risk-level" value="medium">
         <!-- Strategy challenger result (updated after every scan) -->
         <div id="at-strat-check" style="display:none;border-radius:7px;padding:9px 11px;margin-bottom:10px;font-size:12px;line-height:1.55;"></div>
         <!-- Status line -->
@@ -520,6 +518,37 @@ body.help-mode * { cursor: help !important; }
       </div>
 
     </div>
+  </div>
+
+  <!-- Risk Dashboard (full width) -->
+  <div class="card" id="risk-dashboard-card" style="margin-bottom:14px;border:1px solid rgba(245,158,11,.2);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-shield-halved" style="color:#f59e0b;"></i> Risicobeheer Dashboard</div>
+      <div id="risk-health-badge" style="font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:#1a2f1a;color:#00d4aa;border:1px solid rgba(0,212,170,.3);">OK</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
+      <div style="background:#0f0f1a;border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Belegd</div>
+        <div id="risk-exposure-pct" style="font-size:17px;font-weight:700;color:#f59e0b;font-family:monospace;">0%</div>
+        <div id="risk-exposure-limit" style="font-size:10px;color:#7878a0;margin-top:2px;">max 40%</div>
+      </div>
+      <div style="background:#0f0f1a;border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Max Verlies</div>
+        <div id="risk-max-loss" style="font-size:17px;font-weight:700;color:#ff5555;font-family:monospace;">$0</div>
+        <div id="risk-max-loss-pct" style="font-size:10px;color:#7878a0;margin-top:2px;">als alle SL's raken</div>
+      </div>
+      <div style="background:#0f0f1a;border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Positiegrotte</div>
+        <div id="risk-pos-size-auto" style="font-size:17px;font-weight:700;color:#6382ff;font-family:monospace;">$—</div>
+        <div style="font-size:10px;color:#7878a0;margin-top:2px;">auto (% saldo)</div>
+      </div>
+      <div style="background:#0f0f1a;border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Open / Max</div>
+        <div id="risk-pos-count" style="font-size:17px;font-weight:700;color:#fff;font-family:monospace;">0 / 5</div>
+        <div style="font-size:10px;color:#7878a0;margin-top:2px;">posities</div>
+      </div>
+    </div>
+    <div id="risk-warnings" style="display:none;font-size:11px;line-height:1.7;padding:8px 10px;background:#1a1208;border:1px solid rgba(245,158,11,.3);border-radius:6px;color:#f59e0b;"></div>
   </div>
 
   <!-- AI signals row (2 col) -->
@@ -1604,7 +1633,7 @@ async function refreshPaperPositions(){
       changed=true;
     }
   }
-  if(changed) savePaper(paper);
+  if(changed){ savePaper(paper); renderRiskPanel(); }
   renderPaperPage();
 }
 
@@ -2080,7 +2109,9 @@ function computeScore(candles, weights){
   const macdScore = hist>0?Math.min(hist/cur*1000,1):Math.max(hist/cur*1000,-1);
 
   // Bollinger score
-  const {pct}=calcBB(closes);
+  const bbData=calcBB(closes);
+  const {pct}=bbData;
+  const bbWidth = bbData.mid > 0 ? (bbData.upper - bbData.lower) / bbData.mid : 0;
   const bbScore = pct<0.2?0.8:pct>0.8?-0.8:pct<0.4?.3:pct>0.6?-.3:0;
 
   // Volume score
@@ -2096,7 +2127,7 @@ function computeScore(candles, weights){
     rsi:rsi.toFixed(1), rsiScore,
     ema:{e9:ema9,e21:ema21,e50:ema50,score:emaScore},
     macdHist:hist, macdScore,
-    bbPct:pct, bbScore,
+    bbPct:pct, bbScore, bbWidth,
     volTrend, volScore,
     price:cur
   };
@@ -2966,11 +2997,10 @@ function renderActiveTradingPage(){
   if(banner) banner.style.display = s.enabled ? 'flex' : 'none';
   const stat = document.getElementById('at-auto-status');
   if(stat) stat.textContent = s.enabled?`Status: ACTIEF · ${s.strategy||'ai'}`:'Status: inactief';
-  // Sync inputs
-  const posEl  = document.getElementById('at-pos-size');
-  const riskEl = document.getElementById('at-risk-level');
-  if(posEl && s.positionSize) posEl.value = s.positionSize;
-  if(riskEl && s.riskLevel)   riskEl.value = s.riskLevel;
+  // Sync risk level buttons
+  syncRiskLevelButtons(s.riskLevel || 'medium');
+  // Render risk dashboard
+  renderRiskPanel();
 }
 
 function renderAtPricesBar(){
@@ -3229,6 +3259,144 @@ function getRiskSLTP(riskLevel, baseSl, baseTp){
   const m = mult[riskLevel||'medium']||1;
   return { sl: +(baseSl*m).toFixed(1), tp: +(baseTp*m).toFixed(1) };
 }
+
+// ── Auto Position Sizing ─────────────────────────────────────────────────────
+// Position size = % of total portfolio value, scaled by risk level
+const RISK_POS_PCT  = { low:0.01, medium:0.02, high:0.04, aggressive:0.08 };
+const RISK_MAX_EXP  = { low:0.20, medium:0.40, high:0.60, aggressive:0.80 };
+const RISK_MAX_POS  = { low:3,    medium:5,    high:6,    aggressive:8    };
+const RISK_LABELS   = {
+  low:        { label:'Laag',     color:'#6382ff', desc:'1% per trade · max 20% belegd · max 3 posities · SL 1.8% / TP 3.6%' },
+  medium:     { label:'Middel',   color:'#00d4aa', desc:'2% per trade · max 40% belegd · max 5 posities · SL 3% / TP 6%' },
+  high:       { label:'Hoog',     color:'#f59e0b', desc:'4% per trade · max 60% belegd · max 6 posities · SL 5.1% / TP 10.2%' },
+  aggressive: { label:'Agressief',color:'#ff5555', desc:'8% per trade · max 80% belegd · max 8 posities · SL 8.4% / TP 16.8%' },
+};
+
+function calculateAutoPositionSize(paper, riskLevel){
+  const total = calcPaperTotal(paper);
+  const pct = RISK_POS_PCT[riskLevel||'medium'] || 0.02;
+  return Math.max(10, +(total * pct).toFixed(2));
+}
+
+function calcCurrentExposure(paper){
+  let exposed = 0;
+  paper.positions.forEach(pos => {
+    const sym = pos.pair.replace('USDT','').replace('USD','');
+    const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+    const cur = livePrices[bPair] || livePrices[pos.pair] || pos.entry;
+    exposed += cur * pos.qty;
+  });
+  return exposed;
+}
+
+function calcMaxLossIfAllSLHit(paper){
+  let maxLoss = 0;
+  paper.positions.forEach(pos => {
+    if(pos.sl && pos.side === 'BUY'){
+      const sym = pos.pair.replace('USDT','').replace('USD','');
+      const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+      const cur = livePrices[bPair] || livePrices[pos.pair] || pos.entry;
+      const lossPerUnit = cur - pos.sl;
+      maxLoss += lossPerUnit * pos.qty;
+    }
+  });
+  return Math.abs(maxLoss);
+}
+
+function setRiskLevel(level){
+  const s = loadAutoTradeSettings();
+  s.riskLevel = level;
+  saveAutoTradeSettings(s);
+  syncRiskLevelButtons(level);
+  renderRiskPanel();
+}
+
+function syncRiskLevelButtons(level){
+  ['low','medium','high','aggressive'].forEach(lv => {
+    const btn = document.getElementById('risk-btn-'+lv);
+    if(!btn) return;
+    const info = RISK_LABELS[lv];
+    if(lv === level){
+      btn.style.background = `rgba(${lv==='low'?'99,130,255':lv==='medium'?'0,212,170':lv==='high'?'245,158,11':'255,85,85'},.18)`;
+      btn.style.borderColor = info.color;
+      btn.style.color = info.color;
+    } else {
+      btn.style.background = '';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }
+  });
+  // Update desc
+  const desc = document.getElementById('at-risk-desc');
+  if(desc){
+    const info = RISK_LABELS[level];
+    desc.innerHTML = `<span style="color:${info.color};font-weight:600;">${info.label}</span> — ${info.desc}`;
+  }
+  // Keep hidden input in sync for backward compat
+  const riskEl = document.getElementById('at-risk-level');
+  if(riskEl) riskEl.value = level;
+}
+
+function renderRiskPanel(){
+  const s = loadAutoTradeSettings();
+  const paper = loadPaper();
+  const rl = s.riskLevel || 'medium';
+  const total = calcPaperTotal(paper);
+  const exposed = calcCurrentExposure(paper);
+  const maxLoss = calcMaxLossIfAllSLHit(paper);
+  const exposurePct = total > 0 ? (exposed / total * 100) : 0;
+  const maxExp = (RISK_MAX_EXP[rl] || 0.4) * 100;
+  const maxPos = RISK_MAX_POS[rl] || 5;
+  const posSize = calculateAutoPositionSize(paper, rl);
+
+  const expEl = document.getElementById('risk-exposure-pct');
+  const expLimEl = document.getElementById('risk-exposure-limit');
+  const lossEl = document.getElementById('risk-max-loss');
+  const lossPctEl = document.getElementById('risk-max-loss-pct');
+  const sizeEl = document.getElementById('risk-pos-size-auto');
+  const countEl = document.getElementById('risk-pos-count');
+  const warnEl = document.getElementById('risk-warnings');
+  const badgeEl = document.getElementById('risk-health-badge');
+  if(!expEl) return;
+
+  const overExposed = exposurePct > maxExp;
+  expEl.textContent = exposurePct.toFixed(1) + '%';
+  expEl.style.color = overExposed ? '#ff5555' : exposurePct > maxExp * 0.8 ? '#f59e0b' : '#f59e0b';
+  if(expLimEl) expLimEl.textContent = `max ${maxExp.toFixed(0)}%`;
+  if(lossEl) lossEl.textContent = '$' + maxLoss.toFixed(0);
+  if(lossPctEl) lossPctEl.textContent = total > 0 ? `${(maxLoss/total*100).toFixed(1)}% van portfolio` : 'als alle SL\'s raken';
+  if(sizeEl) sizeEl.textContent = '$' + posSize.toFixed(0);
+  if(countEl) countEl.textContent = paper.positions.length + ' / ' + maxPos;
+  // Keep hidden at-pos-size in sync
+  const posEl = document.getElementById('at-pos-size');
+  if(posEl) posEl.value = posSize;
+
+  // Warnings
+  const warnings = [];
+  if(overExposed) warnings.push(`Overbelicht: ${exposurePct.toFixed(1)}% belegd, maximum is ${maxExp.toFixed(0)}% voor niveau ${RISK_LABELS[rl].label}`);
+  if(paper.positions.length >= maxPos) warnings.push(`Maximum posities bereikt (${maxPos}) — geen nieuwe trades totdat een positie sluit`);
+  if(maxLoss / (total||1) > 0.12) warnings.push(`Hoog potentieel verlies: alle stop-losses kunnen ${(maxLoss/total*100).toFixed(1)}% van portfolio uitnemen`);
+  if(paper.balance < 100) warnings.push(`Laag vrij saldo ($${paper.balance.toFixed(0)}) — minimum $100 vereist voor nieuwe trades`);
+  // Concentration warning
+  const sectors = {};
+  paper.positions.forEach(p => { const b = p.pair.replace('USDT',''); sectors[b] = (sectors[b]||0)+1; });
+  Object.entries(sectors).forEach(([asset,cnt]) => { if(cnt>1) warnings.push(`Concentratierisico: meerdere posities in ${asset}`); });
+
+  if(warnEl){
+    if(warnings.length){
+      warnEl.innerHTML = warnings.map(w=>`⚠ ${w}`).join('<br>');
+      warnEl.style.display = 'block';
+    } else {
+      warnEl.style.display = 'none';
+    }
+  }
+  if(badgeEl){
+    if(warnings.length >= 2){ badgeEl.textContent = 'RISICO'; badgeEl.style.background='#2a1010'; badgeEl.style.color='#ff5555'; badgeEl.style.borderColor='rgba(255,85,85,.3)'; }
+    else if(warnings.length === 1){ badgeEl.textContent = 'LET OP'; badgeEl.style.background='#1a1208'; badgeEl.style.color='#f59e0b'; badgeEl.style.borderColor='rgba(245,158,11,.3)'; }
+    else { badgeEl.textContent = 'OK'; badgeEl.style.background='#0a1a0a'; badgeEl.style.color='#00d4aa'; badgeEl.style.borderColor='rgba(0,212,170,.3)'; }
+  }
+}
+
 function saveAutoTradeSettings(s){ localStorage.setItem(AUTO_TRADE_KEY, JSON.stringify(s)); }
 function loadAutoTradeLog(){ return JSON.parse(localStorage.getItem(AUTO_TRADE_LOG_KEY)||'[]'); }
 function saveAutoTradeLog(l){ localStorage.setItem(AUTO_TRADE_LOG_KEY, JSON.stringify(l.slice(-150))); }
@@ -3236,9 +3404,10 @@ function saveAutoTradeLog(l){ localStorage.setItem(AUTO_TRADE_LOG_KEY, JSON.stri
 // Per-strategy trade parameters (buy/sell logic + SL/TP)
 function getStrategyTradeParams(strategyKey, res){
   const cfg = loadAutoTradeSettings();
-  const posSize = cfg.positionSize||150;
-  const maxpos  = cfg.maxPositions||5;
+  const paper = loadPaper();
   const risk    = cfg.riskLevel||'medium';
+  const posSize = calculateAutoPositionSize(paper, risk);
+  const maxpos  = RISK_MAX_POS[risk] || 5;
 
   if(strategyKey === 'ai' || !strategyKey){
     const {sl,tp} = getRiskSLTP(risk,3,6);
@@ -3535,6 +3704,7 @@ async function checkAutoTrades(){
 
   const paper = loadPaper();
   const log   = loadAutoTradeLog();
+  const rl = s.riskLevel || 'medium';
   let changed = false;
 
   for(const res of aiResults){
@@ -3546,23 +3716,48 @@ async function checkAutoTrades(){
     const hasPos     = paper.positions.findIndex(p=>p.pair===displayPair);
     const openCount  = paper.positions.length;
 
+    // ── Pre-trade risk checks ────────────────────────
+    // 1. Check minimum free balance ($100 floor)
+    const minBalance = 100;
+    if(tp_s.buySignal && paper.balance < minBalance) continue;
+    // 2. Check max exposure limit
+    const total = calcPaperTotal(paper);
+    const exposed = calcCurrentExposure(paper);
+    const maxExpAmt = total * (RISK_MAX_EXP[rl] || 0.4);
+    if(tp_s.buySignal && exposed >= maxExpAmt) continue;
+    // 3. Skip if this trade would push exposure over limit
+    if(tp_s.buySignal && (exposed + tp_s.pos) > maxExpAmt * 1.05) continue;
+    // 4. Concentration check: skip if already have position in same base asset
+    const baseAsset = displayPair.replace('USDT','').replace('USD','');
+    const alreadyInSameAsset = paper.positions.some(p => p.pair.replace('USDT','').replace('USD','') === baseAsset && p !== paper.positions[hasPos]);
+    if(tp_s.buySignal && hasPos === -1 && alreadyInSameAsset) continue;
     // ── BUY signal ──────────────────────────────────
     if(tp_s.buySignal && hasPos === -1 && openCount < tp_s.maxpos){
       const qty  = tp_s.pos / price;
       const cost = price * qty;
       if(paper.balance >= cost){
+        // Volatility-adjusted SL: widen SL if price moved fast recently
+        const volatilityFactor = (res.bbWidth && res.bbWidth > 0.06) ? 1.2 : 1.0;
+        const adjSl = tp_s.sl * volatilityFactor;
+        const adjTp = tp_s.tp * (volatilityFactor * 0.8 + 0.2); // TP scales less
         paper.balance -= cost;
         paper.positions.push({
           pair:      displayPair,
           side:      'BUY',
           entry:     price,
           qty:       qty,
-          sl:        price * (1 - tp_s.sl/100),
-          tp:        price * (1 + tp_s.tp/100),
+          sl:        price * (1 - adjSl/100),
+          tp:        price * (1 + adjTp/100),
           ts:        new Date().toISOString().replace('T',' ').slice(0,19),
           autoTrade: true,
-          strategy:  s.strategy||'ai'
+          strategy:  s.strategy||'ai',
+          riskLevel: rl,
+          posSize:   tp_s.pos,
         });
+        const rationale = buildTradeRationale(res, s.strategy||'ai', 'BUY', tp_s);
+        rationale.push(`Positiegrootte auto-berekend: $${tp_s.pos.toFixed(0)} (${(RISK_POS_PCT[rl]*100).toFixed(0)}% van $${total.toFixed(0)} portfolio, risico: ${RISK_LABELS[rl].label})`);
+        rationale.push(`SL: ${adjSl.toFixed(1)}% onder entry${volatilityFactor>1?' (verhoogd i.v.m. hoge volatiliteit)':''} · TP: ${adjTp.toFixed(1)}% boven entry`);
+        rationale.push(`Blootstelling na trade: ${((exposed+tp_s.pos)/total*100).toFixed(1)}% (max ${(RISK_MAX_EXP[rl]*100).toFixed(0)}% voor ${RISK_LABELS[rl].label})`);
         log.push({
           ts:       new Date().toISOString(),
           pair:     displayPair,
@@ -3571,7 +3766,8 @@ async function checkAutoTrades(){
           qty:      +qty.toFixed(6),
           score:    res.score,
           value:    +(tp_s.pos).toFixed(2),
-          rationale: buildTradeRationale(res, s.strategy||'ai', 'BUY', tp_s)
+          riskLevel: rl,
+          rationale: rationale
         });
         changed = true;
       }
@@ -3619,6 +3815,7 @@ async function checkAutoTrades(){
       renderAtPortfolio();
       renderAutoTradeLog();
       renderAutoTradeStats();
+      renderRiskPanel();
     }
     // Also refresh strategy stats (auto-trades affect paper closed trades)
     if(document.getElementById('page-strategies').classList.contains('active')){
@@ -3629,6 +3826,7 @@ async function checkAutoTrades(){
   const stat = document.getElementById('at-auto-status');
   const stratName = s.strategy||'ai';
   if(stat) stat.textContent = `Status: ACTIEF · ${stratName} · ${aiResults.length} pairs gescand · ${log.length} trades`;
+  renderRiskPanel();
   challengeCurrentStrategy();
 }
 
@@ -3651,6 +3849,8 @@ function renderAutoTradeLog(){
       ? `<span style="margin-left:6px;font-size:11px;font-weight:700;color:${e.pnl>=0?'#00d4aa':'#ff5555'};">${e.pnl>=0?'+':''}$${e.pnl.toFixed(2)}</span>`
       : '';
     const valText = isBuy && e.value ? `<span style="font-size:11px;color:#7878a0;">$${e.value.toFixed(0)} ingezet</span>` : '';
+    const rlInfo = e.riskLevel ? RISK_LABELS[e.riskLevel] : null;
+    const riskBadge = rlInfo ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.3);color:${rlInfo.color};border:1px solid ${rlInfo.color}33;">${rlInfo.label}</span>` : '';
     const priceStr = e.price >= 1 ? e.price.toLocaleString('nl',{maximumFractionDigits:2}) : e.price.toFixed(6);
     const rationale = Array.isArray(e.rationale) ? e.rationale : (e.reason ? [e.reason] : []);
     const uid = `tlog_${i}`;
@@ -3664,6 +3864,7 @@ function renderAutoTradeLog(){
         <span style="font-size:12px;font-family:monospace;color:#c0c0d0;">@ $${priceStr}</span>
         ${pnlBadge}
         <span style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          ${riskBadge}
           ${valText}
           <span style="font-size:11px;color:#7878a0;">${e.ts.slice(0,16).replace('T',' ')}</span>
           <i class="fas fa-chevron-down fa-xs" style="color:#7878a0;" id="${uid}_chevron"></i>
@@ -3675,8 +3876,9 @@ function renderAutoTradeLog(){
         ${rationale.map(line=>{
           const isStrat = line.startsWith('Strategie:');
           const isPnl   = line.startsWith('PnL');
-          return `<div style="display:flex;gap:8px;margin-bottom:5px;font-size:12px;color:${isPnl?(e.pnl>=0?'#00d4aa':'#ff5555'):isStrat?'#6382ff':'#c0c0d0'};">
-            <i class="fas ${isStrat?'fa-bookmark':isPnl?'fa-coins':'fa-circle-dot'} fa-xs" style="margin-top:3px;flex-shrink:0;color:${isStrat?'#6382ff':isPnl?(e.pnl>=0?'#00d4aa':'#ff5555'):'#3a3a5c'};"></i>
+          const isRisk  = line.startsWith('Positiegrootte') || line.startsWith('SL:') || line.startsWith('Blootstelling');
+          return `<div style="display:flex;gap:8px;margin-bottom:5px;font-size:12px;color:${isPnl?(e.pnl>=0?'#00d4aa':'#ff5555'):isStrat?'#6382ff':isRisk?'#f59e0b':'#c0c0d0'};">
+            <i class="fas ${isRisk?'fa-shield-halved':isStrat?'fa-bookmark':isPnl?'fa-coins':'fa-circle-dot'} fa-xs" style="margin-top:3px;flex-shrink:0;color:${isRisk?'#f59e0b':isStrat?'#6382ff':isPnl?(e.pnl>=0?'#00d4aa':'#ff5555'):'#3a3a5c'};"></i>
             <span>${line}</span>
           </div>`;
         }).join('')}
@@ -4393,6 +4595,8 @@ renderStrategyLibrary();
 (()=>{ const bar=document.getElementById('live-prices'); if(bar) bar.innerHTML='<span style="font-size:11px;color:#3a3a5c;">Prijzen laden…</span>'; })();
 try { loadDemoData(); } catch(e){ console.warn('loadDemoData:', e.message); showPage('activetrading'); } // also calls showPage('activetrading')
 updateClaudeChatUI();
+// Init risk level buttons and dashboard
+(()=>{ const s = loadAutoTradeSettings(); syncRiskLevelButtons(s.riskLevel||'medium'); renderRiskPanel(); })();
 renderTickerBar(); // show positions immediately (uses entry price as fallback before live prices)
 updateLivePrices();
 setInterval(updateLivePrices, 15000);
