@@ -2,81 +2,10 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Dashboard Hub</title>
-<style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:'Segoe UI',system-ui,sans-serif; background:#0f0f1a; color:#e0e0e0;
-       display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
-.hub { max-width:760px; width:100%; }
-h1 { font-size:28px; font-weight:800; color:#fff; margin-bottom:6px; }
-.sub { font-size:14px; color:#7878a0; margin-bottom:36px; }
-.cards { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-@media(max-width:540px){ .cards{ grid-template-columns:1fr; } }
-.card { background:#1a1a2e; border:1px solid #252540; border-radius:14px; padding:28px;
-        text-decoration:none; color:inherit; transition:all .2s; display:block; }
-.card:hover { border-color:#00d4aa; transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,212,170,.1); }
-.card.main { border-left:4px solid #00d4aa; }
-.card.secondary { border-left:4px solid #6382ff; }
-.icon { font-size:36px; margin-bottom:14px; }
-.card-title { font-size:18px; font-weight:700; color:#fff; margin-bottom:6px; }
-.card-desc { font-size:13px; color:#7878a0; line-height:1.6; margin-bottom:16px; }
-.features { list-style:none; display:flex; flex-direction:column; gap:5px; }
-.features li { font-size:12px; color:#7878a0; display:flex; align-items:center; gap:7px; }
-.features li::before { content:'✓'; color:#00d4aa; font-weight:700; font-size:11px; }
-.badge { display:inline-block; background:rgba(0,212,170,.15); color:#00d4aa;
-         font-size:10px; font-weight:700; padding:2px 10px; border-radius:99px; margin-bottom:10px; }
-.badge.blue { background:rgba(99,130,255,.15); color:#6382ff; }
-.arrow { float:right; color:#00d4aa; font-size:20px; margin-top:2px; }
-.arrow.blue { color:#6382ff; }
-</style>
+<meta http-equiv="refresh" content="0; url=trading.html"/>
+<title>TradingBot Dashboard</title>
 </head>
 <body>
-<div class="hub">
-  <div style="text-align:center; margin-bottom:40px;">
-    <div style="font-size:48px; margin-bottom:12px;">📊</div>
-    <h1>Dashboard Hub</h1>
-    <div class="sub">Kies het dashboard dat je wilt openen</div>
-  </div>
-
-  <div class="cards">
-    <!-- Trading Bot -->
-    <a href="trading.html" class="card main">
-      <div class="arrow">→</div>
-      <div class="icon">📈</div>
-      <div class="badge">PRIMAIR</div>
-      <div class="card-title">TradingBot Dashboard</div>
-      <div class="card-desc">AI-gestuurde crypto trading met Kraken marktanalyse, paper trading en zelflerende strategieën.</div>
-      <ul class="features">
-        <li>AI Analyse — alle Kraken pairs elke 15 min</li>
-        <li>Zelflerende indicator gewichten</li>
-        <li>Paper Trading — virtueel portfolio</li>
-        <li>Markt Sentiment (Reddit + nieuws)</li>
-        <li>RSI / MACD / EMA / Bollinger strategieën</li>
-        <li>API koppelingen: Kraken, Binance, Bybit…</li>
-      </ul>
-    </a>
-
-    <!-- InfraEstimator -->
-    <a href="docs/index.html" class="card secondary">
-      <div class="arrow blue">→</div>
-      <div class="icon">🏗️</div>
-      <div class="badge blue">INFRA</div>
-      <div class="card-title">InfraEstimator</div>
-      <div class="card-desc">Projectschattingen voor Nederlandse ondergrondse infrastructuur (gas & elektra).</div>
-      <ul class="features">
-        <li>Uren schatter per discipline</li>
-        <li>RISMAN risicomatrix</li>
-        <li>Vergunningenanalyse</li>
-        <li>GIS / kaartintegratie</li>
-        <li>Project intake wizard</li>
-      </ul>
-    </a>
-  </div>
-
-  <div style="text-align:center; margin-top:32px; font-size:12px; color:#3a3a5c;">
-    GitHub Pages · ldeleeuw1423-hub/dl
-  </div>
-</div>
+<script>window.location.replace('trading.html');</script>
 </body>
 </html>
