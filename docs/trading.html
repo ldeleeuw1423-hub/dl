@@ -110,6 +110,9 @@ input[type=file] { display:none; }
     <div class="sidebar-item" onclick="showPage('paper')"><i class="fas fa-flask fa-sm"></i> Paper Trading</div>
     <div class="sidebar-item" onclick="showPage('strategies')"><i class="fas fa-robot fa-sm"></i> Strategieën</div>
 
+    <div class="sidebar-section">AI & Leren</div>
+    <div class="sidebar-item" onclick="showPage('ai')"><i class="fas fa-brain fa-sm"></i> AI Analyse</div>
+
     <div class="sidebar-section">Instellingen</div>
     <div class="sidebar-item" onclick="showPage('apis')"><i class="fas fa-plug fa-sm"></i> API Verbindingen</div>
     <div class="sidebar-item" onclick="showPage('import')"><i class="fas fa-file-upload fa-sm"></i> CSV Import</div>
@@ -365,6 +368,116 @@ input[type=file] { display:none; }
   <div id="apis-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;"></div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: AI ANALYSE (Kraken + zelflerende engine)
+════════════════════════════════════════════════════════ -->
+<div class="page" id="page-ai">
+
+  <!-- Header + controls -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-size:14px;color:#7878a0;">Live Kraken marktanalyse · indicators berekend op 1h OHLCV · systeem leert elke dag van resultaten</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select class="filter-input" id="ai-tf" onchange="runAiScan()" style="width:110px;">
+        <option value="60">1 uur</option>
+        <option value="240">4 uur</option>
+        <option value="1440">1 dag</option>
+      </select>
+      <select class="filter-input" id="ai-filter" onchange="filterAiTable()" style="width:130px;">
+        <option value="all">Alle signalen</option>
+        <option value="STRONG BUY">Strong Buy</option>
+        <option value="BUY">Buy</option>
+        <option value="HOLD">Hold</option>
+        <option value="SELL">Sell</option>
+        <option value="STRONG SELL">Strong Sell</option>
+      </select>
+      <button class="btn btn-primary" onclick="runAiScan()" id="ai-scan-btn"><i class="fas fa-satellite-dish fa-xs"></i> Scan Kraken</button>
+    </div>
+  </div>
+
+  <!-- Learning stats -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;">
+    <div class="kpi" style="border-left-color:#6382ff;">
+      <div class="form-label">Paren geanalyseerd</div>
+      <div id="ai-kpi-pairs" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">—</div>
+    </div>
+    <div class="kpi" style="border-left-color:#00d4aa;">
+      <div class="form-label">Voorspellingsnauwkeurigheid</div>
+      <div id="ai-kpi-acc" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">—</div>
+      <div id="ai-kpi-acc-sub" style="font-size:11px;margin-top:2px;" class="muted">nog geen evaluaties</div>
+    </div>
+    <div class="kpi" style="border-left-color:#f59e0b;">
+      <div class="form-label">Sterkste indicator</div>
+      <div id="ai-kpi-best-ind" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">—</div>
+    </div>
+    <div class="kpi" style="border-left-color:#00d4aa;">
+      <div class="form-label">Leerdagen</div>
+      <div id="ai-kpi-days" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">0</div>
+      <div style="font-size:11px;margin-top:2px;" class="muted">evaluaties uitgevoerd</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;margin-bottom:14px;">
+
+    <!-- Pair scanner -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:14px;font-weight:600;color:#fff;">Kraken Markt Scanner</div>
+        <div id="ai-scan-status" style="font-size:12px;" class="muted">Klik "Scan Kraken" om te starten</div>
+      </div>
+      <div id="ai-progress" style="display:none;margin-bottom:12px;">
+        <div style="background:#252540;border-radius:4px;height:4px;overflow:hidden;">
+          <div id="ai-progress-bar" style="height:100%;background:#00d4aa;border-radius:4px;width:0%;transition:width .3s;"></div>
+        </div>
+        <div id="ai-progress-text" style="font-size:11px;color:#7878a0;margin-top:4px;"></div>
+      </div>
+      <table id="ai-table">
+        <thead><tr>
+          <th>Pair</th><th>Prijs</th><th>RSI</th><th>MACD</th><th>EMA Cross</th><th>BB</th><th>Volume</th><th>Score</th><th>Signaal</th><th></th>
+        </tr></thead>
+        <tbody id="ai-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Learning panel -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <!-- Indicator weights -->
+      <div class="card">
+        <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:12px;"><i class="fas fa-brain" style="color:#6382ff;"></i> Geleerde Gewichten</div>
+        <div id="weights-display"></div>
+        <button class="btn btn-ghost" onclick="resetWeights()" style="width:100%;justify-content:center;font-size:12px;margin-top:10px;"><i class="fas fa-undo fa-xs"></i> Reset naar gelijk</button>
+      </div>
+
+      <!-- Evaluate button -->
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:8px;"><i class="fas fa-graduation-cap" style="color:#f59e0b;"></i> Dagelijkse Evaluatie</div>
+        <div style="font-size:12px;color:#7878a0;margin-bottom:10px;">Vergelijkt gisteren's voorspellingen met echte koersbeweging en past gewichten aan.</div>
+        <button class="btn btn-warning" onclick="runDailyEvaluation()" style="width:100%;justify-content:center;"><i class="fas fa-play fa-xs"></i> Evalueer & Leer</button>
+        <div id="eval-result" style="margin-top:8px;font-size:12px;"></div>
+      </div>
+
+      <!-- Learning history chart -->
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:10px;">Nauwkeurigheid over tijd</div>
+        <canvas id="chart-accuracy" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prediction history -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:600;color:#fff;">Voorspellingsgeschiedenis</div>
+      <button class="btn btn-ghost" onclick="clearPredictions()" style="font-size:12px;padding:5px 10px;"><i class="fas fa-trash fa-xs"></i> Wissen</button>
+    </div>
+    <table>
+      <thead><tr><th>Datum</th><th>Pair</th><th>Signaal</th><th>Score</th><th>Prijs toen</th><th>Prijs nu</th><th>Richting</th><th>Correct</th></tr></thead>
+      <tbody id="pred-history-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- ═══ PAGE: CSV IMPORT ═══ -->
 <div class="page" id="page-import">
   <div class="card" style="max-width:600px;margin:0 auto;">
@@ -549,7 +662,8 @@ function saveApis(a){ localStorage.setItem(APIS_KEY, JSON.stringify(a)); }
 //  NAVIGATION
 // ══════════════════════════════════════════════════════════
 const PAGE_TITLES = { overview:'Overzicht', trades:'Trades', performance:'Performance',
-  pairs:'Pairs', paper:'Paper Trading', strategies:'Strategieën', apis:'API Verbindingen', import:'CSV Import' };
+  pairs:'Pairs', paper:'Paper Trading', strategies:'Strategieën', ai:'AI Analyse (Kraken)',
+  apis:'API Verbindingen', import:'CSV Import' };
 
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -565,6 +679,7 @@ function showPage(id){
   if(id==='pairs')       renderPairsPage();
   if(id==='paper')       renderPaperPage();
   if(id==='strategies')  renderStrategiesPage();
+  if(id==='ai')          { renderWeightsDisplay(); renderPredHistory(); renderAiKPIs(); renderAccuracyChart(); }
   if(id==='apis')        renderApisPage();
 }
 
@@ -1299,6 +1414,438 @@ function loadDemoData(){
 function clearData(){ allTrades=[]; renderAll(); document.getElementById('import-status').innerHTML='<div class="muted">Data gewist.</div>'; }
 
 // ══════════════════════════════════════════════════════════
+//  AI ANALYSE — KRAKEN API + TECHNISCHE INDICATOREN
+// ══════════════════════════════════════════════════════════
+const AI_KEY        = 'tb_ai_weights';
+const PRED_KEY      = 'tb_ai_predictions';
+const EVAL_KEY      = 'tb_ai_evals';
+const KRAKEN_BASE   = 'https://api.kraken.com/0/public';
+
+// Prioriteitsparen — Kraken-namen (XXBTZUSD = BTC/USD)
+const KRAKEN_PRIORITY = [
+  'XXBTZUSD','XETHZUSD','SOLUSD','ADAUSD','XRPUSD',
+  'DOTUSD','MATICUSD','LINKUSD','AVAXUSD','ATOMUSD',
+  'UNIUSD','AAVEUSD','LTCUSD','XLMUSD','ALGOUSD',
+  'DOGEUSD','SHIBUSD','BNBUSD','TRXUSD','ETCUSD'
+];
+
+const WEIGHT_DEFAULTS = { rsi:1, ema:1, macd:1, bb:1, vol:1 };
+
+function loadWeights(){ return Object.assign({}, WEIGHT_DEFAULTS, JSON.parse(localStorage.getItem(AI_KEY)||'{}')); }
+function saveWeights(w){ localStorage.setItem(AI_KEY, JSON.stringify(w)); }
+function loadPredictions(){ return JSON.parse(localStorage.getItem(PRED_KEY)||'[]'); }
+function savePredictions(p){ localStorage.setItem(PRED_KEY, JSON.stringify(p)); }
+function loadEvals(){ return JSON.parse(localStorage.getItem(EVAL_KEY)||'[]'); }
+function saveEvals(e){ localStorage.setItem(EVAL_KEY, JSON.stringify(e)); }
+
+// ── Kraken API helpers ──────────────────────────────────
+async function krakenFetch(endpoint){
+  const r = await fetch(KRAKEN_BASE + endpoint);
+  const d = await r.json();
+  if(d.error&&d.error.length) throw new Error(d.error[0]);
+  return d.result;
+}
+
+async function getKrakenPairs(){
+  const result = await krakenFetch('/AssetPairs');
+  return Object.keys(result).filter(k=>
+    !k.includes('.d') && (k.endsWith('USD')||k.endsWith('ZUSD')||k.endsWith('EUR'))
+  ).slice(0,40);
+}
+
+async function getOHLCV(pair, interval=60){
+  const result = await krakenFetch(`/OHLC?pair=${pair}&interval=${interval}`);
+  // result has pair key + last key
+  const key = Object.keys(result).find(k=>k!=='last');
+  return (result[key]||[]).map(c=>({
+    t:c[0], open:+c[1], high:+c[2], low:+c[3], close:+c[4], vol:+c[6]
+  }));
+}
+
+// ── Technical Indicators ───────────────────────────────
+function calcRSI(closes, period=14){
+  if(closes.length<period+1) return 50;
+  let gains=0, losses=0;
+  for(let i=closes.length-period;i<closes.length;i++){
+    const d=closes[i]-closes[i-1];
+    if(d>0) gains+=d; else losses+=Math.abs(d);
+  }
+  const rs=(gains/period)/(losses/period||1e-10);
+  return 100-(100/(1+rs));
+}
+
+function calcEMA(closes, period){
+  const k=2/(period+1);
+  let ema=closes.slice(0,period).reduce((a,b)=>a+b,0)/period;
+  for(let i=period;i<closes.length;i++) ema=closes[i]*k+ema*(1-k);
+  return ema;
+}
+
+function calcMACD(closes){
+  if(closes.length<26) return {macd:0,signal:0,hist:0};
+  const fast=calcEMA(closes,12), slow=calcEMA(closes,26);
+  const macdLine=fast-slow;
+  // simplified signal
+  const macdSeries=closes.slice(-35).map((_,i,a)=>calcEMA(a.slice(0,i+1+closes.length-35),12)-calcEMA(a.slice(0,i+1+closes.length-35),26));
+  const signal=calcEMA(macdSeries.slice(-9),9);
+  return {macd:macdLine,signal,hist:macdLine-signal};
+}
+
+function calcBB(closes, period=20, std=2){
+  if(closes.length<period) return {upper:0,mid:0,lower:0,pct:0.5};
+  const slice=closes.slice(-period);
+  const mid=slice.reduce((a,b)=>a+b,0)/period;
+  const variance=slice.reduce((s,x)=>s+(x-mid)**2,0)/period;
+  const stddev=Math.sqrt(variance)*std;
+  const last=closes[closes.length-1];
+  const pct=stddev>0?(last-(mid-stddev))/(stddev*2):0.5;
+  return {upper:mid+stddev,mid,lower:mid-stddev,pct};
+}
+
+function calcVolumeTrend(candles){
+  if(candles.length<10) return 0;
+  const recent=candles.slice(-5).reduce((s,c)=>s+c.vol,0)/5;
+  const prev=candles.slice(-15,-5).reduce((s,c)=>s+c.vol,0)/10;
+  return prev>0?(recent-prev)/prev:0;
+}
+
+// ── Composite Score (weighted) ─────────────────────────
+function computeScore(candles, weights){
+  const closes=candles.map(c=>c.close);
+  const cur=closes[closes.length-1];
+
+  // RSI score -1..+1
+  const rsi=calcRSI(closes);
+  const rsiScore = rsi<30?1:rsi<45?.5:rsi>70?-1:rsi>55?-.5:0;
+
+  // EMA score
+  const ema9=calcEMA(closes,9), ema21=calcEMA(closes,21), ema50=calcEMA(closes,50);
+  const emaScore = (cur>ema9?.3:-.3)+(ema9>ema21?.4:-.4)+(ema21>ema50?.3:-.3);
+
+  // MACD score
+  const {hist}=calcMACD(closes);
+  const macdScore = hist>0?Math.min(hist/cur*1000,1):Math.max(hist/cur*1000,-1);
+
+  // Bollinger score
+  const {pct}=calcBB(closes);
+  const bbScore = pct<0.2?0.8:pct>0.8?-0.8:pct<0.4?.3:pct>0.6?-.3:0;
+
+  // Volume score
+  const volTrend=calcVolumeTrend(candles);
+  const volScore = Math.max(-1,Math.min(1,volTrend*3));
+
+  // Weighted composite
+  const W=weights, total=W.rsi+W.ema+W.macd+W.bb+W.vol;
+  const composite=(rsiScore*W.rsi + emaScore*W.ema + macdScore*W.macd + bbScore*W.bb + volScore*W.vol)/total;
+
+  return {
+    score:Math.round(composite*100),
+    rsi:rsi.toFixed(1), rsiScore,
+    ema:{e9:ema9,e21:ema21,e50:ema50,score:emaScore},
+    macdHist:hist, macdScore,
+    bbPct:pct, bbScore,
+    volTrend, volScore,
+    price:cur
+  };
+}
+
+function scoreToSignal(score){
+  if(score>=60)  return 'STRONG BUY';
+  if(score>=25)  return 'BUY';
+  if(score<=-60) return 'STRONG SELL';
+  if(score<=-25) return 'SELL';
+  return 'HOLD';
+}
+
+function signalBadge(signal){
+  const map={
+    'STRONG BUY': '<span class="badge" style="background:rgba(0,212,170,.3);color:#00d4aa;">STRONG BUY</span>',
+    'BUY':        '<span class="badge badge-buy">BUY</span>',
+    'HOLD':       '<span class="badge badge-open">HOLD</span>',
+    'SELL':       '<span class="badge badge-sell">SELL</span>',
+    'STRONG SELL':'<span class="badge" style="background:rgba(255,85,85,.3);color:#ff5555;">STRONG SELL</span>',
+  };
+  return map[signal]||signal;
+}
+
+function scoreBar(score){
+  const pct=Math.min(100,Math.max(0,score+100))/2; // -100..100 → 0..100
+  const color=score>=25?'#00d4aa':score<=-25?'#ff5555':'#f59e0b';
+  return `<div style="display:flex;align-items:center;gap:6px;">
+    <div style="width:60px;height:6px;background:#252540;border-radius:3px;overflow:hidden;">
+      <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div>
+    </div>
+    <span style="font-size:12px;color:${color};font-weight:600;font-family:monospace;">${score>0?'+':''}${score}</span>
+  </div>`;
+}
+
+// ── Main scan ──────────────────────────────────────────
+let aiResults=[];
+
+async function runAiScan(){
+  const btn=document.getElementById('ai-scan-btn');
+  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin fa-xs"></i> Bezig...';
+  document.getElementById('ai-progress').style.display='block';
+  document.getElementById('ai-tbody').innerHTML='';
+  document.getElementById('ai-scan-status').textContent='Kraken pairs ophalen...';
+  aiResults=[];
+
+  const interval=parseInt(document.getElementById('ai-tf').value)||60;
+  const weights=loadWeights();
+
+  let pairs=[];
+  try {
+    pairs=await getKrakenPairs();
+    // Sort: priority first
+    pairs.sort((a,b)=>{
+      const ai=KRAKEN_PRIORITY.indexOf(a), bi=KRAKEN_PRIORITY.indexOf(b);
+      return (ai<0?999:ai)-(bi<0?999:bi);
+    });
+  } catch(e){
+    // Fallback to priority list if CORS blocks AssetPairs
+    pairs=KRAKEN_PRIORITY;
+  }
+
+  document.getElementById('ai-kpi-pairs').textContent=pairs.length;
+  const bar=document.getElementById('ai-progress-bar');
+  const txt=document.getElementById('ai-progress-text');
+  const now=new Date().toISOString();
+
+  for(let i=0;i<pairs.length;i++){
+    const pair=pairs[i];
+    bar.style.width=((i+1)/pairs.length*100)+'%';
+    txt.textContent=`${i+1}/${pairs.length} — ${pair}`;
+    try {
+      const candles=await getOHLCV(pair,interval);
+      if(candles.length<30){ continue; }
+      const res=computeScore(candles,weights);
+      const signal=scoreToSignal(res.score);
+      aiResults.push({pair,signal,...res,ts:now});
+      renderAiRow({pair,signal,...res});
+      // Store prediction for learning
+      storePrediction({pair,signal,score:res.score,price:res.price,ts:now,weights:{...weights}});
+    } catch(e){ /* skip pair on error */ }
+    await new Promise(r=>setTimeout(r,200)); // rate limit
+  }
+
+  document.getElementById('ai-progress').style.display='none';
+  document.getElementById('ai-scan-status').textContent=`${aiResults.length} paren geanalyseerd · ${new Date().toLocaleTimeString('nl')}`;
+  btn.disabled=false; btn.innerHTML='<i class="fas fa-satellite-dish fa-xs"></i> Scan Kraken';
+  renderAiKPIs(); renderWeightsDisplay(); renderPredHistory(); renderAccuracyChart();
+}
+
+function renderAiRow(r){
+  const tbody=document.getElementById('ai-tbody');
+  const rsiColor=r.rsi<30?'#00d4aa':r.rsi>70?'#ff5555':'#e0e0e0';
+  const macdColor=r.macdHist>0?'#00d4aa':'#ff5555';
+  const emaColor=r.ema.score>0?'#00d4aa':'#ff5555';
+  const bbColor=r.bbPct<0.3?'#00d4aa':r.bbPct>0.7?'#ff5555':'#e0e0e0';
+  const volColor=r.volTrend>0?'#00d4aa':r.volTrend<-0.1?'#ff5555':'#e0e0e0';
+  const displayPair=r.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD').replace('ZEUR','EUR');
+  const tr=document.createElement('tr');
+  tr.dataset.signal=r.signal;
+  tr.innerHTML=`
+    <td style="font-weight:700;">${displayPair}</td>
+    <td style="font-family:monospace;">${r.price.toLocaleString('nl',{maximumFractionDigits:6})}</td>
+    <td style="color:${rsiColor};font-weight:600;">${r.rsi}</td>
+    <td style="color:${macdColor};font-size:11px;font-family:monospace;">${r.macdHist>=0?'+':''}${r.macdHist.toFixed(4)}</td>
+    <td style="color:${emaColor};font-size:12px;">${r.ema.score>0?'▲ Bull':'▼ Bear'}</td>
+    <td style="color:${bbColor};font-size:12px;">${r.bbPct<0.3?'Lager BB':r.bbPct>0.7?'Boven BB':'Midden'}</td>
+    <td style="color:${volColor};font-size:12px;">${r.volTrend>=0?'+':''}${(r.volTrend*100).toFixed(0)}%</td>
+    <td>${scoreBar(r.score)}</td>
+    <td>${signalBadge(r.signal)}</td>
+    <td><button class="btn btn-ghost" onclick="openPaperFromAi('${r.pair}',${r.price})" style="font-size:11px;padding:3px 8px;">Trade</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function filterAiTable(){
+  const f=document.getElementById('ai-filter').value;
+  document.querySelectorAll('#ai-tbody tr').forEach(tr=>{
+    tr.style.display=(f==='all'||tr.dataset.signal===f)?'':'none';
+  });
+}
+
+function openPaperFromAi(pair,price){
+  const displayPair=pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USDT').replace('ZEUR','USDT');
+  document.getElementById('po-pair').value=displayPair;
+  document.getElementById('po-price').value=price;
+  showPage('paper');
+}
+
+function renderAiKPIs(){
+  const evals=loadEvals();
+  const correct=evals.filter(e=>e.correct).length;
+  const acc=evals.length?Math.round(correct/evals.length*100):null;
+  const el=document.getElementById('ai-kpi-acc');
+  if(acc!==null){ el.textContent=acc+'%'; el.className=acc>=55?'pos':acc<45?'neg':'neu'; }
+  else { el.textContent='—'; el.className='neu'; }
+  document.getElementById('ai-kpi-acc-sub').textContent=evals.length?`${correct}/${evals.length} correct`:'nog geen evaluaties';
+  document.getElementById('ai-kpi-days').textContent=evals.length;
+
+  const weights=loadWeights();
+  const best=Object.entries(weights).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('ai-kpi-best-ind').textContent=best?best[0].toUpperCase()+'('+best[1].toFixed(2)+')':'—';
+}
+
+// ── Predictions (learning memory) ─────────────────────
+function storePrediction(pred){
+  const preds=loadPredictions();
+  // Don't duplicate same pair+day
+  const today=pred.ts.slice(0,10);
+  const exists=preds.find(p=>p.pair===pred.pair&&p.ts.slice(0,10)===today);
+  if(!exists) preds.push(pred);
+  // Keep last 500
+  savePredictions(preds.slice(-500));
+}
+
+function renderPredHistory(){
+  const preds=loadPredictions().slice(-50).reverse();
+  const tbody=document.getElementById('pred-history-tbody');
+  if(!preds.length){
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#7878a0;padding:20px;">Nog geen voorspellingen opgeslagen — run een scan</td></tr>';
+    return;
+  }
+  tbody.innerHTML=preds.map(p=>{
+    const cur=livePrices[p.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USDT')]||null;
+    const dirCorrect=p.evaluated?p.correct:null;
+    const actualDir=cur&&p.price?((cur-p.price)/p.price*100).toFixed(2):null;
+    const displayPair=p.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD').replace('ZEUR','EUR');
+    return `<tr>
+      <td class="muted" style="font-size:11px;">${p.ts.slice(0,16)}</td>
+      <td style="font-weight:600;">${displayPair}</td>
+      <td>${signalBadge(p.signal)}</td>
+      <td>${scoreBar(p.score)}</td>
+      <td style="font-family:monospace;">${p.price.toLocaleString('nl',{maximumFractionDigits:4})}</td>
+      <td style="font-family:monospace;">${cur?cur.toLocaleString('nl',{maximumFractionDigits:4}):'—'}</td>
+      <td class="${actualDir>0?'pos':actualDir<0?'neg':'muted'}">${actualDir!=null?(actualDir>0?'+':'')+actualDir+'%':'—'}</td>
+      <td>${dirCorrect===true?'<span class="pos">✓</span>':dirCorrect===false?'<span class="neg">✗</span>':'<span class="muted">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearPredictions(){ savePredictions([]); saveEvals([]); renderPredHistory(); renderAiKPIs(); renderAccuracyChart(); }
+
+// ── Daily Evaluation & Weight Learning ──────────────────
+async function runDailyEvaluation(){
+  const btn=event.target; btn.disabled=true;
+  const el=document.getElementById('eval-result');
+  el.innerHTML='<span class="muted">Huidige prijzen ophalen...</span>';
+
+  const preds=loadPredictions().filter(p=>!p.evaluated);
+  if(!preds.length){ el.innerHTML='<span class="muted">Geen openstaande voorspellingen.</span>'; btn.disabled=false; return; }
+
+  // Fetch current prices for all unique pairs
+  const uniquePairs=[...new Set(preds.map(p=>p.pair))];
+  const currentPrices={};
+  for(const pair of uniquePairs){
+    try {
+      const r=await krakenFetch(`/Ticker?pair=${pair}`);
+      const key=Object.keys(r)[0];
+      currentPrices[pair]=parseFloat(r[key].c[0]);
+    } catch(e){}
+    await new Promise(r=>setTimeout(r,100));
+  }
+
+  const weights=loadWeights();
+  const evals=loadEvals();
+  let correct=0, total=0;
+  const indScores={rsi:{c:0,t:0},ema:{c:0,t:0},macd:{c:0,t:0},bb:{c:0,t:0},vol:{c:0,t:0}};
+
+  preds.forEach(p=>{
+    const cur=currentPrices[p.pair];
+    if(!cur) return;
+    const actualChange=(cur-p.price)/p.price;
+    const predictedBull=p.score>0;
+    const actualBull=actualChange>0;
+    const isCorrect=predictedBull===actualBull;
+    p.evaluated=true; p.evaluatedPrice=cur; p.correct=isCorrect; p.actualChange=actualChange;
+    total++; if(isCorrect)correct++;
+    evals.push({date:p.ts.slice(0,10),pair:p.pair,signal:p.signal,correct:isCorrect});
+
+    // Per-indicator scoring
+    const imap=[
+      ['rsi', p.weights?.rsi||1, (p.score>0)===(actualBull)],
+      ['ema', p.weights?.ema||1, (p.score>0)===(actualBull)],
+      ['macd',p.weights?.macd||1,(p.score>0)===(actualBull)],
+      ['bb',  p.weights?.bb||1,  (p.score>0)===(actualBull)],
+      ['vol', p.weights?.vol||1, (p.score>0)===(actualBull)],
+    ];
+    imap.forEach(([k,,c])=>{ indScores[k].t++; if(c)indScores[k].c++; });
+  });
+
+  // Adjust weights based on accuracy
+  if(total>0){
+    Object.keys(weights).forEach(k=>{
+      if(!indScores[k].t) return;
+      const acc=indScores[k].c/indScores[k].t;
+      weights[k]=Math.max(0.1,Math.min(3.0,weights[k]*(0.7+acc*0.6)));
+    });
+    // Normalize to max=1.5
+    const maxW=Math.max(...Object.values(weights));
+    if(maxW>1.5) Object.keys(weights).forEach(k=>weights[k]=weights[k]/maxW*1.5);
+    saveWeights(weights);
+  }
+
+  // Update predictions
+  const allPreds=loadPredictions().map(p=>preds.find(pp=>pp.pair===p.pair&&pp.ts===p.ts)||p);
+  savePredictions(allPreds);
+  saveEvals(evals.slice(-200));
+
+  const acc=total?Math.round(correct/total*100):0;
+  el.innerHTML=`<span class="${acc>=55?'pos':'neg'}">${correct}/${total} correct (${acc}%) · gewichten bijgewerkt</span>`;
+  btn.disabled=false;
+  renderWeightsDisplay(); renderPredHistory(); renderAiKPIs(); renderAccuracyChart();
+}
+
+// ── Weights display ─────────────────────────────────────
+function renderWeightsDisplay(){
+  const w=loadWeights();
+  const max=Math.max(...Object.values(w))||1;
+  const labels={rsi:'RSI',ema:'EMA',macd:'MACD',bb:'Bollinger',vol:'Volume'};
+  document.getElementById('weights-display').innerHTML=Object.entries(w).map(([k,v])=>{
+    const pct=v/max*100;
+    const color=v>=1.2?'#00d4aa':v<=0.6?'#ff5555':'#f59e0b';
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+        <span class="muted">${labels[k]}</span>
+        <span style="color:${color};font-weight:600;">${v.toFixed(2)}</span>
+      </div>
+      <div style="background:#252540;border-radius:3px;height:5px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;transition:width .5s;"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function resetWeights(){ saveWeights({...WEIGHT_DEFAULTS}); renderWeightsDisplay(); renderAiKPIs(); }
+
+// ── Accuracy chart ──────────────────────────────────────
+function renderAccuracyChart(){
+  const evals=loadEvals();
+  const byDay={};
+  evals.forEach(e=>{ if(!byDay[e.date]){byDay[e.date]={c:0,t:0};} byDay[e.date].t++; if(e.correct)byDay[e.date].c++; });
+  const days=Object.keys(byDay).sort().slice(-14);
+  const accs=days.map(d=>Math.round(byDay[d].c/byDay[d].t*100));
+  destroyChart('accuracy');
+  if(!days.length){
+    const ctx=document.getElementById('chart-accuracy').getContext('2d');
+    ctx.clearRect(0,0,999,999);
+    return;
+  }
+  charts['accuracy']=new Chart(document.getElementById('chart-accuracy').getContext('2d'),{
+    type:'line',
+    data:{labels:days.map(d=>d.slice(5)), datasets:[
+      {data:accs,borderColor:'#6382ff',backgroundColor:'rgba(99,130,255,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3},
+      {data:Array(days.length).fill(50),borderColor:'rgba(255,85,85,.3)',borderWidth:1,borderDash:[4,4],pointRadius:0}
+    ]},
+    options:{plugins:{legend:{display:false}},scales:{
+      x:{ticks:{color:'#7878a0',font:{size:10}},grid:{color:'#252540'}},
+      y:{ticks:{color:'#7878a0',font:{size:10},callback:v=>v+'%'},grid:{color:'#252540'},min:0,max:100}
+    },animation:{duration:300}}
+  });
+}
+
+// ══════════════════════════════════════════════════════════
 //  MODAL UTILS
 // ══════════════════════════════════════════════════════════
 function closeModal(id){ document.getElementById(id).style.display='none'; }
@@ -1316,9 +1863,13 @@ function refreshAll(){
 //  INIT
 // ══════════════════════════════════════════════════════════
 renderStratParams();
+renderWeightsDisplay();
+renderPredHistory();
+renderAiKPIs();
+renderAccuracyChart();
 loadDemoData();
 updateLivePrices();
-setInterval(updateLivePrices, 15000);  // refresh prices every 15s
+setInterval(updateLivePrices, 15000);
 </script>
 </body>
 </html>
