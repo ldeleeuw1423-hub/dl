@@ -1182,7 +1182,7 @@ function showPage(id){
   });
   document.getElementById('page-title').textContent = PAGE_TITLES[id]||id;
   if(id==='trades')        renderTradesTable();
-  if(id==='performance')   renderPerfCharts();
+  if(id==='performance')   { try { renderPerfCharts(); } catch(e){ console.warn('PerfCharts:', e.message); } }
   if(id==='pairs')         renderPairsPage();
   if(id==='paper')         renderPaperPage();
   if(id==='activetrading') { renderActiveTradingPage(); renderAutoTradeStats(); }
@@ -1208,7 +1208,7 @@ function filteredTrades(){
 // ══════════════════════════════════════════════════════════
 function renderAll(){
   renderKPIs();
-  renderOverviewCharts();
+  try { renderOverviewCharts(); } catch(e){ console.warn('Chart.js not ready:', e.message); }
   renderRecentTrades();
 }
 
@@ -1861,12 +1861,13 @@ async function updateLivePrices(){
     const data=await r.json();
     if(Array.isArray(data)) data.forEach(d=>{ livePrices[d.symbol]=parseFloat(d.price); });
     renderTickerBar();
-    document.getElementById('last-update').textContent=new Date().toLocaleTimeString('nl',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    document.getElementById('status-text').textContent='Live';
-    document.getElementById('status-dot').style.background='#00d4aa';
+    const lu=document.getElementById('last-update'); if(lu) lu.textContent=new Date().toLocaleTimeString('nl',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const st=document.getElementById('status-text'); if(st) st.textContent='Live';
+    const sd=document.getElementById('status-dot'); if(sd) sd.style.background='#00d4aa';
   } catch(e){
-    document.getElementById('status-text').textContent='Offline';
-    document.getElementById('status-dot').style.background='#ff5555';
+    const st=document.getElementById('status-text'); if(st) st.textContent='Offline';
+    const sd=document.getElementById('status-dot'); if(sd) sd.style.background='#ff5555';
+    renderTickerBar(); // still show positions even without live prices
   }
 }
 
@@ -4386,10 +4387,13 @@ renderStratParams();
 renderWeightsDisplay();
 renderPredHistory();
 renderAiKPIs();
-renderAccuracyChart();
+try { renderAccuracyChart(); } catch(e){ console.warn('AccuracyChart init:', e.message); }
 renderStrategyLibrary();
-loadDemoData(); // also calls showPage('activetrading')
+// Show topbar placeholder immediately (before prices arrive)
+(()=>{ const bar=document.getElementById('live-prices'); if(bar) bar.innerHTML='<span style="font-size:11px;color:#3a3a5c;">Prijzen laden…</span>'; })();
+try { loadDemoData(); } catch(e){ console.warn('loadDemoData:', e.message); showPage('activetrading'); } // also calls showPage('activetrading')
 updateClaudeChatUI();
+renderTickerBar(); // show positions immediately (uses entry price as fallback before live prices)
 updateLivePrices();
 setInterval(updateLivePrices, 15000);
 
