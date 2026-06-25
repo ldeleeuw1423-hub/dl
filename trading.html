@@ -1315,7 +1315,7 @@ function openStrategyModal(idx){
     document.getElementById('strat-maxpos').value=s.maxpos||50;
     document.getElementById('strat-notes').value=s.notes||'';
     renderStratParams();
-    if(s.params) Object.entries(s.params).forEach(([k,v]=>{ const el=document.getElementById('sp-'+k); if(el)el.value=v; }));
+    if(s.params) Object.entries(s.params).forEach(([k,v])=>{ const el=document.getElementById('sp-'+k); if(el)el.value=v; });
   } else {
     document.getElementById('strat-name').value='';
     document.getElementById('strat-type').value='rsi';
@@ -1779,7 +1779,7 @@ function scoreBar(score){
 // ── Main scan ──────────────────────────────────────────
 let aiResults=[];
 
-async function runAiScan(){
+async function _runAiScanCore(){
   const btn=document.getElementById('ai-scan-btn');
   btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin fa-xs"></i> Bezig...';
   document.getElementById('ai-progress').style.display='block';
@@ -2075,16 +2075,14 @@ setInterval(()=>{
 }, 1000);
 
 // Wrappen rond runAiScan voor logging
-const _origRunAiScan = runAiScan;
 async function runAiScan(){
   scanCount++;
   const el=document.getElementById('scan-count-display');
   if(el) el.textContent=scanCount;
-  // Log scan
   const log=loadScanLog();
   log.push({ ts: new Date().toISOString(), count: aiResults.length });
   saveScanLog(log);
-  return _origRunAiScan();
+  return _runAiScanCore();
 }
 
 // ══════════════════════════════════════════════════════════
