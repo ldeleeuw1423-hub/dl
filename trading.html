@@ -699,47 +699,52 @@ function calcKellySize(paper){
 }
 
 // ── Zelflerend systeem ───────────────────────────────────
-let lastLearning={avoidList:[],minScore:0,slMultiplier:1.0,learnLog:[]};
+// Geen blacklist — het moment was fout, niet de coin.
+// Leert per coin welke score-drempel nodig is voor winst.
+let lastLearning={coinThresholds:{},globalMinScore:0,slMultiplier:1.0,learnLog:[]};
 function calcSelfLearning(paper){
   const closed=paper.closed||[];
-  const result={avoidList:[],minScore:0,slMultiplier:1.0,learnLog:[]};
+  const result={coinThresholds:{},globalMinScore:0,slMultiplier:1.0,learnLog:[]};
   if(closed.length<5) return result;
 
-  // 1. Coins vermijden die structureel verliezen (win rate <30%, min 3 trades)
+  // 1. Per-coin drempel: leer bij welke score deze coin wél wint
   const byCoin={};
   closed.forEach(t=>{
     const sym=(t.pair||'').replace(/EUR$|USDT$/,'');
-    if(!byCoin[sym]) byCoin[sym]={w:0,l:0,pnl:0};
-    t.pnl>0?byCoin[sym].w++:byCoin[sym].l++;
-    byCoin[sym].pnl+=t.pnl;
+    if(!byCoin[sym]) byCoin[sym]={wins:[],losses:[]};
+    (t.pnl>0?byCoin[sym].wins:byCoin[sym].losses).push(t);
   });
-  Object.entries(byCoin).forEach(([sym,v])=>{
-    const n=v.w+v.l;
-    if(n>=3 && v.w/n<0.30){
-      result.avoidList.push(sym);
-      result.learnLog.push(`${sym} vermeden — win rate ${(v.w/n*100).toFixed(0)}% op ${n} trades · netto €${v.pnl.toFixed(0)}`);
+  Object.entries(byCoin).forEach(([sym,{wins,losses}])=>{
+    const n=wins.length+losses.length;
+    if(n<3) return;
+    const wr=wins.length/n;
+    if(wr<0.35){
+      // Bereken bij welke score de winsten plaatsvonden
+      const winAvgScore=wins.length?wins.reduce((s,t)=>s+(t.score||0),0)/wins.length:0;
+      const lossAvgScore=losses.length?losses.reduce((s,t)=>s+(t.score||0),0)/losses.length:0;
+      // Nieuwe drempel: ruim boven het gemiddelde verliesmoment
+      const drempel=Math.min(85, Math.max(40, Math.round(lossAvgScore+20)));
+      result.coinThresholds[sym]=drempel;
+      result.learnLog.push(`${sym}: kopen pas bij score ≥ ${drempel} — verliezen bij gem. score ${lossAvgScore.toFixed(0)}, winsten bij gem. score ${winAvgScore.toFixed(0)}`);
     }
   });
 
-  // 2. Minimale score verhogen als lage signalen structureel verliezen
-  const scoreBrackets=[{min:0,max:30},{min:30,max:50},{min:50,max:75}];
+  // 2. Globale drempel: als een heel score-bracket structureel verliest
+  const scoreBrackets=[{min:0,max:30},{min:30,max:50}];
   for(const b of scoreBrackets){
     const tt=closed.filter(t=>t.score!=null&&t.score>=b.min&&t.score<b.max);
-    if(tt.length>=5){
-      const wr=tt.filter(t=>t.pnl>0).length/tt.length;
-      if(wr<0.35){
-        result.minScore=b.max;
-        result.learnLog.push(`Min. score verhoogd naar ${b.max} — scores ${b.min}–${b.max} winnen slechts ${(wr*100).toFixed(0)}%`);
-        break;
-      }
+    if(tt.length>=5&&tt.filter(t=>t.pnl>0).length/tt.length<0.35){
+      result.globalMinScore=b.max;
+      const wr=+(tt.filter(t=>t.pnl>0).length/tt.length*100).toFixed(0);
+      result.learnLog.push(`Globale drempel → ${b.max} — scores ${b.min}–${b.max} winnen slechts ${wr}%`);
+      break;
     }
   }
 
   // 3. SL verbreden als Stop-Loss te vaak geraakt wordt
-  const slHits=closed.filter(t=>t.reason?.includes('Stop-Loss'));
-  const slRate=slHits.length/closed.length;
-  if(slRate>0.60){ result.slMultiplier=1.8; result.learnLog.push(`SL 80% breder — Stop-Loss geraakt in ${(slRate*100).toFixed(0)}% van de trades`); }
-  else if(slRate>0.45){ result.slMultiplier=1.4; result.learnLog.push(`SL 40% breder — Stop-Loss geraakt in ${(slRate*100).toFixed(0)}% van de trades`); }
+  const slRate=closed.filter(t=>t.reason?.includes('Stop-Loss')).length/closed.length;
+  if(slRate>0.60){ result.slMultiplier=1.8; result.learnLog.push(`SL 80% breder — Stop-Loss raakt ${(slRate*100).toFixed(0)}% van de trades`); }
+  else if(slRate>0.45){ result.slMultiplier=1.4; result.learnLog.push(`SL 40% breder — Stop-Loss raakt ${(slRate*100).toFixed(0)}% van de trades`); }
 
   return result;
 }
@@ -772,14 +777,13 @@ function autoTrade(){
 
     // ── KOPEN: score > 0 en we hebben nog geen positie ────
     if(res.score>0 && !alreadyOwned){
-      // Zelfleer: vermijd coins die structureel verliezen
-      if(lastLearning.avoidList.includes(sym)){
-        decisions.push({pair,score:res.score,rsi:res.rsi,action:'VERMEDEN',
-          detail:`Geleerd: ${sym} verliest structureel — ${lastLearning.learnLog.find(l=>l.startsWith(sym))||'te weinig wins'}`});
-      // Zelfleer: geleerde minimale score
-      } else if(lastLearning.minScore>0 && res.score<lastLearning.minScore){
-        decisions.push({pair,score:res.score,rsi:res.rsi,action:'TE ZWAK',
-          detail:`Score ${res.score} < geleerde drempel ${lastLearning.minScore} — historisch te zwak`});
+      // Zelfleer: per-coin drempel OF globale drempel — nog niet het juiste moment
+      const coinDrempel=lastLearning.coinThresholds[sym]||0;
+      const effectieveDrempel=Math.max(coinDrempel, lastLearning.globalMinScore);
+      if(effectieveDrempel>0 && res.score<effectieveDrempel){
+        const reden=coinDrempel>0?`${sym} wint pas bij score ≥ ${coinDrempel} (nu ${res.score})`:`Globale drempel ${lastLearning.globalMinScore} (nu ${res.score})`;
+        decisions.push({pair,score:res.score,rsi:res.rsi,action:'TE VROEG',
+          detail:`Geleerd: ${reden} — wacht op sterker signaal`});
       } else {
       // Vrij-saldo multiplier: hoe meer cash ongebruikt, hoe groter de inzet bij sterke signalen
       const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
@@ -922,9 +926,10 @@ function autoTrade(){
           if(!price||price<=0) continue;
           const addSize=Math.min(paper.balance*0.92,perKandidaat);
           if(addSize<5) continue;
-          // Budget-ronde respecteert ook zelfleer: vermijd slechte coins
-          if(lastLearning.avoidList.includes(pair.replace(/EUR$/,''))) continue;
-          if(lastLearning.minScore>0 && res.score<lastLearning.minScore) continue;
+          // Budget-ronde respecteert zelfleer-drempels
+          const bSym=pair.replace(/EUR$/,'');
+          const bDrempel=Math.max(lastLearning.coinThresholds[bSym]||0,lastLearning.globalMinScore);
+          if(bDrempel>0 && res.score<bDrempel) continue;
           const bbW=res.bb?.width||0.04;
           const slPct=Math.max(1.5,Math.min(15,price*bbW/4/price*100*1.5*lastLearning.slMultiplier));
           const tpPct=slPct*2.5;
@@ -983,9 +988,10 @@ function renderDecisions(){
     return;
   }
   const colorMap={
-    'GEKOCHT':'var(--green)','VERKOCHT':'var(--red)',
-    'AL OPEN':'var(--blue)','OVERGESLAGEN':'#6868a0',
-    'GEEN SALDO':'var(--amber)','GEEN PRIJS':'#6868a0','NEUTRAAL':'#6868a0'
+    'GEKOCHT':'var(--green)','VERKOCHT':'var(--red)','BIJGEKOCHT':'var(--green)',
+    'AL OPEN':'var(--blue)','OVERGESLAGEN':'#6868a0','TE VROEG':'var(--amber)',
+    'GEEN SALDO':'var(--amber)','GEEN PRIJS':'#6868a0','NEUTRAAL':'#6868a0',
+    'GEKOCHT (budget)':'var(--green)','BIJGEKOCHT (budget)':'var(--green)'
   };
   wrap.innerHTML=lastDecisions.map(d=>{
     const col=colorMap[d.action]||'#6868a0';
