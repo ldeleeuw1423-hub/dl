@@ -875,7 +875,7 @@ function renderPositions(){
         <div class="progress-labels"><span>SL ${slFmt}</span><span style="color:${barColor};">${curFmt}</span><span>TP ${tpFmt}</span></div>
         <div class="progress-bar"><div class="progress-fill" style="width:${barPct.toFixed(1)}%;background:${barColor};"></div></div>
       </div>`:''}
-      <div class="pos-meta">Ingekocht op ${entFmt} · ${pos.qty?.toFixed?.(pos.qty>=1?4:6):pos.qty} stuks</div>
+      <div class="pos-meta">Ingekocht op ${entFmt} · ${pos.qty!=null?pos.qty.toFixed(pos.qty>=1?4:6):pos.qty} stuks</div>
     </div>`;
   }).join('')+'</div>';
 }
