@@ -667,71 +667,77 @@ function autoTrade(){
   const log=loadLog();
   let changed=false;
 
-  // Drempel en grootte bepaald door de markt + eigen resultaten
-  const buyThreshold=calcAdaptiveThreshold(paper, s.scoreBuy);
-  const sellThreshold=-buyThreshold;
-  const baseSize=calcKellySize(paper);
+  const totalCap=paper.balance+paper.positions.reduce((t,p)=>t+posValueEUR(p),0);
+  const kellySize=calcKellySize(paper);
 
-  for(const res of scanResults){
+  // Geen vaste drempel — markt rangschikt, wij volgen
+  // Koop: positieve score, nog geen positie, saldo beschikbaar
+  // Positiegrootte: Kelly × scorefractie (hogere score = groter belang)
+  // Verkoop: score draait negatief op een open positie
+
+  // Sorteer op score (beste kansen eerst)
+  const ranked=[...scanResults].sort((a,b)=>b.score-a.score);
+
+  for(const res of ranked){
     const pair=res.pair;
     const price=getPrice(pair)||res.price;
-    const hasPos=paper.positions.findIndex(p=>p.pair===pair);
-    const alreadyOwned=hasPos!==-1;
+    if(!price||price<=0) continue;
+    const idx=paper.positions.findIndex(p=>p.pair===pair);
+    const alreadyOwned=idx!==-1;
 
-    // ── KOPEN ─────────────────────────────────────────────
-    if(res.score>=buyThreshold && !alreadyOwned && paper.balance>=10 && price>0){
-      const currency='EUR';
+    // ── KOPEN: score > 0 en we hebben nog geen positie ────
+    if(res.score>0 && !alreadyOwned && paper.balance>=10){
+      // Positiegrootte: Kelly × hoe sterk het signaal is (0–1 schaal)
+      // Sterk signaal (score 80) → vol Kelly; zwak (score 5) → 5% van Kelly
       const scoreFraction=Math.min(1, res.score/100);
-      const posSize=Math.min(paper.balance*0.95, Math.max(10, +(baseSize*(0.5+scoreFraction)).toFixed(2)));
+      const posSize=Math.min(paper.balance*0.95, Math.max(10, +(kellySize*scoreFraction).toFixed(2)));
       const qty=posSize/price;
       if(qty<=0) continue;
-      // SL/TP puur op BB-volatiliteit — markt bepaalt de marge
+      // SL/TP puur op BB-breedte — ATR-proxy, geen vaste %
       const bbW=res.bb?.width||0.04;
-      const atr=price*bbW/4; // ATR-proxy: kwart van BB-breedte
-      const slPct=Math.max(1.5, Math.min(10, (atr/price)*100*1.5));
+      const slPct=Math.max(1.5, Math.min(10, price*bbW/4/price*100*1.5));
       const tpPct=slPct*2.5;
-
       paper.balance-=posSize;
       paper.positions.push({
-        pair, currency, side:'BUY', entry:price, qty, posSize,
+        pair, currency:'EUR', side:'BUY', entry:price, qty, posSize,
         sl:+(price*(1-slPct/100)).toFixed(8),
         tp:+(price*(1+tpPct/100)).toFixed(8),
-        atrPct:+slPct.toFixed(3), // opgeslagen voor trailing
+        atrPct:+slPct.toFixed(3),
         ts:new Date().toISOString(), score:res.score, rsi:res.rsi
       });
       log.push({
         ts:new Date().toISOString(), pair, action:'KOOP', price:+price.toFixed(8),
-        qty:+qty.toFixed(8), value:+posSize.toFixed(2), score:res.score, currency,
-        why:buildReason(res,'KOOP',slPct,tpPct,posSize,paper.balance+posSize,currency,buyThreshold)
+        qty:+qty.toFixed(8), value:+posSize.toFixed(2), score:res.score, currency:'EUR',
+        why:buildReason(res,'KOOP',slPct,tpPct,posSize,paper.balance+posSize,'EUR',0)
       });
       changed=true;
     }
 
-    // ── VERKOPEN (signaal) ────────────────────────────────
-    if(res.score<=sellThreshold && alreadyOwned){
-      const pos=paper.positions[hasPos];
+    // ── VERKOPEN: score negatief op open positie ───────────
+    if(res.score<0 && alreadyOwned){
+      const pos=paper.positions[idx];
       const pnlEur=posPnlEUR(pos);
       paper.balance+=pos.posSize+pnlEur;
       paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
-      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:pos.currency||'USDT',ts:new Date().toISOString()});
-      paper.positions.splice(hasPos,1);
+      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:'EUR',ts:new Date().toISOString()});
+      paper.positions.splice(idx,1);
       log.push({
         ts:new Date().toISOString(), pair, action:'VERKOOP', price:+price.toFixed(8),
         qty:+pos.qty.toFixed(8), pnl:+pnlEur.toFixed(4), score:res.score,
-        why:buildReason(res,'VERKOOP',0,0,0,0,pos.currency||'USDT',sellThreshold)
+        why:buildReason(res,'VERKOOP',0,0,0,0,'EUR',0)
       });
       changed=true;
     }
 
     // ── TRAILING (ATR-gebaseerd, geen vaste percentages) ─
-    if(alreadyOwned && paper.positions[hasPos]){
-      const pos=paper.positions[hasPos];
+    const idxNow=paper.positions.findIndex(p=>p.pair===pair);
+    if(idxNow!==-1){
+      const pos=paper.positions[idxNow];
       const atrPct=pos.atrPct||2;
-      // Zodra prijs boven entry: trail op ATR-afstand
       if(price>pos.entry){
         const trailSL=+(price*(1-atrPct/100)).toFixed(8);
         if(trailSL>pos.sl){
-          paper.positions[hasPos].sl=trailSL;
+          paper.positions[idxNow].sl=trailSL;
           changed=true;
         }
       }
