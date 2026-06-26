@@ -3,10 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta http-equiv="Pragma" content="no-cache"/>
-<meta http-equiv="Expires" content="0"/>
-<title>TradingBot Dashboard v3</title>
+<title>TradingBot Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
@@ -486,34 +483,36 @@ body.help-mode * { cursor: help !important; }
         <button class="btn btn-ghost" onclick="runAiScan()" style="width:100%;justify-content:center;font-size:12px;"><i class="fas fa-satellite-dish fa-xs"></i> Nu scannen</button>
       </div>
 
-      <!-- Portfolio snapshot -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-wallet" style="color:#f59e0b;"></i> Portfolio</div>
-          <button class="btn btn-ghost" onclick="refreshActivePrices()" style="font-size:11px;padding:3px 8px;"><i class="fas fa-sync fa-xs" id="at-refresh-icon"></i></button>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px;">
-          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
-            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Vrij Saldo</div>
-            <div id="at-free" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
-          </div>
-          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
-            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">U-PnL</div>
-            <div id="at-upnl" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
-          </div>
-          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
-            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Totaal</div>
-            <div id="at-total" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
-          </div>
-          <div style="background:#252540;border-radius:6px;padding:9px;text-align:center;">
-            <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.7px;">Posities</div>
-            <div id="at-poscount" style="font-size:15px;font-weight:700;margin-top:3px;" class="neu">—</div>
-          </div>
-        </div>
-        <div id="at-positions" style="font-size:12px;max-height:180px;overflow-y:auto;"></div>
-      </div>
-
     </div>
+  </div>
+
+  <!-- ══ PORTFOLIO (full width, duidelijk) ══ -->
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;color:#fff;"><i class="fas fa-wallet" style="color:#f59e0b;"></i> Mijn Portfolio</div>
+      <button class="btn btn-ghost" onclick="refreshActivePrices()" style="font-size:11px;padding:4px 10px;"><i class="fas fa-sync fa-xs" id="at-refresh-icon"></i> Ververs</button>
+    </div>
+    <!-- Totaalrij -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:#0f0f1a;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Totale Waarde</div>
+        <div id="at-total" style="font-size:22px;font-weight:700;color:#fff;font-family:monospace;">—</div>
+      </div>
+      <div style="background:#0f0f1a;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Ongerealiseerde Winst</div>
+        <div id="at-upnl" style="font-size:22px;font-weight:700;font-family:monospace;" class="neu">—</div>
+      </div>
+      <div style="background:#0f0f1a;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Vrij Saldo</div>
+        <div id="at-free" style="font-size:22px;font-weight:700;color:#fff;font-family:monospace;">—</div>
+      </div>
+      <div style="background:#0f0f1a;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:#7878a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Open Posities</div>
+        <div id="at-poscount" style="font-size:22px;font-weight:700;color:#fff;font-family:monospace;">—</div>
+      </div>
+    </div>
+    <!-- Positiekaarten -->
+    <div id="at-positions"></div>
   </div>
 
   <!-- Risk Dashboard (full width) -->
@@ -3070,39 +3069,104 @@ function renderAtPortfolio(){
   const paper = loadPaper();
   let upnl = 0;
   paper.positions.forEach(pos=>{
-    const sym = pos.pair.replace('USDT','');
+    const sym = pos.pair.replace('USDT','').replace('USD','');
     const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
     const cur = livePrices[bPair]||livePrices[pos.pair]||pos.entry;
     upnl += pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
   });
   const totalVal = calcPaperTotal(paper);
+  const totalPnlPct = paper.startBalance>0 ? (totalVal-paper.startBalance)/paper.startBalance*100 : 0;
 
-  document.getElementById('at-free').textContent = paper.balance.toFixed(2);
+  // Totaalrij
+  const freeEl = document.getElementById('at-free');
+  if(freeEl) freeEl.textContent = '$'+paper.balance.toLocaleString('nl',{maximumFractionDigits:0});
   const upnlEl = document.getElementById('at-upnl');
-  upnlEl.textContent = (upnl>=0?'+':'')+upnl.toFixed(2);
-  upnlEl.className = upnl>=0?'pos':'neg';
-  document.getElementById('at-total').textContent = totalVal.toFixed(2);
-  document.getElementById('at-poscount').textContent = paper.positions.length;
+  if(upnlEl){
+    upnlEl.textContent = (upnl>=0?'+':'')+'$'+Math.abs(upnl).toLocaleString('nl',{maximumFractionDigits:0});
+    upnlEl.style.color = upnl>=0?'#00d4aa':'#ff5555';
+  }
+  const totEl = document.getElementById('at-total');
+  if(totEl){
+    totEl.innerHTML = `$${totalVal.toLocaleString('nl',{maximumFractionDigits:0})} <span style="font-size:13px;color:${totalPnlPct>=0?'#00d4aa':'#ff5555'};">${totalPnlPct>=0?'+':''}${totalPnlPct.toFixed(1)}%</span>`;
+  }
+  const cntEl = document.getElementById('at-poscount');
+  if(cntEl) cntEl.textContent = paper.positions.length;
 
   const posDiv = document.getElementById('at-positions');
+  if(!posDiv) return;
   if(!paper.positions.length){
-    posDiv.innerHTML = '<div style="color:#7878a0;text-align:center;padding:10px;font-size:12px;">Geen open posities</div>';
+    posDiv.innerHTML = '<div style="color:#7878a0;text-align:center;padding:24px;font-size:13px;border:1px dashed #252540;border-radius:8px;">Geen open posities — Auto Trading staat aan en scant de markt.</div>';
     return;
   }
-  posDiv.innerHTML = paper.positions.map((pos,i)=>{
-    const sym = pos.pair.replace('USDT','');
+
+  posDiv.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;">` +
+  paper.positions.map((pos,i)=>{
+    const sym = pos.pair.replace('USDT','').replace('USD','');
     const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
     const cur = livePrices[bPair]||livePrices[pos.pair]||pos.entry;
     const pnl = pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
-    const pc = pnl>=0?'#00d4aa':'#ff5555';
-    const autoTag = pos.autoTrade?'<span style="font-size:9px;background:rgba(99,130,255,.15);color:#6382ff;border-radius:3px;padding:1px 5px;">AUTO</span>':'';
-    return `<div style="display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid #1e1e38;">
-      <div style="font-weight:700;font-size:12px;flex:1;">${pos.pair} ${autoTag}</div>
-      <div style="font-family:monospace;font-size:10px;color:#7878a0;">${pos.entry.toLocaleString('nl',{maximumFractionDigits:4})}</div>
-      <div style="font-size:12px;font-weight:700;color:${pc};">${pnl>=0?'+':''}${pnl.toFixed(2)}</div>
-      <button onclick="openClosePosModal(${i})" style="background:rgba(255,85,85,.1);border:none;color:#ff5555;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;">✕</button>
+    const pnlPct = (cur-pos.entry)/pos.entry*100;
+    const posVal = cur*pos.qty;
+    const isPos = pnl>=0;
+    const pnlColor = isPos?'#00d4aa':'#ff5555';
+    const pnlBg = isPos?'rgba(0,212,170,.08)':'rgba(255,85,85,.08)';
+    const pnlBorder = isPos?'rgba(0,212,170,.25)':'rgba(255,85,85,.25)';
+
+    // Progress bar: position between SL and TP
+    let barPct = 50, barColor = '#7878a0';
+    if(pos.sl && pos.tp){
+      const range = pos.tp - pos.sl;
+      barPct = range>0 ? Math.max(0,Math.min(100,(cur-pos.sl)/range*100)) : 50;
+      barColor = barPct>65?'#00d4aa':barPct<35?'#ff5555':'#f59e0b';
+    }
+
+    const entryFmt = pos.entry>=1?'$'+pos.entry.toLocaleString('nl',{maximumFractionDigits:2}):'$'+pos.entry.toFixed(5);
+    const curFmt   = cur>=1?'$'+cur.toLocaleString('nl',{maximumFractionDigits:2}):'$'+cur.toFixed(5);
+    const slFmt    = pos.sl?(pos.sl>=1?'$'+pos.sl.toLocaleString('nl',{maximumFractionDigits:2}):'$'+pos.sl.toFixed(4)):'—';
+    const tpFmt    = pos.tp?(pos.tp>=1?'$'+pos.tp.toLocaleString('nl',{maximumFractionDigits:2}):'$'+pos.tp.toFixed(4)):'—';
+
+    // Coin icons mapping
+    const coinIcon = {'BTC':'₿','ETH':'Ξ','SOL':'◎','XRP':'✕','BNB':'⬡','ADA':'₳','DOGE':'Ð','AVAX':'▲','DOT':'●','LINK':'⬡'}[sym]||sym[0];
+
+    return `<div style="background:#13132a;border:1px solid ${pnlBorder};border-radius:10px;padding:14px;position:relative;">
+      <!-- Header: coin + badge -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:38px;height:38px;border-radius:50%;background:rgba(99,130,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#6382ff;">${coinIcon}</div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:#fff;">${sym}</div>
+            <div style="font-size:10px;color:#7878a0;">${pos.ts?.slice(0,10)||'—'} · ${pos.autoTrade?'AUTO':'HANDMATIG'}</div>
+          </div>
+        </div>
+        <button onclick="openClosePosModal(${i})" style="background:rgba(255,85,85,.12);border:1px solid rgba(255,85,85,.3);color:#ff5555;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;">Sluiten</button>
+      </div>
+
+      <!-- Huidige waarde + PnL -->
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <div style="font-size:10px;color:#7878a0;margin-bottom:2px;">Huidige Waarde</div>
+          <div style="font-size:24px;font-weight:700;color:#fff;font-family:monospace;">$${posVal>=1?posVal.toLocaleString('nl',{maximumFractionDigits:0}):posVal.toFixed(2)}</div>
+        </div>
+        <div style="text-align:right;background:${pnlBg};border:1px solid ${pnlBorder};border-radius:8px;padding:6px 12px;">
+          <div style="font-size:20px;font-weight:700;color:${pnlColor};font-family:monospace;">${isPos?'+':''}${pnlPct.toFixed(1)}%</div>
+          <div style="font-size:12px;color:${pnlColor};font-weight:600;">${isPos?'+':''}$${Math.abs(pnl).toFixed(2)}</div>
+        </div>
+      </div>
+
+      <!-- Voortgangsbalk SL → TP -->
+      ${pos.sl&&pos.tp?`<div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#7878a0;margin-bottom:3px;">
+          <span>SL ${slFmt}</span><span style="color:${barColor};">▼ ${curFmt}</span><span>TP ${tpFmt}</span>
+        </div>
+        <div style="height:5px;background:#1e1e38;border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${barPct}%;background:${barColor};border-radius:3px;transition:width .3s;"></div>
+        </div>
+      </div>`:''}
+
+      <!-- Entry prijs -->
+      <div style="font-size:11px;color:#7878a0;">Ingekocht op ${entryFmt} · ${pos.qty?.toFixed?.(pos.qty>=1?4:6):pos.qty} stuks</div>
     </div>`;
-  }).join('');
+  }).join('') + '</div>';
 }
 
 function renderAtTopSignals(){
