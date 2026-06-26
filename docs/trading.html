@@ -283,71 +283,78 @@ let livePrices = {};
 let scanResults = [];
 let chartObj = null;
 
-// Kraken pair → display naam
-// Gebaseerd op Kraken API documentatie + bevestigde paren
-// BNB staat NIET op Kraken; DOGE heet XDGUSD op Kraken
-const KRAKEN_MAP = {
-  // USD paren (bevestigd op Kraken)
-  'XXBTZUSD':'BTCUSDT',  // BTC/USD
-  'XETHZUSD':'ETHUSDT',  // ETH/USD
-  'XXRPZUSD':'XRPUSDT',  // XRP/USD
-  'SOLUSD':'SOLUSDT',    // SOL/USD
-  'ADAUSD':'ADAUSDT',    // ADA/USD
-  'XDGUSD':'DOGEUSDT',   // DOGE/USD (Kraken gebruikt XDG)
-  'AVAXUSD':'AVAXUSDT',  // AVAX/USD
-  'DOTUSD':'DOTUSDT',    // DOT/USD
-  'LINKUSD':'LINKUSDT',  // LINK/USD
-  // EUR paren (bevestigd op Kraken)
-  'XXBTZEUR':'BTCEUR',   // BTC/EUR
-  'XETHZEUR':'ETHEUR',   // ETH/EUR
-  'XXRPZEUR':'XRPEUR',   // XRP/EUR
-  'SOLEUR':'SOLEUR',     // SOL/EUR
-  'ADAEUR':'ADAEUR',     // ADA/EUR
-  'DOTEUR':'DOTEUR',     // DOT/EUR
-  'LINKEUR':'LINKEUR',   // LINK/EUR
-  // BTC cross paren (bevestigd op Kraken)
-  'XETHXXBT':'ETHBTC',   // ETH/BTC
-  'XXRPXXBT':'XRPBTC',   // XRP/BTC
-  'ADAXBT':'ADABTC',     // ADA/BTC
-  'DOTXBT':'DOTBTC',     // DOT/BTC
-  'LINKXBT':'LINKBTC',   // LINK/BTC
+// ── CoinMarketCap — de enige bron van waarheid ───────────
+// CMC geeft geverifieerde EUR-prijzen, geen aannames nodig
+const CMC_KEY = 'b9234d0333fd4cefb5d18e2debd80e62';
+const CMC_URL = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest';
+
+// CMC symbool → Kraken OHLCV pair (voor technische analyse)
+// Enige mapping die overblijft — voor candle data
+const CMC_TO_KRAKEN = {
+  'BTC':'XXBTZUSD','ETH':'XETHZUSD','XRP':'XXRPZUSD','SOL':'SOLUSD',
+  'ADA':'ADAUSD','DOGE':'XDGUSD','AVAX':'AVAXUSD','DOT':'DOTUSD',
+  'LINK':'LINKUSD','LTC':'XLTCZUSD','ATOM':'ATOMUSD','NEAR':'NEARUSD',
+  'UNI':'UNIUSD','BCH':'BCHUSD','ALGO':'ALGOUSD','MATIC':'MATICUSD',
+  'ICP':'ICPUSD','FIL':'FILUSD','APT':'APTUSD','ARB':'ARBUSD'
 };
-function krakenToDisplay(kp){ return KRAKEN_MAP[kp] || kp; }
+
+let cmcCoins   = [];  // volledige CMC coin data
+let topMovers  = [];  // top N symbolen op volume (bijv. ['BTC','ETH','SOL'])
+
 function getPairCurrency(pair){
   if(pair.endsWith('EUR')) return 'EUR';
   if(pair.endsWith('BTC')) return 'BTC';
   return 'USDT';
 }
-// Alle live prijzen komen van de 24hr ticker (alle ~2000 symbolen)
-// Geen vaste BINANCE_PAIRS meer — Binance bepaalt wat er is
-let topMovers = []; // dynamisch bijgewerkt op volume
-function getEURUSDT(){ return livePrices['EURUSDT'] || 1.10; }
-function getBTCUSDT(){ return livePrices['BTCUSDT'] || 65000; }
-function getPrice(pair){
-  if(livePrices[pair]) return livePrices[pair];
-  // Bereken via USDT als directe EUR/BTC prijs niet beschikbaar op Binance
-  const sym = pair.replace(/EUR$|USDT$|BTC$/, '');
-  if(pair.endsWith('EUR') && livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getEURUSDT();
-  if(pair.endsWith('BTC') && livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getBTCUSDT();
-  return null;
+// EUR/USD koers direct uit CMC (BTC quote)
+function getEURUSDT(){
+  const btc = cmcCoins.find(c=>c.symbol==='BTC');
+  if(btc?.quote?.EUR?.price && btc?.quote?.USD?.price)
+    return btc.quote.USD.price / btc.quote.EUR.price;
+  return livePrices['EURUSDT'] || 1.10;
 }
-// Alles in EUR — de markt in jouw valuta
+function getBTCEUR(){
+  const btc = cmcCoins.find(c=>c.symbol==='BTC');
+  return btc?.quote?.EUR?.price || livePrices['BTCEUR'] || 85000;
+}
+function getBTCUSDT(){ return livePrices['BTCUSDT'] || 65000; }
+
+// Prijs opzoeken — EUR altijd beschikbaar via CMC
+function getPrice(pair){
+  const sym = pair.replace(/EUR$|USDT$|USD$|BTC$/, '');
+  const coin = cmcCoins.find(c=>c.symbol===sym);
+  if(pair.endsWith('EUR')){
+    if(coin?.quote?.EUR?.price) return coin.quote.EUR.price;
+    if(livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getEURUSDT();
+  }
+  if(pair.endsWith('BTC')){
+    if(coin?.quote?.BTC?.price) return coin.quote.BTC.price;
+    if(livePrices[sym+'USDT'] && getBTCUSDT()) return livePrices[sym+'USDT'] / getBTCUSDT();
+  }
+  // USDT/USD fallback
+  if(coin?.quote?.USD?.price) return coin.quote.USD.price;
+  return livePrices[pair] || livePrices[sym+'USDT'] || null;
+}
+// Display naam van een Kraken pair
+function krakenToDisplay(kp){
+  // Zoek welk CMC symbool dit Kraken pair gebruikt
+  const sym = Object.entries(CMC_TO_KRAKEN).find(([s,k])=>k===kp)?.[0];
+  return sym ? sym+'EUR' : kp; // standaard: toon als EUR pair
+}
+// Alles in EUR — CMC levert dit direct, geen conversie-hacks
+function toEUR(nativeValue, currency){
+  if(currency==='EUR') return nativeValue;
+  if(currency==='BTC') return nativeValue * getBTCEUR();
+  return nativeValue / getEURUSDT(); // USDT→EUR
+}
 function posValueEUR(pos){
   const cur = getPrice(pos.pair) || pos.entry;
-  const c = pos.currency || 'USDT';
-  if(c === 'EUR') return cur * pos.qty;
-  if(c === 'BTC') return cur * pos.qty * getBTCUSDT() / getEURUSDT();
-  return cur * pos.qty / getEURUSDT();
+  return toEUR(cur * pos.qty, pos.currency||'USDT');
 }
 function posPnlEUR(pos){
   const cur = getPrice(pos.pair) || pos.entry;
-  const c = pos.currency || 'USDT';
-  const native = (cur - pos.entry) * pos.qty;
-  if(c === 'EUR') return native;
-  if(c === 'BTC') return native * getBTCUSDT() / getEURUSDT();
-  return native / getEURUSDT();
+  return toEUR((cur - pos.entry) * pos.qty, pos.currency||'USDT');
 }
-// Backwards compat alias
 function posValueUSDT(pos){ return posValueEUR(pos) * getEURUSDT(); }
 function posPnlUSDT(pos){ return posPnlEUR(pos) * getEURUSDT(); }
 function fmtPrice(price, currency){
@@ -377,54 +384,113 @@ function resetPortfolio(){
   renderAll();
 }
 
-// ── Live prijzen — ALLE Binance symbolen (geen vaste lijst) ─
-async function fetchPrices(){
+// ── CoinMarketCap prijzen (elke 60s) ─────────────────────
+// CMC geeft EUR direct — geen conversie, geen aannames
+async function fetchCMCPrices(){
   try {
-    // Haal 24hr mini-ticker op: geeft prijs + volume voor ALLE ~2000 paren
-    // Geen enkel invalid-symbol probleem mogelijk
-    const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?type=MINI');
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const data = await r.json();
-    if(Array.isArray(data)){
-      data.forEach(d=>{ livePrices[d.symbol]=parseFloat(d.lastPrice); });
-      // Top movers dynamisch bijwerken op quoteVolume (USDT)
-      const stables=new Set(['USDT','BUSD','USDC','DAI','TUSD','FDUSD','USDD']);
-      topMovers = data
-        .filter(d=>d.symbol.endsWith('USDT') && !stables.has(d.symbol.replace('USDT','')))
-        .sort((a,b)=>parseFloat(b.quoteVolume)-parseFloat(a.quoteVolume))
-        .slice(0,20).map(d=>d.symbol);
+    const r = await fetch(
+      CMC_URL+'?limit=50&sort=volume_24h&convert=EUR,USD,BTC',
+      { headers:{'X-CMC_PRO_API_KEY': CMC_KEY, 'Accept':'application/json'} }
+    );
+    if(!r.ok) throw new Error('CMC HTTP '+r.status);
+    const d = await r.json();
+    if(d.data){
+      cmcCoins = d.data;
+      topMovers = cmcCoins.map(c=>c.symbol);
+      // Vul ook livePrices voor Binance-fallback compatibiliteit
+      cmcCoins.forEach(c=>{
+        if(c.quote?.USD?.price) livePrices[c.symbol+'USDT']=c.quote.USD.price;
+        if(c.quote?.EUR?.price) livePrices[c.symbol+'EUR'] =c.quote.EUR.price;
+        if(c.quote?.BTC?.price) livePrices[c.symbol+'BTC'] =c.quote.BTC.price;
+      });
     }
-    renderTicker();
     document.getElementById('status-dot').className='live';
+    renderTicker();
     checkSLTP();
     renderPositions();
     renderKPIs();
   } catch(e){
-    document.getElementById('status-dot').className='';
-    console.warn('fetchPrices fout:',e.message);
+    console.warn('CMC fout:',e.message);
+    // Fallback: Binance als CMC faalt
+    await fetchBinanceFallback();
   }
+}
+
+// Binance fallback voor snelle prijs-updates
+async function fetchBinanceFallback(){
+  try {
+    const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?type=MINI');
+    if(!r.ok) throw new Error('Binance HTTP '+r.status);
+    const data = await r.json();
+    if(Array.isArray(data)){
+      data.forEach(d=>{ livePrices[d.symbol]=parseFloat(d.lastPrice); });
+      if(!cmcCoins.length){
+        // Als CMC nog niet geladen is, gebruik Binance voor topMovers
+        const stables=new Set(['USDT','BUSD','USDC','DAI','TUSD','FDUSD','USDD']);
+        topMovers = data
+          .filter(d=>d.symbol.endsWith('USDT')&&!stables.has(d.symbol.replace('USDT','')))
+          .sort((a,b)=>parseFloat(b.quoteVolume)-parseFloat(a.quoteVolume))
+          .slice(0,20).map(d=>d.symbol.replace('USDT',''));
+      }
+    }
+    document.getElementById('status-dot').className='live';
+    renderTicker(); checkSLTP(); renderPositions(); renderKPIs();
+  } catch(e){
+    document.getElementById('status-dot').className='';
+    console.warn('Binance fallback fout:',e.message);
+  }
+}
+
+// Hoofd fetch-functie — CMC primair, Binance als snelle 15s update
+async function fetchPrices(useCMC=false){
+  if(useCMC) return fetchCMCPrices();
+  // Snelle update: Binance voor posities die al open zijn
+  const openSymbols=[...new Set(loadPaper().positions.map(p=>p.pair.replace(/EUR$|BTC$/,'')+'USDT'))];
+  if(openSymbols.length){
+    try{
+      const url='https://api.binance.com/api/v3/ticker/price?symbols=['+openSymbols.map(s=>`"${s}"`).join(',')+']';
+      const r=await fetch(url);
+      if(r.ok){ const d=await r.json(); if(Array.isArray(d)) d.forEach(x=>{ livePrices[x.symbol]=parseFloat(x.price); }); }
+    }catch(e){ /* stille fallback */ }
+  }
+  checkSLTP(); renderPositions(); renderKPIs();
 }
 
 function renderTicker(){
   const el = document.getElementById('ticker-track');
-  // Toon top-20 movers + EUR/BTC conversies
-  const showPairs = [...new Set([...topMovers.slice(0,12),
-    'BTCEUR','ETHEUR','XRPEUR','ETHBTC','SOLBTC'])].slice(0,16);
-  const items = showPairs.map(p=>{
-    const pr = livePrices[p];
-    if(!pr) return '';
-    const isEUR=p.endsWith('EUR'), isBTC=p.endsWith('BTC');
-    const sym = p.replace(/USDT$|EUR$|BTC$/,'');
-    const pfx = isEUR?'€':isBTC?'₿':'$';
-    const prFmt = pr>=100?pr.toLocaleString('nl',{maximumFractionDigits:0}):pr.toFixed(pr>=1?2:5);
-    const suffix = isEUR?'<sup style="color:#6868a0;font-size:9px;">€</sup>':isBTC?'<sup style="color:#f59e0b;font-size:9px;">₿</sup>':'';
-    return `<div class="tick-item">
-      <span class="tick-sym">${sym}${suffix}</span>
-      <span class="tick-price">${pfx}${prFmt}</span>
-    </div>`;
-  }).join('<span style="color:#2a2a48;padding:0 4px;">·</span>');
-  const html = items + '<span style="color:#2a2a48;padding:0 14px;">·</span>' + items;
-  el.innerHTML = html;
+  let items = '';
+
+  if(cmcCoins.length){
+    // CMC: toon top-20 met EUR prijs + 24u% verandering — alles geverifieerd, geen aannames
+    items = cmcCoins.slice(0,20).map(c=>{
+      const eurPrice=c.quote?.EUR?.price;
+      if(!eurPrice) return '';
+      const chg=c.quote?.EUR?.percent_change_24h||0;
+      const isUp=chg>=0;
+      const prFmt=eurPrice>=100
+        ?eurPrice.toLocaleString('nl',{maximumFractionDigits:0})
+        :eurPrice.toFixed(eurPrice>=1?2:5);
+      const chgFmt=(isUp?'+':'')+chg.toFixed(2)+'%';
+      return `<div class="tick-item">
+        <span class="tick-sym">${c.symbol}</span>
+        <span class="tick-price">€${prFmt}</span>
+        <span class="tick-chg" style="color:${isUp?'var(--green)':'var(--red)'};">${chgFmt}</span>
+      </div>`;
+    }).filter(Boolean).join('<span style="color:#2a2a48;padding:0 4px;">·</span>');
+  } else {
+    // Binance fallback: USDT paren omgezet naar EUR
+    const eur=getEURUSDT();
+    items=[...topMovers.slice(0,12),'BTC','ETH','SOL'].map(sym=>{
+      const pr=livePrices[sym+'USDT'];
+      if(!pr) return '';
+      const eurPr=pr/eur;
+      const prFmt=eurPr>=100?eurPr.toLocaleString('nl',{maximumFractionDigits:0}):eurPr.toFixed(2);
+      return `<div class="tick-item"><span class="tick-sym">${sym}</span><span class="tick-price">€${prFmt}</span></div>`;
+    }).filter(Boolean).join('<span style="color:#2a2a48;padding:0 4px;">·</span>');
+  }
+
+  if(!items){ el.innerHTML='<span style="color:#3a3a5c;font-size:12px;">Prijzen laden…</span>'; return; }
+  el.innerHTML=items+'<span style="color:#2a2a48;padding:0 14px;">·</span>'+items;
 }
 
 // ── Technische analyse ────────────────────────────────────
@@ -498,24 +564,29 @@ async function fetchKrakenOHLCV(pair, interval=240){
 }
 
 // ── AI Scan ───────────────────────────────────────────────
-const SCAN_PAIRS = Object.keys(KRAKEN_MAP);
-
 async function runScan(){
+  // Dynamisch: CMC top-movers die ook Kraken candle data hebben
+  const scanItems=(cmcCoins.length?cmcCoins:Object.keys(CMC_TO_KRAKEN).map(s=>({symbol:s})))
+    .map(c=>({sym:c.symbol,kp:CMC_TO_KRAKEN[c.symbol]})).filter(x=>x.kp);
+
   const btn=document.getElementById('scan-btn');
   btn.innerHTML='<i class="fas fa-spinner fa-spin fa-sm"></i> Scannen…';
   btn.disabled=true;
-  document.getElementById('at-status').textContent='Bezig met scannen van '+SCAN_PAIRS.length+' paren…';
+  document.getElementById('at-status').textContent='Bezig met scannen van '+scanItems.length+' paren…';
 
   const results=[], failed=[];
-  for(const kp of SCAN_PAIRS){
+  for(const {sym,kp} of scanItems){
     try {
       const candles=await fetchKrakenOHLCV(kp,240);
-      if(candles.length<30){ failed.push(kp+'(te weinig data)'); continue; }
+      if(candles.length<30){ failed.push(sym+'(te weinig data)'); continue; }
       const res=computeScore(candles);
-      const displayPair=krakenToDisplay(kp);
+      // EUR prijs uit CMC — authoratief, geen aannames
+      const coin=cmcCoins.find(c=>c.symbol===sym);
+      if(coin?.quote?.EUR?.price) res.price=coin.quote.EUR.price;
+      const displayPair=sym+'EUR';
       const signal=res.score>=50?'STRONG BUY':res.score>=28?'BUY':res.score<=-50?'STRONG SELL':res.score<=-28?'SELL':'HOLD';
-      results.push({kp, pair:displayPair, signal, ...res});
-    } catch(e){ failed.push(kp+'('+e.message.slice(0,30)+')'); }
+      results.push({kp,sym,pair:displayPair,signal,...res});
+    } catch(e){ failed.push(sym+'('+e.message.slice(0,30)+')'); }
   }
   results.sort((a,b)=>b.score-a.score);
   scanResults=results;
@@ -623,13 +694,11 @@ function autoTrade(){
 
     // ── KOPEN ─────────────────────────────────────────────
     if(res.score>=buyThreshold && !alreadyOwned && paper.balance>=10){
-      const currency=getPairCurrency(pair);
-      // Schaal op signaalsterkte maar geen arbitraire vaste multipliers
+      const currency='EUR'; // alles in EUR via CMC
       const scoreFraction=Math.min(1, res.score/100);
       const posSize=Math.min(paper.balance*0.95, Math.max(10, +(baseSize*(0.5+scoreFraction)).toFixed(2)));
-      // Bereken qty in native valuta van het paar
-      const toNative=currency==='EUR'?getEURUSDT():currency==='BTC'?getBTCUSDT():1;
-      const qty=(toNative>1?posSize/toNative:posSize)/price;
+      // qty = EUR bedrag / EUR prijs (CMC geeft EUR, geen aannames)
+      const qty=price>0?posSize/price:0;
       // SL/TP puur op BB-volatiliteit — markt bepaalt de marge
       const bbW=res.bb?.width||0.04;
       const atr=price*bbW/4; // ATR-proxy: kwart van BB-breedte
@@ -866,7 +935,7 @@ function renderLog(){
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="log-pair">${pairLabel}</span>
           <span class="log-price">${pfxPrice}${prFmt}</span>
-          ${e.value?`<span style="font-size:11px;color:#6868a0;">€${(e.value/getEURUSDT()).toFixed(0)}</span>`:''}
+          ${e.value?`<span style="font-size:11px;color:#6868a0;">€${(+e.value).toFixed(0)}</span>`:''}
           ${pnlStr}
         </div>
         <div class="log-meta">${e.ts?.slice(0,16).replace('T',' ')||''}${e.score!==undefined?' · score '+e.score:''}</div>
@@ -992,9 +1061,11 @@ function renderAll(){
   // Fear & Greed ophalen (dagelijks, geen rate-limit)
   fetchFearGreed();
 
-  // Prijzen ophalen
-  fetchPrices();
-  setInterval(fetchPrices,15000);
+  // CMC elke 60s — primaire databron (EUR prijzen, 24u% verandering, top-movers)
+  fetchCMCPrices();
+  setInterval(fetchCMCPrices, 60000);
+  // Binance snelle update voor open posities elke 15s
+  setInterval(fetchPrices, 15000);
 
   // Auto-scan starten
   startAutoScan();
