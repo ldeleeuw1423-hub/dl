@@ -1429,7 +1429,7 @@ function renderPairsPage(){
   document.getElementById('pairs-grid').innerHTML = Object.values(pairs).sort((a,b)=>b.pnl-a.pnl).map(p=>{
     const wr=(p.w+p.l)?+(p.w/(p.w+p.l)*100).toFixed(0):0;
     const c=p.pnl>=0?'#00d4aa':'#ff5555';
-    const price = livePrices[p.pair];
+    const price = getPairPrice(p.pair);
     return `<div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div style="font-size:15px;font-weight:700;color:#fff;">${p.pair}</div>
@@ -1454,7 +1454,7 @@ function renderPairsPage(){
 function calcPaperTotal(paper){
   let total = paper.balance;
   paper.positions.forEach(pos=>{
-    const cur = livePrices[pos.pair] || parseFloat(pos.entry);
+    const cur = getPairPrice(pos.pair) || parseFloat(pos.entry);
     const upnl = pos.side==='BUY' ? (cur-pos.entry)*pos.qty : (pos.entry-cur)*pos.qty;
     total += pos.entry*pos.qty + upnl;
   });
@@ -1465,7 +1465,7 @@ function renderPaperPage(){
   const paper = loadPaper();
   let totalUpnl=0;
   paper.positions.forEach(pos=>{
-    const cur=livePrices[pos.pair]||pos.entry;
+    const cur=getPairPrice(pos.pair)||pos.entry;
     totalUpnl += pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
   });
   const totalVal=calcPaperTotal(paper), rpnl=paper.realizedPnl;
@@ -1477,7 +1477,7 @@ function renderPaperPage(){
   // Positions
   const ptbody = document.getElementById('positions-tbody');
   ptbody.innerHTML = paper.positions.length ? paper.positions.map((pos,i)=>{
-    const cur=livePrices[pos.pair]||pos.entry;
+    const cur=getPairPrice(pos.pair)||pos.entry;
     const upnl=pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
     const pc=upnl>=0?'pos':'neg';
     const sltp=[(pos.sl?'SL:'+pos.sl:''),(pos.tp?'TP:'+pos.tp:'')].filter(Boolean).join(' | ')||'—';
@@ -1578,7 +1578,7 @@ function openClosePosModal(idx){
   document.getElementById('close-pos-idx').value=idx;
   document.getElementById('close-pos-info').innerHTML =
     `<strong>${pos.pair}</strong> ${pos.side} ${pos.qty} @ ${pos.entry.toLocaleString()}`;
-  const cur=livePrices[pos.pair]||pos.entry;
+  const cur=getPairPrice(pos.pair)||pos.entry;
   document.getElementById('close-price').value=cur;
   document.getElementById('modal-close-pos').style.display='flex';
 }
@@ -1615,7 +1615,7 @@ async function refreshPaperPositions(){
   let changed=false;
   for(let i=paper.positions.length-1;i>=0;i--){
     const pos=paper.positions[i];
-    const cur=livePrices[pos.pair]||pos.entry;
+    const cur=getPairPrice(pos.pair)||pos.entry;
     let hit=null;
     if(pos.sl&&((pos.side==='BUY'&&cur<=pos.sl)||(pos.side==='SELL'&&cur>=pos.sl))) hit={price:pos.sl,reason:'Stop Loss'};
     if(pos.tp&&((pos.side==='BUY'&&cur>=pos.tp)||(pos.side==='SELL'&&cur<=pos.tp))) hit={price:pos.tp,reason:'Take Profit'};
@@ -1877,7 +1877,17 @@ function toggleGlobalLive(el){
 // ══════════════════════════════════════════════════════════
 //  LIVE PRICES (Binance public REST, polled)
 // ══════════════════════════════════════════════════════════
-const TRACKED_PAIRS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT'];
+const TRACKED_PAIRS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT',
+  'ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT'];
+
+// Centrale helper: vindt altijd de juiste prijs ongeacht pair-formaat
+function getPairPrice(pair){
+  if(!pair) return null;
+  if(livePrices[pair]) return livePrices[pair];
+  const sym = pair.replace('USDT','').replace('USD','').replace('EUR','');
+  const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
+  return livePrices[bPair] || null;
+}
 
 async function updateLivePrices(){
   try {
@@ -1906,8 +1916,7 @@ function renderTickerBar(){
     // Show what you own: asset, current value, % P&L
     bar.innerHTML=positions.slice(0,8).map(pos=>{
       const sym=pos.pair.replace('USDT','').replace('USD','');
-      const bPair=sym==='BTC'?'BTCUSDT':sym+'USDT';
-      const cur=livePrices[bPair]||livePrices[pos.pair]||pos.entry;
+      const cur=getPairPrice(pos.pair)||pos.entry;
       const value=cur*pos.qty;
       const pct=(cur-pos.entry)/pos.entry*100;
       const color=pct>=0?'#00d4aa':'#ff5555';
@@ -2263,7 +2272,7 @@ function filterAiTable(){
 }
 
 function openPaperFromAi(pair,price){
-  const displayPair=pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USDT').replace('ZEUR','USDT');
+  const displayPair=krakenPairToDisplay(pair);
   document.getElementById('po-pair').value=displayPair;
   document.getElementById('po-price').value=price;
   showPage('paper');
@@ -2303,10 +2312,10 @@ function renderPredHistory(){
     return;
   }
   tbody.innerHTML=preds.map(p=>{
-    const cur=livePrices[p.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USDT')]||null;
+    const cur=getPairPrice(krakenPairToDisplay(p.pair))||null;
     const dirCorrect=p.evaluated?p.correct:null;
     const actualDir=cur&&p.price?((cur-p.price)/p.price*100).toFixed(2):null;
-    const displayPair=p.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD').replace('ZEUR','EUR');
+    const displayPair=krakenPairToDisplay(p.pair);
     return `<tr>
       <td class="muted" style="font-size:11px;">${p.ts.slice(0,16)}</td>
       <td style="font-weight:600;">${displayPair}</td>
@@ -3071,7 +3080,7 @@ function renderAtPortfolio(){
   paper.positions.forEach(pos=>{
     const sym = pos.pair.replace('USDT','').replace('USD','');
     const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
-    const cur = livePrices[bPair]||livePrices[pos.pair]||pos.entry;
+    const cur = livePrices[bPair]||getPairPrice(pos.pair)||pos.entry;
     upnl += pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
   });
   const totalVal = calcPaperTotal(paper);
@@ -3103,7 +3112,7 @@ function renderAtPortfolio(){
   paper.positions.map((pos,i)=>{
     const sym = pos.pair.replace('USDT','').replace('USD','');
     const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
-    const cur = livePrices[bPair]||livePrices[pos.pair]||pos.entry;
+    const cur = livePrices[bPair]||getPairPrice(pos.pair)||pos.entry;
     const pnl = pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
     const pnlPct = (cur-pos.entry)/pos.entry*100;
     const posVal = cur*pos.qty;
@@ -3345,7 +3354,7 @@ const AUTO_TRADE_LOG_KEY = 'tb_auto_trade_log';
 
 function loadAutoTradeSettings(){
   return Object.assign(
-    { enabled:false, strategy:'ai', positionSize:150, maxPositions:5, riskLevel:'medium' },
+    { enabled:true, strategy:'ai', positionSize:150, maxPositions:5, riskLevel:'medium' },
     JSON.parse(localStorage.getItem(AUTO_TRADE_KEY)||'{}')
   );
 }
@@ -3405,7 +3414,7 @@ function calcCurrentExposure(paper){
   paper.positions.forEach(pos => {
     const sym = pos.pair.replace('USDT','').replace('USD','');
     const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
-    const cur = livePrices[bPair] || livePrices[pos.pair] || pos.entry;
+    const cur = getPairPrice(pos.pair)||pos.entry;
     exposed += cur * pos.qty;
   });
   return exposed;
@@ -3417,7 +3426,7 @@ function calcMaxLossIfAllSLHit(paper){
     if(pos.sl && pos.side === 'BUY'){
       const sym = pos.pair.replace('USDT','').replace('USD','');
       const bPair = sym==='BTC'?'BTCUSDT':sym+'USDT';
-      const cur = livePrices[bPair] || livePrices[pos.pair] || pos.entry;
+      const cur = getPairPrice(pos.pair)||pos.entry;
       const lossPerUnit = cur - pos.sl;
       maxLoss += lossPerUnit * pos.qty;
     }
@@ -3535,21 +3544,21 @@ function saveAutoTradeLog(l){ localStorage.setItem(AUTO_TRADE_LOG_KEY, JSON.stri
 function getStrategyTradeParams(strategyKey, res){
   const cfg = loadAutoTradeSettings();
   const paper = loadPaper();
-  const risk    = 'aggressive'; // system always uses max-profit mode
+  const risk    = cfg.riskLevel || 'medium';
   const posSize = calculateAutoPositionSize(paper, risk, res.score);
   const maxpos  = 50; // no artificial cap — limited only by free balance
 
   if(strategyKey === 'ai' || !strategyKey){
     const {sl,tp} = getRiskSLTP(risk,3,6);
     return { sl, tp, pos:posSize, maxpos,
-      buySignal:  res.score >= 55,
-      sellSignal: res.score <= -40
+      buySignal:  res.score >= 30,
+      sellSignal: res.score <= -30
     };
   }
   const strat = STRATEGY_LIBRARY.find(s=>s.name===strategyKey);
   if(!strat){
     const {sl,tp} = getRiskSLTP(risk,3,6);
-    return { sl, tp, pos:posSize, maxpos, buySignal:res.score>=55, sellSignal:res.score<=-40 };
+    return { sl, tp, pos:posSize, maxpos, buySignal:res.score>=30, sellSignal:res.score<=-30 };
   }
   const p = strat.params||{};
   let buySignal=false, sellSignal=false, baseSl=3, baseTp=6;
@@ -3834,7 +3843,7 @@ async function checkAutoTrades(){
 
   const paper = loadPaper();
   const log   = loadAutoTradeLog();
-  const rl = 'aggressive'; // system always goes for maximum profit
+  const rl = s.riskLevel || 'medium';
   let changed = false;
 
   for(const res of aiResults){
