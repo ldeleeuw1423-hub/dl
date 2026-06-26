@@ -849,6 +849,65 @@ function autoTrade(){
     }
   }
 
+  // ── BUDGET-RONDE: als >20% nog vrij, inzetten op beste kansen ──
+  {
+    const totaalV=paper.balance+paper.positions.reduce((s,p)=>s+posValueEUR(p),0);
+    if(paper.balance/totaalV>0.20 && paper.balance>50){
+      const teInzetten=paper.balance*0.90;
+      const kandidaten=ranked.filter(r=>r.score>0).slice(0,6);
+      if(kandidaten.length){
+        const perKandidaat=Math.floor(teInzetten/kandidaten.length);
+        for(const res of kandidaten){
+          if(paper.balance<10) break;
+          const pair=res.pair;
+          const price=getPrice(pair)||res.price;
+          if(!price||price<=0) continue;
+          const addSize=Math.min(paper.balance*0.92,perKandidaat);
+          if(addSize<5) continue;
+          const bbW=res.bb?.width||0.04;
+          const slPct=Math.max(1.5,Math.min(10,price*bbW/4/price*100*1.5));
+          const tpPct=slPct*2.5;
+          const idx2=paper.positions.findIndex(p=>p.pair===pair);
+          if(idx2===-1){
+            // Nieuwe positie
+            const qty=addSize/price;
+            paper.balance-=addSize;
+            paper.positions.push({pair,currency:'EUR',side:'BUY',entry:price,qty,posSize:addSize,
+              sl:+(price*(1-slPct/100)).toFixed(8),tp:+(price*(1+tpPct/100)).toFixed(8),
+              atrPct:+slPct.toFixed(3),ts:new Date().toISOString(),score:res.score,rsi:res.rsi});
+            log.push({ts:new Date().toISOString(),pair,action:'KOOP',price:+price.toFixed(8),
+              qty:+qty.toFixed(8),value:+addSize.toFixed(2),score:res.score,currency:'EUR',
+              why:buildReason(res,'KOOP',slPct,tpPct,addSize,paper.balance+addSize,'EUR',0)});
+            const di=decisions.findIndex(d=>d.pair===pair);
+            const dec={pair,score:res.score,rsi:res.rsi,action:'GEKOCHT',detail:`Budget-ronde €${addSize.toFixed(0)} · score ${res.score}`};
+            if(di>=0) decisions[di]=dec; else decisions.push(dec);
+            changed=true;
+          } else {
+            // Bijkopen bestaande positie (max 40% portfolio)
+            const pos=paper.positions[idx2];
+            if(posValueEUR(pos)/totaalV>=0.40) continue;
+            const addQty=addSize/price;
+            const newQty=pos.qty+addQty;
+            const newEntry=(pos.entry*pos.qty+price*addQty)/newQty;
+            paper.balance-=addSize;
+            paper.positions[idx2].qty=newQty;
+            paper.positions[idx2].entry=+newEntry.toFixed(8);
+            paper.positions[idx2].posSize=(pos.posSize||0)+addSize;
+            paper.positions[idx2].sl=+(price*(1-slPct/100)).toFixed(8);
+            paper.positions[idx2].tp=+(price*(1+tpPct/100)).toFixed(8);
+            log.push({ts:new Date().toISOString(),pair,action:'BIJKOOP',price:+price.toFixed(8),
+              qty:+addQty.toFixed(8),value:+addSize.toFixed(2),score:res.score,currency:'EUR',
+              why:[`Budget-ronde: €${addSize.toFixed(0)} bijgekocht`,`Nieuw gem. entry: ${fmtPrice(newEntry,'EUR')}`]});
+            const di=decisions.findIndex(d=>d.pair===pair);
+            const dec={pair,score:res.score,rsi:res.rsi,action:'BIJGEKOCHT',detail:`Budget-ronde +€${addSize.toFixed(0)} · gem. ${fmtPrice(newEntry,'EUR')}`};
+            if(di>=0) decisions[di]=dec; else decisions.push(dec);
+            changed=true;
+          }
+        }
+      }
+    }
+  }
+
   lastDecisions=decisions;
   if(changed){ savePaper(paper); saveLog(log); renderAll(); }
   renderDecisions();
