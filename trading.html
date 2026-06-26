@@ -283,19 +283,34 @@ let livePrices = {};
 let scanResults = [];
 let chartObj = null;
 
-// Kraken pair → display naam (vaste mapping voor scan)
+// Kraken pair → display naam
+// Gebaseerd op Kraken API documentatie + bevestigde paren
+// BNB staat NIET op Kraken; DOGE heet XDGUSD op Kraken
 const KRAKEN_MAP = {
-  // USD paren
-  'XXBTZUSD':'BTCUSDT','XETHZUSD':'ETHUSDT','SOLUSD':'SOLUSDT','XRPUSD':'XRPUSDT',
-  'ADAUSD':'ADAUSDT','DOGEUSD':'DOGEUSDT','AVAXUSD':'AVAXUSDT','DOTUSD':'DOTUSDT',
-  'LINKUSD':'LINKUSDT','BNBUSD':'BNBUSDT',
-  // EUR paren (Kraken heeft native EUR)
-  'XXBTZEUR':'BTCEUR','XETHZEUR':'ETHEUR','XXRPZEUR':'XRPEUR',
-  'ADAEUR':'ADAEUR','DOTEUR':'DOTEUR','XDGEUR':'DOGEEUR','SOLEUR':'SOLEUR',
-  'LINKEUR':'LINKEUR','AVAXEUR':'AVAXEUR',
-  // BTC cross paren
-  'XETHXXBT':'ETHBTC','SOLXBT':'SOLBTC','XXRPXXBT':'XRPBTC',
-  'ADAXBT':'ADABTC','DOTXBT':'DOTBTC','LINKXBT':'LINKBTC'
+  // USD paren (bevestigd op Kraken)
+  'XXBTZUSD':'BTCUSDT',  // BTC/USD
+  'XETHZUSD':'ETHUSDT',  // ETH/USD
+  'XXRPZUSD':'XRPUSDT',  // XRP/USD
+  'SOLUSD':'SOLUSDT',    // SOL/USD
+  'ADAUSD':'ADAUSDT',    // ADA/USD
+  'XDGUSD':'DOGEUSDT',   // DOGE/USD (Kraken gebruikt XDG)
+  'AVAXUSD':'AVAXUSDT',  // AVAX/USD
+  'DOTUSD':'DOTUSDT',    // DOT/USD
+  'LINKUSD':'LINKUSDT',  // LINK/USD
+  // EUR paren (bevestigd op Kraken)
+  'XXBTZEUR':'BTCEUR',   // BTC/EUR
+  'XETHZEUR':'ETHEUR',   // ETH/EUR
+  'XXRPZEUR':'XRPEUR',   // XRP/EUR
+  'SOLEUR':'SOLEUR',     // SOL/EUR
+  'ADAEUR':'ADAEUR',     // ADA/EUR
+  'DOTEUR':'DOTEUR',     // DOT/EUR
+  'LINKEUR':'LINKEUR',   // LINK/EUR
+  // BTC cross paren (bevestigd op Kraken)
+  'XETHXXBT':'ETHBTC',   // ETH/BTC
+  'XXRPXXBT':'XRPBTC',   // XRP/BTC
+  'ADAXBT':'ADABTC',     // ADA/BTC
+  'DOTXBT':'DOTBTC',     // DOT/BTC
+  'LINKXBT':'LINKBTC',   // LINK/BTC
 };
 function krakenToDisplay(kp){ return KRAKEN_MAP[kp] || kp; }
 function getPairCurrency(pair){
@@ -491,19 +506,20 @@ async function runScan(){
   btn.disabled=true;
   document.getElementById('at-status').textContent='Bezig met scannen van '+SCAN_PAIRS.length+' paren…';
 
-  const results=[];
+  const results=[], failed=[];
   for(const kp of SCAN_PAIRS){
     try {
       const candles=await fetchKrakenOHLCV(kp,240);
-      if(candles.length<30) continue;
+      if(candles.length<30){ failed.push(kp+'(te weinig data)'); continue; }
       const res=computeScore(candles);
       const displayPair=krakenToDisplay(kp);
       const signal=res.score>=50?'STRONG BUY':res.score>=28?'BUY':res.score<=-50?'STRONG SELL':res.score<=-28?'SELL':'HOLD';
       results.push({kp, pair:displayPair, signal, ...res});
-    } catch(e){ /* skip */ }
+    } catch(e){ failed.push(kp+'('+e.message.slice(0,30)+')'); }
   }
   results.sort((a,b)=>b.score-a.score);
   scanResults=results;
+  if(failed.length) console.warn('Scan: paren mislukt →',failed.join(', '));
 
   renderSignals();
   btn.innerHTML='<i class="fas fa-satellite-dish fa-sm"></i> Nu scannen';
@@ -514,7 +530,8 @@ async function runScan(){
 
   const ts=new Date().toLocaleTimeString('nl',{hour:'2-digit',minute:'2-digit'});
   const best=results[0];
-  document.getElementById('at-status').textContent=`Scan klaar ${ts} · ${results.length} paren · sterkste: ${best?.pair||'—'} (${best?.score||0})`;
+  const failTxt=failed.length?` · ${failed.length} paren overgeslagen`:'';
+  document.getElementById('at-status').textContent=`Scan klaar ${ts} · ${results.length} paren${failTxt} · sterkste: ${best?.pair||'—'} (${best?.score||0})`;
   checkStrategyFit();
 }
 
