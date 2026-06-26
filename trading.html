@@ -16,8 +16,11 @@ body{font-family:'Inter',-apple-system,sans-serif;background:#0a0a14;color:#e0e0
 .topbar{display:flex;align-items:center;gap:14px;padding:10px 20px;background:#12121f;border-bottom:1px solid #1e1e38;position:sticky;top:0;z-index:100;}
 .topbar-logo{font-size:16px;font-weight:800;color:#fff;letter-spacing:-0.5px;white-space:nowrap;}
 .topbar-logo span{color:var(--green);}
-#price-ticker{display:flex;gap:14px;flex:1;overflow:hidden;}
-.tick-item{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;}
+#price-ticker{flex:1;overflow:hidden;position:relative;height:26px;}
+#ticker-track{display:flex;gap:28px;position:absolute;white-space:nowrap;animation:scroll-ticker 30s linear infinite;}
+#ticker-track:hover{animation-play-state:paused;}
+@keyframes scroll-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tick-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;}
 .tick-sym{font-weight:700;color:#a0a0c0;}
 .tick-price{font-family:monospace;font-weight:600;color:#fff;}
 .tick-chg{font-size:11px;font-weight:700;}
@@ -127,7 +130,7 @@ input:checked+.slider:before{background:var(--green);transform:translateX(22px);
 <div class="topbar">
   <div class="topbar-logo">Auto<span>Trader</span></div>
   <div id="status-dot"></div>
-  <div id="price-ticker"><span style="color:#3a3a5c;font-size:12px;">Prijzen laden…</span></div>
+  <div id="price-ticker"><div id="ticker-track"><span style="color:#3a3a5c;font-size:12px;">Prijzen laden…</span></div></div>
 </div>
 
 <div class="main">
@@ -333,8 +336,8 @@ async function fetchPrices(){
 }
 
 function renderTicker(){
-  const el = document.getElementById('price-ticker');
-  el.innerHTML = BINANCE_PAIRS.slice(0,7).map(p=>{
+  const el = document.getElementById('ticker-track');
+  const items = BINANCE_PAIRS.map(p=>{
     const pr = livePrices[p];
     if(!pr) return '';
     const sym = p.replace('USDT','');
@@ -342,7 +345,9 @@ function renderTicker(){
       <span class="tick-sym">${sym}</span>
       <span class="tick-price">${pr>=100?pr.toLocaleString('nl',{maximumFractionDigits:0}):'$'+pr.toFixed(pr>=1?2:5)}</span>
     </div>`;
-  }).join('<span style="color:#2a2a48;">·</span>');
+  }).join('<span style="color:#2a2a48;padding:0 4px;">·</span>');
+  const html = items + '<span style="color:#2a2a48;padding:0 14px;">·</span>' + items;
+  el.innerHTML = html;
 }
 
 // ── Technische analyse ────────────────────────────────────
