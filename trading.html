@@ -558,7 +558,33 @@ function calcBB(closes, period=20){
   return {upper:mid+std,mid,lower:mid-std,pct:+pct.toFixed(3),width:std>0?+(std*2/mid).toFixed(4):0};
 }
 
-function computeScore(candles){
+let learnedWeights = null;
+
+// Leer van handelshistorie welke indicatoren écht voorspellend zijn
+function calcAdaptiveWeights(closed){
+  const BASE={rsi:1.2,ema:1.0,macd:0.8,bb:0.8,vol:0.4};
+  const TOTAL=Object.values(BASE).reduce((s,v)=>s+v,0); // 4.2
+  const withData=closed.filter(t=>t.indicators);
+  if(withData.length<10) return BASE;
+  const INDS=['rsi','ema','macd','bb','vol'];
+  const accuracy={};
+  const weights={};
+  for(const ind of INDS){
+    const bullish=withData.filter(t=>(t.indicators[ind]||0)>0);
+    const bearish=withData.filter(t=>(t.indicators[ind]||0)<0);
+    const bullWR=bullish.length>=3?bullish.filter(t=>t.pnl>0).length/bullish.length:0.5;
+    const bearWR=bearish.length>=3?bearish.filter(t=>t.pnl>0).length/bearish.length:0.5;
+    // Hoe meer bullWR boven bearWR, hoe beter de indicator
+    const predictiveness=(bullWR-bearWR+1)/2; // 0–1, 0.5=neutraal
+    accuracy[ind]={bullWR:+bullWR.toFixed(2),bearWR:+bearWR.toFixed(2),predictiveness:+predictiveness.toFixed(2),n:bullish.length+bearish.length};
+    weights[ind]=BASE[ind]*(predictiveness*2); // 0.5→base, 1.0→2×base, 0.0→0
+  }
+  const newTotal=Object.values(weights).reduce((s,v)=>s+v,0);
+  if(newTotal>0){ const sc=TOTAL/newTotal; for(const ind of INDS) weights[ind]=+(weights[ind]*sc).toFixed(3); }
+  return {...weights,_accuracy:accuracy,_n:withData.length};
+}
+
+function computeScore(candles, weights){
   const closes=candles.map(c=>c.close);
   const cur=closes[closes.length-1];
   const rsi=calcRSI(closes);
@@ -576,10 +602,13 @@ function computeScore(candles){
   const bbScore    = bb.pct<0.2?0.8:bb.pct>0.8?-0.8:bb.pct<0.4?.3:bb.pct>0.6?-.3:0;
   const volScore   = volRatio>1.5?0.4:volRatio<0.6?-0.2:0;
 
-  const composite=(rsiScore*1.2 + emaScore*1.0 + macdScore*0.8 + bbScore*0.8 + volScore*0.4)/4.2;
+  const W=weights||{rsi:1.2,ema:1.0,macd:0.8,bb:0.8,vol:0.4};
+  const totalW=(W.rsi||1.2)+(W.ema||1.0)+(W.macd||0.8)+(W.bb||0.8)+(W.vol||0.4);
+  const composite=(rsiScore*(W.rsi||1.2)+emaScore*(W.ema||1.0)+macdScore*(W.macd||0.8)+bbScore*(W.bb||0.8)+volScore*(W.vol||0.4))/totalW;
   const score=Math.round(composite*100);
 
-  return { score, rsi, ema9, ema21, ema50, emaScore, macdHist, bb, volRatio, price:cur };
+  const indicators={rsi:+rsiScore.toFixed(3),ema:+emaScore.toFixed(3),macd:+macdScore.toFixed(3),bb:+bbScore.toFixed(3),vol:+volScore.toFixed(3)};
+  return { score, rsi, ema9, ema21, ema50, emaScore, macdHist, bb, volRatio, price:cur, indicators };
 }
 
 // ── Binance klines — sneller dan Kraken, meer paren, parallel ok ─
@@ -613,6 +642,9 @@ async function runScan(){
   btn.disabled=true;
   document.getElementById('at-status').textContent=`Bezig met scannen van ${coinsToScan.length} paren…`;
 
+  // Herbereken adaptieve gewichten op basis van handelshistorie
+  learnedWeights = calcAdaptiveWeights(loadPaper().closed);
+
   const results=[], failed=[];
   // Parallel batches van 10 — Binance rate-limit is royaal (1200/min)
   for(let i=0;i<coinsToScan.length;i+=10){
@@ -620,7 +652,7 @@ async function runScan(){
     const settled=await Promise.allSettled(batch.map(async ({sym,bPair})=>{
       const candles=await fetchBinanceKlines(bPair,'4h',100);
       if(candles.length<30) throw new Error('te weinig data');
-      const res=computeScore(candles);
+      const res=computeScore(candles, learnedWeights);
       const coin=geckoCoins.find(c=>c.symbol===sym);
       if(coin?.current_price) res.price=coin.current_price;
       const displayPair=sym+'EUR';
@@ -699,52 +731,18 @@ function calcKellySize(paper){
 }
 
 // ── Zelflerend systeem ───────────────────────────────────
-// Geen blacklist — het moment was fout, niet de coin.
-// Leert per coin welke score-drempel nodig is voor winst.
-let lastLearning={coinThresholds:{},globalMinScore:0,slMultiplier:1.0,learnLog:[]};
+// Adaptive indicator weights vervangen vaste drempels.
+// Enige data-gedreven aanpassing hier: SL verbreden als Stop-Loss te vaak raakt.
+let lastLearning={slMultiplier:1.0,learnLog:[]};
 function calcSelfLearning(paper){
   const closed=paper.closed||[];
-  const result={coinThresholds:{},globalMinScore:0,slMultiplier:1.0,learnLog:[]};
+  const result={slMultiplier:1.0,learnLog:[]};
   if(closed.length<5) return result;
 
-  // 1. Per-coin drempel: leer bij welke score deze coin wél wint
-  const byCoin={};
-  closed.forEach(t=>{
-    const sym=(t.pair||'').replace(/EUR$|USDT$/,'');
-    if(!byCoin[sym]) byCoin[sym]={wins:[],losses:[]};
-    (t.pnl>0?byCoin[sym].wins:byCoin[sym].losses).push(t);
-  });
-  Object.entries(byCoin).forEach(([sym,{wins,losses}])=>{
-    const n=wins.length+losses.length;
-    if(n<3) return;
-    const wr=wins.length/n;
-    if(wr<0.35){
-      // Bereken bij welke score de winsten plaatsvonden
-      const winAvgScore=wins.length?wins.reduce((s,t)=>s+(t.score||0),0)/wins.length:0;
-      const lossAvgScore=losses.length?losses.reduce((s,t)=>s+(t.score||0),0)/losses.length:0;
-      // Nieuwe drempel: ruim boven het gemiddelde verliesmoment
-      const drempel=Math.min(85, Math.max(40, Math.round(lossAvgScore+20)));
-      result.coinThresholds[sym]=drempel;
-      result.learnLog.push(`${sym}: kopen pas bij score ≥ ${drempel} — verliezen bij gem. score ${lossAvgScore.toFixed(0)}, winsten bij gem. score ${winAvgScore.toFixed(0)}`);
-    }
-  });
-
-  // 2. Globale drempel: als een heel score-bracket structureel verliest
-  const scoreBrackets=[{min:0,max:30},{min:30,max:50}];
-  for(const b of scoreBrackets){
-    const tt=closed.filter(t=>t.score!=null&&t.score>=b.min&&t.score<b.max);
-    if(tt.length>=5&&tt.filter(t=>t.pnl>0).length/tt.length<0.35){
-      result.globalMinScore=b.max;
-      const wr=+(tt.filter(t=>t.pnl>0).length/tt.length*100).toFixed(0);
-      result.learnLog.push(`Globale drempel → ${b.max} — scores ${b.min}–${b.max} winnen slechts ${wr}%`);
-      break;
-    }
-  }
-
-  // 3. SL verbreden als Stop-Loss te vaak geraakt wordt
+  // SL verbreden als Stop-Loss te vaak geraakt wordt (puur data-gedreven)
   const slRate=closed.filter(t=>t.reason?.includes('Stop-Loss')).length/closed.length;
-  if(slRate>0.60){ result.slMultiplier=1.8; result.learnLog.push(`SL 80% breder — Stop-Loss raakt ${(slRate*100).toFixed(0)}% van de trades`); }
-  else if(slRate>0.45){ result.slMultiplier=1.4; result.learnLog.push(`SL 40% breder — Stop-Loss raakt ${(slRate*100).toFixed(0)}% van de trades`); }
+  if(slRate>0.60){ result.slMultiplier=1.8; result.learnLog.push(`SL 80% breder — Stop-Loss raakt ${(slRate*100).toFixed(0)}% van de trades (data: ${closed.length} trades)`); }
+  else if(slRate>0.45){ result.slMultiplier=1.4; result.learnLog.push(`SL 40% breder — Stop-Loss raakt ${(slRate*100).toFixed(0)}% van de trades (data: ${closed.length} trades)`); }
 
   return result;
 }
@@ -777,14 +775,7 @@ function autoTrade(){
 
     // ── KOPEN: score > 0 en we hebben nog geen positie ────
     if(res.score>0 && !alreadyOwned){
-      // Zelfleer: per-coin drempel OF globale drempel — nog niet het juiste moment
-      const coinDrempel=lastLearning.coinThresholds[sym]||0;
-      const effectieveDrempel=Math.max(coinDrempel, lastLearning.globalMinScore);
-      if(effectieveDrempel>0 && res.score<effectieveDrempel){
-        const reden=coinDrempel>0?`${sym} wint pas bij score ≥ ${coinDrempel} (nu ${res.score})`:`Globale drempel ${lastLearning.globalMinScore} (nu ${res.score})`;
-        decisions.push({pair,score:res.score,rsi:res.rsi,action:'TE VROEG',
-          detail:`Geleerd: ${reden} — wacht op sterker signaal`});
-      } else {
+      {
       // Vrij-saldo multiplier: hoe meer cash ongebruikt, hoe groter de inzet bij sterke signalen
       const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
       const freePct=paper.balance/((paper.balance+totalDeployed)||1);
@@ -813,7 +804,8 @@ function autoTrade(){
           sl:+(price*(1-slPct/100)).toFixed(8),
           tp:+(price*(1+tpPct/100)).toFixed(8),
           atrPct:+slPct.toFixed(3),
-          ts:new Date().toISOString(), score:res.score, rsi:res.rsi
+          ts:new Date().toISOString(), score:res.score, rsi:res.rsi,
+          indicators:res.indicators
         });
         log.push({
           ts:new Date().toISOString(), pair, action:'KOOP', price:+price.toFixed(8),
@@ -824,7 +816,7 @@ function autoTrade(){
           detail:`${kellyReason} · ${qty.toFixed(qty>=1?4:6)} stuks · SL ${slPct.toFixed(1)}% · TP ${tpPct.toFixed(1)}%`});
         changed=true;
       }
-      } // einde else (niet vermeden, niet te zwak)
+      }
     } else if(res.score>0 && alreadyOwned){
       // Bijkopen als signaal sterk genoeg is (score >= 45) én positie nog niet te groot
       const pos=paper.positions[idx];
@@ -880,7 +872,7 @@ function autoTrade(){
       const pnlEur=posPnlEUR(pos);
       paper.balance+=pos.posSize+pnlEur;
       paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
-      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:'EUR',score:res.score,ts:new Date().toISOString()});
+      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:'EUR',score:res.score,ts:new Date().toISOString(),indicators:pos.indicators});
       paper.positions.splice(idx,1);
       log.push({
         ts:new Date().toISOString(), pair, action:'VERKOOP', price:+price.toFixed(8),
@@ -911,12 +903,12 @@ function autoTrade(){
     }
   }
 
-  // ── BUDGET-RONDE: als >20% nog vrij, inzetten op beste kansen ──
+  // ── BUDGET-RONDE: als >5% nog vrij, inzetten op beste kansen ──
   {
     const totaalV=paper.balance+paper.positions.reduce((s,p)=>s+posValueEUR(p),0);
-    if(paper.balance/totaalV>0.20 && paper.balance>50){
-      const teInzetten=paper.balance*0.90;
-      const kandidaten=ranked.filter(r=>r.score>0).slice(0,6);
+    if(paper.balance/totaalV>0.05 && paper.balance>20){
+      const teInzetten=paper.balance*0.95;
+      const kandidaten=ranked.filter(r=>r.score>0).slice(0,10);
       if(kandidaten.length){
         const perKandidaat=Math.floor(teInzetten/kandidaten.length);
         for(const res of kandidaten){
@@ -924,12 +916,8 @@ function autoTrade(){
           const pair=res.pair;
           const price=getPrice(pair)||res.price;
           if(!price||price<=0) continue;
-          const addSize=Math.min(paper.balance*0.92,perKandidaat);
+          const addSize=Math.min(paper.balance*0.95,perKandidaat);
           if(addSize<5) continue;
-          // Budget-ronde respecteert zelfleer-drempels
-          const bSym=pair.replace(/EUR$/,'');
-          const bDrempel=Math.max(lastLearning.coinThresholds[bSym]||0,lastLearning.globalMinScore);
-          if(bDrempel>0 && res.score<bDrempel) continue;
           const bbW=res.bb?.width||0.04;
           const slPct=Math.max(1.5,Math.min(15,price*bbW/4/price*100*1.5*lastLearning.slMultiplier));
           const tpPct=slPct*2.5;
@@ -989,8 +977,9 @@ function renderDecisions(){
   }
   const colorMap={
     'GEKOCHT':'var(--green)','VERKOCHT':'var(--red)','BIJGEKOCHT':'var(--green)',
-    'AL OPEN':'var(--blue)','OVERGESLAGEN':'#6868a0','TE VROEG':'var(--amber)',
+    'AL OPEN':'var(--blue)','OVERGESLAGEN':'#6868a0',
     'GEEN SALDO':'var(--amber)','GEEN PRIJS':'#6868a0','NEUTRAAL':'#6868a0',
+    'TE ZWAK':'var(--amber)',
     'GEKOCHT (budget)':'var(--green)','BIJGEKOCHT (budget)':'var(--green)'
   };
   wrap.innerHTML=lastDecisions.map(d=>{
@@ -1163,11 +1152,28 @@ function renderPerformance(){
     ${bevindingen.map(b=>`<div style="font-size:11px;color:${b.startsWith('⚠️')?'#f59e0b':'var(--green)'};line-height:1.5;padding:6px 10px;background:#0f0f1a;border-radius:6px;">${b}</div>`).join('')}
   </div>`:''}
 
-  ${lastLearning.learnLog.length?`${sec('Wat ik geleerd heb — actief toegepast')}
-  <div style="display:grid;gap:6px;">
+  ${lastLearning.learnLog.length||learnedWeights?`${sec('Wat ik geleerd heb — actief toegepast')}
+  ${lastLearning.learnLog.length?`<div style="display:grid;gap:6px;margin-bottom:10px;">
     ${lastLearning.learnLog.map(l=>`<div style="font-size:11px;color:var(--blue);line-height:1.5;padding:6px 10px;background:#0f0f1a;border-radius:6px;">🧠 ${l}</div>`).join('')}
-  </div>
-  <div style="font-size:10px;color:#6868a0;margin-top:6px;">Deze regels worden direct toegepast bij de volgende scan.</div>`
+  </div>`:''}
+  ${(()=>{
+    const w=learnedWeights;
+    if(!w||!w._accuracy) return '<div style="font-size:11px;color:#6868a0;">Indicator gewichten: basis (nog te weinig data met indicatoren opgeslagen)</div>';
+    const NAMEN={rsi:'RSI',ema:'EMA',macd:'MACD',bb:'Bollinger',vol:'Volume'};
+    const items=Object.entries(w._accuracy).map(([k,v])=>{
+      const bw=Math.round(v.predictiveness*100);
+      const col=v.predictiveness>0.55?'var(--green)':v.predictiveness<0.45?'var(--red)':'#6868a0';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+        <span style="width:72px;font-size:11px;font-weight:700;color:#fff;">${NAMEN[k]||k}</span>
+        <div style="flex:1;height:5px;background:#1e1e38;border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${bw}%;background:${col};border-radius:3px;"></div>
+        </div>
+        <span style="font-size:10px;font-family:monospace;color:${col};width:36px;text-align:right;">${bw}%</span>
+        <span style="font-size:10px;color:#6868a0;width:90px;">${(v.bullWR*100).toFixed(0)}% win bullish</span>
+      </div>`;
+    });
+    return `<div style="background:#0f0f1a;border-radius:8px;padding:10px;"><div style="font-size:10px;color:#6868a0;margin-bottom:6px;">Indicator voorspelkracht op basis van ${w._n} trades met data</div>${items.join('')}</div>`;
+  })()}`
   :'<div style="font-size:11px;color:#6868a0;margin-top:8px;">Zelfleer actief — nog te weinig handelshistorie (min 5 trades per coin/bracket).</div>'}`;
 }
 
@@ -1194,7 +1200,7 @@ function checkSLTP(){
       const pnlEur=(hitPrice-pos.entry)*pos.qty*convMul;
       paper.balance+=pos.posSize+pnlEur;
       paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
-      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:c,ts:new Date().toISOString(),reason:hitReason});
+      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:c,ts:new Date().toISOString(),reason:hitReason,indicators:pos.indicators});
       paper.positions.splice(i,1);
       const sign=pnlEur>=0?'+':'';
       log.push({
