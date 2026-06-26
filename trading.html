@@ -208,25 +208,10 @@ input:checked+.slider:before{background:var(--green);transform:translateX(22px);
   </div>
 </div>
 
-<!-- ══ ROW 3: Signalen + Live Chart ══ -->
-<div class="grid2" style="margin-bottom:14px;">
+<!-- ══ ROW 3: Chart (groot) + Trade Log (ernaast) ══ -->
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;">
 
-  <!-- AI Signalen -->
-  <div class="card">
-    <div class="card-title"><i class="fas fa-brain" style="color:var(--blue);"></i> AI Signalen</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
-      <div>
-        <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Kopen</div>
-        <div id="signals-buy"><div class="empty" style="padding:10px;"><i></i>Run scan</div></div>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Verkopen</div>
-        <div id="signals-sell"><div class="empty" style="padding:10px;"><i></i>Run scan</div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Live chart -->
+  <!-- Live chart — groot -->
   <div class="card">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <div class="card-title" style="margin-bottom:0;flex:1;"><i class="fas fa-chart-candlestick" style="color:var(--amber);"></i> Live Chart</div>
@@ -237,6 +222,8 @@ input:checked+.slider:before{background:var(--green);transform:translateX(22px);
         <option value="XRPUSD">XRP/USD</option>
         <option value="ADAUSD">ADA/USD</option>
         <option value="DOGEUSD">DOGE/USD</option>
+        <option value="XXBTZEUR">BTC/EUR</option>
+        <option value="XETHZEUR">ETH/EUR</option>
       </select>
       <select id="chart-tf" onchange="loadChart()" style="background:#0f0f1a;border:1px solid #2a2a48;color:#e0e0f0;border-radius:6px;padding:4px 8px;font-size:12px;">
         <option value="60">1u</option>
@@ -244,25 +231,40 @@ input:checked+.slider:before{background:var(--green);transform:translateX(22px);
         <option value="1440">1d</option>
       </select>
     </div>
-    <div id="chart-wrap"></div>
+    <div id="chart-wrap" style="height:420px;"></div>
     <div id="chart-status" style="font-size:10px;color:#6868a0;margin-top:4px;"></div>
+  </div>
+
+  <!-- Trade log — naast chart -->
+  <div class="card" style="display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:0;"><i class="fas fa-list-check" style="color:var(--amber);"></i> Trade Log</div>
+      <button class="btn btn-sm btn-danger" onclick="if(confirm('Trade log wissen?')){localStorage.removeItem(LOG_KEY);renderLog();}">Wis</button>
+    </div>
+    <div class="log-scroll" id="log-wrap" style="flex:1;max-height:430px;">
+      <div class="empty"><i class="fas fa-clock"></i>Nog geen trades</div>
+    </div>
   </div>
 </div>
 
-<!-- ══ ROW 4: Trade log ══ -->
-<div class="card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-    <div class="card-title" style="margin-bottom:0;"><i class="fas fa-list-check" style="color:var(--amber);"></i> Trade Log</div>
-    <button class="btn btn-sm btn-danger" onclick="if(confirm('Trade log wissen?')){localStorage.removeItem(LOG_KEY);renderLog();}">Wis log</button>
-  </div>
-  <div class="log-scroll" id="log-wrap">
-    <div class="empty"><i class="fas fa-clock"></i>Nog geen trades uitgevoerd</div>
+<!-- ══ ROW 4: AI Signalen ══ -->
+<div class="card" style="margin-bottom:14px;">
+  <div class="card-title"><i class="fas fa-brain" style="color:var(--blue);"></i> AI Signalen</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
+    <div>
+      <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Kopen</div>
+      <div id="signals-buy"><div class="empty" style="padding:10px;"><i></i>Run scan</div></div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Verkopen</div>
+      <div id="signals-sell"><div class="empty" style="padding:10px;"><i></i>Run scan</div></div>
+    </div>
   </div>
 </div>
 
 <!-- Reset -->
 <div style="text-align:center;margin-top:18px;">
-  <button class="btn btn-sm" onclick="resetPortfolio()" style="color:#4a4a6a;">Portfolio resetten naar $10.000</button>
+  <button class="btn btn-sm" onclick="resetPortfolio()" style="color:#4a4a6a;">Portfolio resetten naar €10.000</button>
 </div>
 
 </div><!-- /main -->
@@ -323,19 +325,25 @@ function getPrice(pair){
   if(pair.endsWith('BTC') && livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getBTCUSDT();
   return livePrices[pair.replace('USDT','USD')] || null;
 }
-function posValueUSDT(pos){
+// Alles in EUR — de markt in jouw valuta
+function posValueEUR(pos){
   const cur = getPrice(pos.pair) || pos.entry;
   const c = pos.currency || 'USDT';
-  if(c === 'EUR') return cur * pos.qty * getEURUSDT();
-  if(c === 'BTC') return cur * pos.qty * getBTCUSDT();
-  return cur * pos.qty;
+  if(c === 'EUR') return cur * pos.qty;
+  if(c === 'BTC') return cur * pos.qty * getBTCUSDT() / getEURUSDT();
+  return cur * pos.qty / getEURUSDT();
 }
-function posPnlUSDT(pos){
+function posPnlEUR(pos){
   const cur = getPrice(pos.pair) || pos.entry;
   const c = pos.currency || 'USDT';
-  const mul = c==='EUR' ? getEURUSDT() : c==='BTC' ? getBTCUSDT() : 1;
-  return (cur - pos.entry) * pos.qty * mul;
+  const native = (cur - pos.entry) * pos.qty;
+  if(c === 'EUR') return native;
+  if(c === 'BTC') return native * getBTCUSDT() / getEURUSDT();
+  return native / getEURUSDT();
 }
+// Backwards compat alias
+function posValueUSDT(pos){ return posValueEUR(pos) * getEURUSDT(); }
+function posPnlUSDT(pos){ return posPnlEUR(pos) * getEURUSDT(); }
 function fmtPrice(price, currency){
   if(currency==='EUR') return '€'+(price>=1?price.toLocaleString('nl',{maximumFractionDigits:2}):price.toFixed(5));
   if(currency==='BTC') return '₿'+price.toFixed(6);
@@ -530,6 +538,50 @@ function renderSignals(){
   sellEl.innerHTML= sells.length ? sells.map(r=>fmtRow(r,false)).join('') : '<div style="color:#6868a0;font-size:12px;padding:8px 0;">Geen verkoop-signalen</div>';
 }
 
+/// ── Marktintelligentie: Fear & Greed ────────────────────
+let fgValue = 50; // 0=extreme fear, 100=extreme greed; default neutraal
+async function fetchFearGreed(){
+  try {
+    const r = await fetch('https://api.alternative.me/fng/?limit=1');
+    const d = await r.json();
+    fgValue = parseInt(d.data?.[0]?.value || 50);
+  } catch(e){ /* gebruik default 50 */ }
+}
+
+// ── Intelligentie: adaptieve drempel uit eigen resultaten ─
+function calcAdaptiveThreshold(paper, base=28){
+  const recent=(paper.closed||[]).slice(-20);
+  if(recent.length<5) return base; // te weinig data: gebruik basis
+  const wins=recent.filter(t=>t.pnl>0);
+  const losses=recent.filter(t=>t.pnl<0);
+  const winRate=wins.length/recent.length;
+  const avgWin=wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 1;
+  const avgLoss=losses.length ? losses.reduce((s,t)=>s+Math.abs(t.pnl),0)/losses.length : 1;
+  // Kelly edge: positief = we winnen meer dan we verliezen
+  const edge=(winRate*avgWin - (1-winRate)*avgLoss)/avgWin;
+  // Markt bang (FG<30): meer kansen, drempel omlaag
+  const fgAdj=(50-Math.min(fgValue,50))/200; // max -12.5% bij extreme fear
+  // Hogere edge = we kunnen lagere drempel veroorloven
+  const adapted=Math.round(base*(1-edge*0.4-fgAdj));
+  return Math.max(15, Math.min(50, adapted));
+}
+
+// ── Intelligentie: Kelly positiegroottes ─────────────────
+function calcKellySize(paper){
+  const recent=(paper.closed||[]).slice(-20);
+  const base=paper.balance*0.10; // 10% als er nog geen data is
+  if(recent.length<5) return Math.min(base, paper.balance*0.95);
+  const wins=recent.filter(t=>t.pnl>0);
+  const losses=recent.filter(t=>t.pnl<0);
+  const winRate=wins.length/recent.length;
+  const avgWin=wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 1;
+  const avgLoss=losses.length ? losses.reduce((s,t)=>s+Math.abs(t.pnl),0)/losses.length : 1;
+  const odds=avgLoss>0?avgWin/avgLoss:1;
+  // Half-Kelly: mathematisch optimaal maar gehalveerd voor veiligheid
+  const kelly=Math.max(0,(winRate*odds-(1-winRate))/odds)*0.5;
+  return Math.min(paper.balance*0.95, Math.max(base, paper.balance*kelly));
+}
+
 // ── Auto Trading ──────────────────────────────────────────
 function autoTrade(){
   const s=loadSettings();
@@ -538,6 +590,11 @@ function autoTrade(){
   const log=loadLog();
   let changed=false;
 
+  // Drempel en grootte bepaald door de markt + eigen resultaten
+  const buyThreshold=calcAdaptiveThreshold(paper, s.scoreBuy);
+  const sellThreshold=-buyThreshold;
+  const baseSize=calcKellySize(paper);
+
   for(const res of scanResults){
     const pair=res.pair;
     const price=getPrice(pair)||res.price;
@@ -545,65 +602,60 @@ function autoTrade(){
     const alreadyOwned=hasPos!==-1;
 
     // ── KOPEN ─────────────────────────────────────────────
-    if(res.score>=s.scoreBuy && !alreadyOwned && paper.balance>=10){
-      const currency = getPairCurrency(pair);
-      const mult=res.score>=70?2.5:res.score>=50?1.8:1.0;
-      const posSize=Math.min(paper.balance*0.95, Math.max(10, +(paper.balance*s.riskPct*mult).toFixed(2)));
-      // qty berekend in native valuta
-      const mul = currency==='EUR'?getEURUSDT():currency==='BTC'?getBTCUSDT():1;
-      const nativeAmt = mul>1 ? posSize/mul : posSize;
-      const qty=nativeAmt/price;
-
+    if(res.score>=buyThreshold && !alreadyOwned && paper.balance>=10){
+      const currency=getPairCurrency(pair);
+      // Schaal op signaalsterkte maar geen arbitraire vaste multipliers
+      const scoreFraction=Math.min(1, res.score/100);
+      const posSize=Math.min(paper.balance*0.95, Math.max(10, +(baseSize*(0.5+scoreFraction)).toFixed(2)));
+      // Bereken qty in native valuta van het paar
+      const toNative=currency==='EUR'?getEURUSDT():currency==='BTC'?getBTCUSDT():1;
+      const qty=(toNative>1?posSize/toNative:posSize)/price;
+      // SL/TP puur op BB-volatiliteit — markt bepaalt de marge
       const bbW=res.bb?.width||0.04;
-      const slPct=Math.max(1.5, Math.min(8, bbW*100*1.2));
+      const atr=price*bbW/4; // ATR-proxy: kwart van BB-breedte
+      const slPct=Math.max(1.5, Math.min(10, (atr/price)*100*1.5));
       const tpPct=slPct*2.5;
 
       paper.balance-=posSize;
       paper.positions.push({
         pair, currency, side:'BUY', entry:price, qty, posSize,
-        sl:+(price*(1-slPct/100)).toFixed(6),
-        tp:+(price*(1+tpPct/100)).toFixed(6),
-        ts:new Date().toISOString(),
-        score:res.score, rsi:res.rsi
+        sl:+(price*(1-slPct/100)).toFixed(8),
+        tp:+(price*(1+tpPct/100)).toFixed(8),
+        atrPct:+slPct.toFixed(3), // opgeslagen voor trailing
+        ts:new Date().toISOString(), score:res.score, rsi:res.rsi
       });
-
       log.push({
-        ts:new Date().toISOString(), pair, action:'KOOP', price:+price.toFixed(6),
-        qty:+qty.toFixed(6), value:+posSize.toFixed(2), score:res.score, currency,
-        why: buildReason(res, 'KOOP', slPct, tpPct, posSize, paper.balance+posSize, currency)
+        ts:new Date().toISOString(), pair, action:'KOOP', price:+price.toFixed(8),
+        qty:+qty.toFixed(8), value:+posSize.toFixed(2), score:res.score, currency,
+        why:buildReason(res,'KOOP',slPct,tpPct,posSize,paper.balance+posSize,currency,buyThreshold)
       });
       changed=true;
     }
 
     // ── VERKOPEN (signaal) ────────────────────────────────
-    if(res.score<=s.scoreSell && alreadyOwned){
+    if(res.score<=sellThreshold && alreadyOwned){
       const pos=paper.positions[hasPos];
-      const pnlUsdt=posPnlUSDT(pos);
-      paper.balance+=pos.posSize+pnlUsdt;
-      paper.realizedPnl=(paper.realizedPnl||0)+pnlUsdt;
-      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlUsdt.toFixed(4),currency:pos.currency||'USDT',ts:new Date().toISOString()});
+      const pnlEur=posPnlEUR(pos);
+      paper.balance+=pos.posSize+pnlEur;
+      paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
+      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:pos.currency||'USDT',ts:new Date().toISOString()});
       paper.positions.splice(hasPos,1);
       log.push({
-        ts:new Date().toISOString(), pair, action:'VERKOOP', price:+price.toFixed(6),
-        qty:+pos.qty.toFixed(6), pnl:+pnlUsdt.toFixed(4), score:res.score,
-        why: buildReason(res,'VERKOOP',0,0,0,0,pos.currency||'USDT')
+        ts:new Date().toISOString(), pair, action:'VERKOOP', price:+price.toFixed(8),
+        qty:+pos.qty.toFixed(8), pnl:+pnlEur.toFixed(4), score:res.score,
+        why:buildReason(res,'VERKOOP',0,0,0,0,pos.currency||'USDT',sellThreshold)
       });
       changed=true;
     }
 
-    // ── TRAILING STOP ─────────────────────────────────────
-    if(alreadyOwned){
+    // ── TRAILING (ATR-gebaseerd, geen vaste percentages) ─
+    if(alreadyOwned && paper.positions[hasPos]){
       const pos=paper.positions[hasPos];
-      const pnlPct=(price-pos.entry)/pos.entry*100;
-      // Zodra 3% winst: zet SL omhoog naar break-even
-      if(pnlPct>=3 && pos.sl<pos.entry){
-        paper.positions[hasPos].sl=+(pos.entry*1.002).toFixed(6); // 0.2% boven entry
-        changed=true;
-      }
-      // Zodra 6% winst: sleep SL mee op 50% van de winst
-      if(pnlPct>=6){
-        const trailSL=+(price*(1-(pnlPct*0.5)/100)).toFixed(6);
-        if(trailSL>paper.positions[hasPos].sl){
+      const atrPct=pos.atrPct||2;
+      // Zodra prijs boven entry: trail op ATR-afstand
+      if(price>pos.entry){
+        const trailSL=+(price*(1-atrPct/100)).toFixed(8);
+        if(trailSL>pos.sl){
           paper.positions[hasPos].sl=trailSL;
           changed=true;
         }
@@ -622,21 +674,25 @@ function checkSLTP(){
   for(let i=paper.positions.length-1;i>=0;i--){
     const pos=paper.positions[i];
     const cur=getPrice(pos.pair)||pos.entry;
+    // Trailing ook hier updaten op elke prijs-tick
+    if(cur>pos.entry && pos.atrPct){
+      const trailSL=+(cur*(1-pos.atrPct/100)).toFixed(8);
+      if(trailSL>pos.sl){ paper.positions[i].sl=trailSL; changed=true; }
+    }
     let hitPrice=null, hitReason='';
     if(pos.sl && cur<=pos.sl){ hitPrice=pos.sl; hitReason='Stop-Loss geraakt'; }
     if(pos.tp && cur>=pos.tp){ hitPrice=pos.tp; hitReason='Take-Profit bereikt'; }
     if(hitPrice){
-      const c = pos.currency||'USDT';
-      const convMul = c==='EUR'?getEURUSDT():c==='BTC'?getBTCUSDT():1;
-      const pnlUsdt = (hitPrice-pos.entry)*pos.qty*convMul;
-      paper.balance+=pos.posSize+pnlUsdt;
-      paper.realizedPnl=(paper.realizedPnl||0)+pnlUsdt;
-      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnlUsdt.toFixed(4),currency:c,ts:new Date().toISOString(),reason:hitReason});
+      const pnlEur=posPnlEUR({...pos, entry:pos.entry});
+      paper.balance+=pos.posSize+pnlEur;
+      paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
+      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:pos.currency||'USDT',ts:new Date().toISOString(),reason:hitReason});
       paper.positions.splice(i,1);
+      const sign=pnlEur>=0?'+':'';
       log.push({
         ts:new Date().toISOString(), pair:pos.pair, action:hitReason,
-        price:+hitPrice.toFixed(6), qty:+pos.qty.toFixed(6), pnl:+pnlUsdt.toFixed(4),
-        why:[hitReason+` · ${pnlUsdt>=0?'Winst':'Verlies'}: ${pnlUsdt>=0?'+':''}$${pnlUsdt.toFixed(2)}`]
+        price:+hitPrice.toFixed(8), qty:+pos.qty.toFixed(8), pnl:+pnlEur.toFixed(4),
+        why:[hitReason+` · ${sign}€${Math.abs(pnlEur).toFixed(2)}`]
       });
       changed=true;
     }
@@ -645,21 +701,22 @@ function checkSLTP(){
 }
 
 // ── Trade rationale ───────────────────────────────────────
-function buildReason(res, action, slPct, tpPct, posSize, freeWas){
+function buildReason(res, action, slPct, tpPct, posSize, freeWas, currency='USDT', threshold=28){
   const lines=[];
   if(action==='KOOP'){
     if(res.rsi<35) lines.push(`RSI ${res.rsi} — oververkocht, koopmogelijkheid`);
     else if(res.rsi<45) lines.push(`RSI ${res.rsi} — licht oververkocht`);
-    if(res.emaScore>0) lines.push(`EMA9 boven EMA21 boven EMA50 — opgaande trend`);
-    if(res.macdHist>0) lines.push(`MACD histogram positief (+${res.macdHist.toFixed(5)}) — momentum omhoog`);
-    if(res.bb?.pct<0.25) lines.push(`Prijs dicht bij BB-ondergrens (${(res.bb.pct*100).toFixed(0)}%) — steun`);
-    lines.push(`AI score ${res.score} · SL ${slPct.toFixed(1)}% · TP ${(slPct*2.5).toFixed(1)}%`);
-    lines.push(`Ingezet: $${posSize.toFixed(0)} van $${(freeWas).toFixed(0)} vrij saldo`);
+    if(res.emaScore>0) lines.push(`EMA9>EMA21>EMA50 — opgaande trend`);
+    if(res.macdHist>0) lines.push(`MACD positief (${res.macdHist.toFixed(5)}) — momentum omhoog`);
+    if(res.bb?.pct<0.25) lines.push(`Prijs bij BB-ondergrens (${(res.bb.pct*100).toFixed(0)}%) — steun`);
+    lines.push(`Score ${res.score} ≥ adaptieve drempel ${threshold} · SL ${slPct.toFixed(1)}% · TP ${tpPct.toFixed(1)}% (BB-volatiliteit)`);
+    lines.push(`Kelly: €${posSize.toFixed(0)} van €${freeWas.toFixed(0)} · F&G ${fgValue}/100`);
+    if(currency!=='USDT') lines.push(`Valuta: ${currency} paar`);
   } else {
-    if(res.rsi>65) lines.push(`RSI ${res.rsi} — overbought, verkoopsignaal`);
+    if(res.rsi>65) lines.push(`RSI ${res.rsi} — overbought`);
     if(res.emaScore<0) lines.push(`EMA trending neerwaarts`);
     if(res.macdHist<0) lines.push(`MACD negatief — neerwaarts momentum`);
-    lines.push(`AI score ${res.score} — verkoopdrempel bereikt`);
+    lines.push(`Score ${res.score} ≤ adaptieve drempel ${threshold} — exit`);
   }
   return lines;
 }
@@ -668,28 +725,27 @@ function buildReason(res, action, slPct, tpPct, posSize, freeWas){
 function renderKPIs(){
   const paper=loadPaper();
   let upnl=0;
-  paper.positions.forEach(pos=>{ upnl+=posPnlUSDT(pos); });
-  const posVal=paper.positions.reduce((s,pos)=>s+posValueUSDT(pos),0);
+  paper.positions.forEach(pos=>{ upnl+=posPnlEUR(pos); });
+  const posVal=paper.positions.reduce((s,pos)=>s+posValueEUR(pos),0);
   const total=paper.balance+posVal;
   const totalPct=(total-paper.start)/paper.start*100;
   const realized=paper.realizedPnl||0;
+  const fmtE=v=>(v>=0?'+':'')+' €'+Math.abs(v).toLocaleString('nl',{maximumFractionDigits:0});
 
-  const fmt=(v,dec=0)=>v>=0?`+$${v.toFixed(dec)}`:`-$${Math.abs(v).toFixed(dec)}`;
-
-  document.getElementById('kpi-total').textContent='$'+total.toLocaleString('nl',{maximumFractionDigits:0});
+  document.getElementById('kpi-total').textContent='€'+total.toLocaleString('nl',{maximumFractionDigits:0});
   const tpEl=document.getElementById('kpi-total-pct');
-  tpEl.textContent=(totalPct>=0?'+':'')+totalPct.toFixed(1)+'% t.o.v. start';
+  tpEl.textContent=(totalPct>=0?'+':'')+totalPct.toFixed(1)+'% · F&G '+fgValue;
   tpEl.className='kpi-sub '+(totalPct>=0?'pos':'neg');
 
   const pnlEl=document.getElementById('kpi-pnl');
-  pnlEl.textContent=(upnl>=0?'+':'')+'$'+Math.abs(upnl).toFixed(0);
+  pnlEl.textContent=(upnl>=0?'+':'')+'€'+Math.abs(upnl).toFixed(0);
   pnlEl.className='kpi-value '+(upnl>=0?'pos':'neg');
 
-  document.getElementById('kpi-free').textContent='$'+paper.balance.toLocaleString('nl',{maximumFractionDigits:0});
+  document.getElementById('kpi-free').textContent='€'+paper.balance.toLocaleString('nl',{maximumFractionDigits:0});
   document.getElementById('kpi-free-sub').textContent=paper.positions.length+' positie'+(paper.positions.length!==1?'s':'')+' open';
 
   const rEl=document.getElementById('kpi-realized');
-  rEl.textContent=(realized>=0?'+':'')+'$'+Math.abs(realized).toFixed(0);
+  rEl.textContent=(realized>=0?'+':'')+'€'+Math.abs(realized).toFixed(0);
   rEl.className='kpi-value '+(realized>=0?'pos':'neg');
 }
 
@@ -704,8 +760,8 @@ function renderPositions(){
   wrap.innerHTML='<div class="pos-grid">'+paper.positions.map((pos,i)=>{
     const cur=getPrice(pos.pair)||pos.entry;
     const currency=pos.currency||'USDT';
-    const val=posValueUSDT(pos);
-    const pnl=posPnlUSDT(pos);
+    const val=posValueEUR(pos);
+    const pnl=posPnlEUR(pos);
     const pnlPct=(cur-pos.entry)/pos.entry*100;
     const isUp=pnl>=0;
     const sym=pos.pair.replace(/USDT$|EUR$|BTC$/,'');
@@ -724,7 +780,7 @@ function renderPositions(){
     const tpFmt=pos.tp?fmtPrice(pos.tp,currency):'—';
     const curFmt=fmtPrice(cur,currency);
     const currBadge=currency!=='USDT'?`<span style="font-size:9px;background:rgba(99,130,255,.2);color:#6382ff;padding:1px 5px;border-radius:4px;margin-left:4px;">${currency}</span>`:'';
-    const valFmt='$'+val.toLocaleString('nl',{maximumFractionDigits:0});
+    const valFmt='€'+val.toLocaleString('nl',{maximumFractionDigits:0});
 
     return `<div class="pos-card ${isUp?'up':'down'}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -738,7 +794,7 @@ function renderPositions(){
         <button onclick="sluitPositie(${i})" class="btn btn-danger btn-sm">Sluiten</button>
       </div>
       <div class="pos-val">${valFmt}</div>
-      <div class="pos-pnl ${isUp?'up':'down'}">${isUp?'+':''}${pnlPct.toFixed(2)}% &nbsp;·&nbsp; ${isUp?'+':''}$${Math.abs(pnl).toFixed(2)}</div>
+      <div class="pos-pnl ${isUp?'up':'down'}">${isUp?'+':''}${pnlPct.toFixed(2)}% &nbsp;·&nbsp; ${isUp?'+':''}€${Math.abs(pnl).toFixed(2)}</div>
       ${pos.sl&&pos.tp?`
       <div class="progress-wrap">
         <div class="progress-labels"><span>SL ${slFmt}</span><span style="color:${barColor};">${curFmt}</span><span>TP ${tpFmt}</span></div>
@@ -907,22 +963,24 @@ function renderAll(){
   // Eerste render
   renderAll();
 
+  // Fear & Greed ophalen (dagelijks, geen rate-limit)
+  fetchFearGreed();
+
   // Prijzen ophalen
   fetchPrices();
-  setInterval(fetchPrices,15000); // elke 15 sec
+  setInterval(fetchPrices,15000);
 
   // Auto-scan starten
   startAutoScan();
 
-  // Eerste scan na 3 seconden (zodra prijzen er zijn)
+  // Eerste scan na 3 seconden
   setTimeout(runScan, 3000);
 
   // Chart
   loadChart();
 
-  // Resize chart
   window.addEventListener('resize',()=>{
-    if(chartObj){ const w=document.getElementById('chart-wrap').clientWidth; chartObj.resize(w,320); }
+    if(chartObj){ const w=document.getElementById('chart-wrap').clientWidth; chartObj.resize(w,420); }
   });
 })();
 </script>
