@@ -285,6 +285,7 @@ const SETTINGS_KEY= 'at2_settings';
 let livePrices = {};
 let scanResults = [];
 let chartObj = null;
+let geckoLoaded = false; // scan triggert na eerste gecko load
 
 // ── CoinGecko — gratis, EUR direct, CORS ok in browser ───
 const GECKO_URL = 'https://api.coingecko.com/api/v3/coins/markets';
@@ -366,7 +367,7 @@ function savePaper(p){ localStorage.setItem(PAPER_KEY, JSON.stringify(p)); }
 function loadLog(){ return JSON.parse(localStorage.getItem(LOG_KEY)||'[]'); }
 function saveLog(l){ localStorage.setItem(LOG_KEY, JSON.stringify(l.slice(-200))); }
 function loadSettings(){
-  return Object.assign({ enabled:true, riskPct:0.20, scoreBuy:28, scoreSell:-28 },
+  return Object.assign({ enabled:true, riskPct:0.20, scoreBuy:20, scoreSell:-20 },
     JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'));
 }
 function saveSettings(s){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
@@ -396,6 +397,8 @@ async function fetchGeckoPrices(){
     }
     document.getElementById('status-dot').className='live';
     renderTicker(); checkSLTP(); renderPositions(); renderKPIs();
+    // Eerste load: start scan zodra prijzen bekend zijn
+    if(!geckoLoaded){ geckoLoaded=true; runScan(); }
   } catch(e){
     console.warn('CoinGecko fout:',e.message);
     await fetchBinanceFallback();
@@ -676,12 +679,12 @@ function autoTrade(){
     const alreadyOwned=hasPos!==-1;
 
     // ── KOPEN ─────────────────────────────────────────────
-    if(res.score>=buyThreshold && !alreadyOwned && paper.balance>=10){
-      const currency='EUR'; // alles in EUR via CMC
+    if(res.score>=buyThreshold && !alreadyOwned && paper.balance>=10 && price>0){
+      const currency='EUR';
       const scoreFraction=Math.min(1, res.score/100);
       const posSize=Math.min(paper.balance*0.95, Math.max(10, +(baseSize*(0.5+scoreFraction)).toFixed(2)));
-      // qty = EUR bedrag / EUR prijs (CMC geeft EUR, geen aannames)
-      const qty=price>0?posSize/price:0;
+      const qty=posSize/price;
+      if(qty<=0) continue;
       // SL/TP puur op BB-volatiliteit — markt bepaalt de marge
       const bbW=res.bb?.width||0.04;
       const atr=price*bbW/4; // ATR-proxy: kwart van BB-breedte
@@ -1054,7 +1057,7 @@ function renderAll(){
   startAutoScan();
 
   // Eerste scan na 3 seconden
-  setTimeout(runScan, 3000);
+  // scan wordt getriggerd door fetchGeckoPrices() na eerste load
 
   // Chart
   loadChart();
