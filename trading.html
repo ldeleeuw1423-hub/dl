@@ -672,7 +672,7 @@ function calcAdaptiveThreshold(paper, base=28){
 // ── Intelligentie: Kelly positiegroottes ─────────────────
 function calcKellySize(paper){
   const recent=(paper.closed||[]).slice(-20);
-  const base=paper.balance*0.10; // 10% als er nog geen data is
+  const base=paper.balance*0.20; // 20% als startpunt (geen handelsgeschiedenis)
   if(recent.length<5) return Math.min(base, paper.balance*0.95);
   const wins=recent.filter(t=>t.pnl>0);
   const losses=recent.filter(t=>t.pnl<0);
@@ -680,8 +680,8 @@ function calcKellySize(paper){
   const avgWin=wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 1;
   const avgLoss=losses.length ? losses.reduce((s,t)=>s+Math.abs(t.pnl),0)/losses.length : 1;
   const odds=avgLoss>0?avgWin/avgLoss:1;
-  // Half-Kelly: mathematisch optimaal maar gehalveerd voor veiligheid
-  const kelly=Math.max(0,(winRate*odds-(1-winRate))/odds)*0.5;
+  // Driekwart-Kelly: meer inzet dan half-Kelly, nog steeds beschermd
+  const kelly=Math.max(0,(winRate*odds-(1-winRate))/odds)*0.75;
   return Math.min(paper.balance*0.95, Math.max(base, paper.balance*kelly));
 }
 
@@ -711,13 +711,15 @@ function autoTrade(){
 
     // ── KOPEN: score > 0 en we hebben nog geen positie ────
     if(res.score>0 && !alreadyOwned){
-      // Kelly bepaalt alles: score/100 = hoe sterk het signaal is (0→1)
-      // Geen vaste vloer — als Kelly een klein getal geeft, is het signaal te zwak
+      // Vrij-saldo multiplier: hoe meer cash ongebruikt, hoe groter de inzet bij sterke signalen
+      const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
+      const freePct=paper.balance/((paper.balance+totalDeployed)||1);
+      const freeBoost=freePct>0.5?Math.min(2.5, 1+(freePct-0.5)*3):1;
       const scoreFraction=Math.min(1, res.score/100);
-      const rawSize=+(kellySize*scoreFraction).toFixed(2);
+      const rawSize=+(kellySize*scoreFraction*freeBoost).toFixed(2);
       const posSize=Math.min(paper.balance*0.95, rawSize);
       const pctOfPortfolio=(posSize/(paper.balance||1)*100).toFixed(1);
-      const kellyReason=`Kelly €${kellySize.toFixed(0)} × score ${(scoreFraction*100).toFixed(0)}% = €${rawSize.toFixed(0)} (${pctOfPortfolio}% van saldo)`;
+      const kellyReason=`Kelly €${kellySize.toFixed(0)} × score ${(scoreFraction*100).toFixed(0)}%${freeBoost>1?' × vrij-saldo ×'+freeBoost.toFixed(1):''} = €${rawSize.toFixed(0)} (${pctOfPortfolio}% van saldo)`;
 
       if(posSize<1){
         // Signaal bestaat maar is te zwak om zinvol te handelen
