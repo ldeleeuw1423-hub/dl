@@ -96,7 +96,7 @@ input:checked+.slider:before{background:var(--green);transform:translateX(22px);
 .score-num{font-size:12px;font-weight:700;font-family:monospace;width:36px;text-align:right;flex-shrink:0;}
 
 /* Chart */
-#chart-wrap{background:#0d0d1a;border-radius:8px;overflow:hidden;height:320px;}
+#chart-wrap{background:#0d0d1a;border-radius:8px;overflow:hidden;height:420px;}
 
 /* Status bar */
 .status-bar{font-size:11px;color:#6868a0;padding:8px 12px;background:#0f0f1a;border-radius:6px;margin-top:10px;}
@@ -283,31 +283,19 @@ let livePrices = {};
 let scanResults = [];
 let chartObj = null;
 
-// Alles wat gunstig kan zijn: USDT, EUR én BTC cross-paren
-const BINANCE_PAIRS = [
-  // vs USDT
-  'BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT',
-  'ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT',
-  // vs EUR
-  'BTCEUR','ETHEUR','XRPEUR','BNBEUR','ADAEUR','DOGEEUR','DOTEUR',
-  // vs BTC (cross — welke coin verslaat BTC?)
-  'ETHBTC','SOLBTC','XRPBTC','ADABTC','DOTBTC','LINKBTC','AVAXBTC',
-  // conversiekoersen
-  'EURUSDT'
-];
-
-// Kraken pair → Binance display naam
+// Kraken pair → display naam (vaste mapping voor scan)
 const KRAKEN_MAP = {
   // USD paren
   'XXBTZUSD':'BTCUSDT','XETHZUSD':'ETHUSDT','SOLUSD':'SOLUSDT','XRPUSD':'XRPUSDT',
   'ADAUSD':'ADAUSDT','DOGEUSD':'DOGEUSDT','AVAXUSD':'AVAXUSDT','DOTUSD':'DOTUSDT',
   'LINKUSD':'LINKUSDT','BNBUSD':'BNBUSDT',
-  // EUR paren
-  'XXBTZEUR':'BTCEUR','XETHZEUR':'ETHEUR','XXRPZEUR':'XRPEUR','ADAEUR':'ADAEUR',
-  'DOTEUR':'DOTEUR','DOGEEUR':'DOGEEUR','SOLEUR':'SOLEUR','LINKEUR':'LINKEUR','AVAXEUR':'AVAXEUR',
+  // EUR paren (Kraken heeft native EUR)
+  'XXBTZEUR':'BTCEUR','XETHZEUR':'ETHEUR','XXRPZEUR':'XRPEUR',
+  'ADAEUR':'ADAEUR','DOTEUR':'DOTEUR','XDGEUR':'DOGEEUR','SOLEUR':'SOLEUR',
+  'LINKEUR':'LINKEUR','AVAXEUR':'AVAXEUR',
   // BTC cross paren
-  'XETHXXBT':'ETHBTC','SOLXBT':'SOLBTC','XXRPXXBT':'XRPBTC','ADAXBT':'ADABTC',
-  'DOTXBT':'DOTBTC','LINKXBT':'LINKBTC','AVAXBTC':'AVAXBTC'
+  'XETHXXBT':'ETHBTC','SOLXBT':'SOLBTC','XXRPXXBT':'XRPBTC',
+  'ADAXBT':'ADABTC','DOTXBT':'DOTBTC','LINKXBT':'LINKBTC'
 };
 function krakenToDisplay(kp){ return KRAKEN_MAP[kp] || kp; }
 function getPairCurrency(pair){
@@ -315,15 +303,18 @@ function getPairCurrency(pair){
   if(pair.endsWith('BTC')) return 'BTC';
   return 'USDT';
 }
+// Alle live prijzen komen van de 24hr ticker (alle ~2000 symbolen)
+// Geen vaste BINANCE_PAIRS meer — Binance bepaalt wat er is
+let topMovers = []; // dynamisch bijgewerkt op volume
 function getEURUSDT(){ return livePrices['EURUSDT'] || 1.10; }
 function getBTCUSDT(){ return livePrices['BTCUSDT'] || 65000; }
 function getPrice(pair){
   if(livePrices[pair]) return livePrices[pair];
+  // Bereken via USDT als directe EUR/BTC prijs niet beschikbaar op Binance
   const sym = pair.replace(/EUR$|USDT$|BTC$/, '');
-  // Bereken via USDT als directe EUR/BTC prijs niet beschikbaar
   if(pair.endsWith('EUR') && livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getEURUSDT();
   if(pair.endsWith('BTC') && livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getBTCUSDT();
-  return livePrices[pair.replace('USDT','USD')] || null;
+  return null;
 }
 // Alles in EUR — de markt in jouw valuta
 function posValueEUR(pos){
@@ -371,37 +362,49 @@ function resetPortfolio(){
   renderAll();
 }
 
-// ── Live prijzen (Binance) ────────────────────────────────
+// ── Live prijzen — ALLE Binance symbolen (geen vaste lijst) ─
 async function fetchPrices(){
   try {
-    const url = 'https://api.binance.com/api/v3/ticker/price?symbols=[' +
-      BINANCE_PAIRS.map(p=>`"${p}"`).join(',') + ']';
-    const r = await fetch(url);
+    // Haal 24hr mini-ticker op: geeft prijs + volume voor ALLE ~2000 paren
+    // Geen enkel invalid-symbol probleem mogelijk
+    const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?type=MINI');
+    if(!r.ok) throw new Error('HTTP '+r.status);
     const data = await r.json();
-    if(Array.isArray(data)) data.forEach(d=>{ livePrices[d.symbol]=parseFloat(d.price); });
+    if(Array.isArray(data)){
+      data.forEach(d=>{ livePrices[d.symbol]=parseFloat(d.lastPrice); });
+      // Top movers dynamisch bijwerken op quoteVolume (USDT)
+      const stables=new Set(['USDT','BUSD','USDC','DAI','TUSD','FDUSD','USDD']);
+      topMovers = data
+        .filter(d=>d.symbol.endsWith('USDT') && !stables.has(d.symbol.replace('USDT','')))
+        .sort((a,b)=>parseFloat(b.quoteVolume)-parseFloat(a.quoteVolume))
+        .slice(0,20).map(d=>d.symbol);
+    }
     renderTicker();
     document.getElementById('status-dot').className='live';
-    // SL/TP controleren op elke prijs-update
     checkSLTP();
     renderPositions();
     renderKPIs();
   } catch(e){
     document.getElementById('status-dot').className='';
+    console.warn('fetchPrices fout:',e.message);
   }
 }
 
 function renderTicker(){
   const el = document.getElementById('ticker-track');
-  const displayPairs = BINANCE_PAIRS.filter(p=>p!=='EURUSDT');
-  const items = displayPairs.map(p=>{
+  // Toon top-20 movers + EUR/BTC conversies
+  const showPairs = [...new Set([...topMovers.slice(0,12),
+    'BTCEUR','ETHEUR','XRPEUR','ETHBTC','SOLBTC'])].slice(0,16);
+  const items = showPairs.map(p=>{
     const pr = livePrices[p];
     if(!pr) return '';
-    const isEUR = p.endsWith('EUR');
-    const sym = p.replace('USDT','').replace('EUR','');
-    const pfx = isEUR ? '€' : '$';
-    const prFmt = pr>=100 ? pr.toLocaleString('nl',{maximumFractionDigits:0}) : pr.toFixed(pr>=1?2:5);
+    const isEUR=p.endsWith('EUR'), isBTC=p.endsWith('BTC');
+    const sym = p.replace(/USDT$|EUR$|BTC$/,'');
+    const pfx = isEUR?'€':isBTC?'₿':'$';
+    const prFmt = pr>=100?pr.toLocaleString('nl',{maximumFractionDigits:0}):pr.toFixed(pr>=1?2:5);
+    const suffix = isEUR?'<sup style="color:#6868a0;font-size:9px;">€</sup>':isBTC?'<sup style="color:#f59e0b;font-size:9px;">₿</sup>':'';
     return `<div class="tick-item">
-      <span class="tick-sym">${sym}${isEUR?'<span style="color:#6868a0;font-size:10px;">€</span>':''}</span>
+      <span class="tick-sym">${sym}${suffix}</span>
       <span class="tick-price">${pfx}${prFmt}</span>
     </div>`;
   }).join('<span style="color:#2a2a48;padding:0 4px;">·</span>');
@@ -683,10 +686,13 @@ function checkSLTP(){
     if(pos.sl && cur<=pos.sl){ hitPrice=pos.sl; hitReason='Stop-Loss geraakt'; }
     if(pos.tp && cur>=pos.tp){ hitPrice=pos.tp; hitReason='Take-Profit bereikt'; }
     if(hitPrice){
-      const pnlEur=posPnlEUR({...pos, entry:pos.entry});
+      // P&L op de exacte trigger-prijs, niet de live marktprijs
+      const c=pos.currency||'USDT';
+      const convMul=c==='EUR'?1:c==='BTC'?getBTCUSDT()/getEURUSDT():1/getEURUSDT();
+      const pnlEur=(hitPrice-pos.entry)*pos.qty*convMul;
       paper.balance+=pos.posSize+pnlEur;
       paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
-      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:pos.currency||'USDT',ts:new Date().toISOString(),reason:hitReason});
+      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:c,ts:new Date().toISOString(),reason:hitReason});
       paper.positions.splice(i,1);
       const sign=pnlEur>=0?'+':'';
       log.push({
@@ -810,13 +816,13 @@ function sluitPositie(i){
   const log=loadLog();
   const pos=paper.positions[i];
   if(!pos) return;
-  const price=getPrice(pos.pair)||pos.entry;
-  const pnl=(price-pos.entry)*pos.qty;
-  paper.balance+=pos.entry*pos.qty+pnl;
-  paper.realizedPnl=(paper.realizedPnl||0)+pnl;
-  paper.closed.push({pair:pos.pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnl.toFixed(4),ts:new Date().toISOString(),reason:'Handmatig gesloten'});
+  const pnlEur=posPnlEUR(pos);
+  paper.balance+=pos.posSize+pnlEur;
+  paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
+  const exitPrice=getPrice(pos.pair)||pos.entry;
+  paper.closed.push({pair:pos.pair,entry:pos.entry,exit:exitPrice,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:pos.currency||'USDT',ts:new Date().toISOString(),reason:'Handmatig gesloten'});
   paper.positions.splice(i,1);
-  log.push({ts:new Date().toISOString(),pair:pos.pair,action:'HANDMATIG GESLOTEN',price:+price.toFixed(6),qty:+pos.qty.toFixed(6),pnl:+pnl.toFixed(4),why:['Handmatig gesloten door gebruiker','PnL: '+(pnl>=0?'+':'')+'$'+pnl.toFixed(2)]});
+  log.push({ts:new Date().toISOString(),pair:pos.pair,action:'HANDMATIG GESLOTEN',price:+exitPrice.toFixed(8),qty:+pos.qty.toFixed(8),pnl:+pnlEur.toFixed(4),why:['Handmatig gesloten','P&L: '+(pnlEur>=0?'+':'')+'€'+Math.abs(pnlEur).toFixed(2)]});
   savePaper(paper); saveLog(log); renderAll();
 }
 
@@ -832,15 +838,18 @@ function renderLog(){
     const isSL=e.action.includes('Stop')||e.action.includes('Take');
     const badgeCls=isBuy?'buy':'sell';
     const prFmt=e.price>=1?e.price.toLocaleString('nl',{maximumFractionDigits:2}):e.price?.toFixed?.(6)||'—';
-    const pnlStr=e.pnl!==undefined?` · PnL: <span class="${e.pnl>=0?'pos':'neg'}">${e.pnl>=0?'+':''}$${Math.abs(e.pnl).toFixed(2)}</span>`:'';
+    const pnlStr=e.pnl!==undefined?` · <span class="${e.pnl>=0?'pos':'neg'}">${e.pnl>=0?'+':''}€${Math.abs(e.pnl).toFixed(2)}</span>`:'';
     const why=Array.isArray(e.why)?e.why:[];
+    const pairLabel=(e.pair||'').replace(/USDT$/,'').replace(/EUR$/,'€').replace(/BTC$/,'₿');
+    const currency=e.currency||'USDT';
+    const pfxPrice=currency==='EUR'?'€':currency==='BTC'?'₿':'$';
     return `<div class="log-entry">
       <span class="log-badge ${badgeCls}">${e.action}</span>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="log-pair">${e.pair?.replace('USDT','')}</span>
-          <span class="log-price">$${prFmt}</span>
-          ${e.value?`<span style="font-size:11px;color:#6868a0;">$${e.value.toFixed(0)}</span>`:''}
+          <span class="log-pair">${pairLabel}</span>
+          <span class="log-price">${pfxPrice}${prFmt}</span>
+          ${e.value?`<span style="font-size:11px;color:#6868a0;">€${(e.value/getEURUSDT()).toFixed(0)}</span>`:''}
           ${pnlStr}
         </div>
         <div class="log-meta">${e.ts?.slice(0,16).replace('T',' ')||''}${e.score!==undefined?' · score '+e.score:''}</div>
@@ -900,7 +909,7 @@ async function loadChart(){
   try {
     const candles=await fetchKrakenOHLCV(pair,tf);
     chartObj=LightweightCharts.createChart(wrap,{
-      width:wrap.clientWidth, height:320,
+      width:wrap.clientWidth, height:420,
       layout:{background:{color:'#0d0d1a'},textColor:'#a0a0c0'},
       grid:{vertLines:{color:'#1a1a2e'},horzLines:{color:'#1a1a2e'}},
       rightPriceScale:{borderColor:'#2a2a48'},
