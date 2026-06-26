@@ -250,19 +250,10 @@ input:checked+.slider:before{background:var(--green);transform:translateX(22px);
   </div>
 </div>
 
-<!-- ══ ROW 4: AI Signalen ══ -->
+<!-- ══ ROW 4: Scan beslissingen ══ -->
 <div class="card" style="margin-bottom:14px;">
-  <div class="card-title"><i class="fas fa-brain" style="color:var(--blue);"></i> AI Signalen</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
-    <div>
-      <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Kopen</div>
-      <div id="signals-buy"><div class="empty" style="padding:10px;"><i></i>Run scan</div></div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Verkopen</div>
-      <div id="signals-sell"><div class="empty" style="padding:10px;"><i></i>Run scan</div></div>
-    </div>
-  </div>
+  <div class="card-title"><i class="fas fa-brain" style="color:var(--blue);"></i> Scan beslissingen <span id="scan-ts" style="font-weight:400;font-size:11px;color:#6868a0;margin-left:6px;"></span></div>
+  <div id="decisions-wrap"><div class="empty" style="padding:10px;"><i></i>Wacht op scan…</div></div>
 </div>
 
 <!-- Reset -->
@@ -286,6 +277,7 @@ let livePrices = {};
 let scanResults = [];
 let chartObj = null;
 let geckoLoaded = false; // scan triggert na eerste gecko load
+let lastDecisions = []; // beslissingen van de laatste scan
 
 // ── CoinGecko — gratis, EUR direct, CORS ok in browser ───
 const GECKO_URL = 'https://api.coingecko.com/api/v3/coins/markets';
@@ -578,42 +570,22 @@ async function runScan(){
   scanResults=results;
   if(failed.length) console.warn('Scan: paren mislukt →',failed.join(', '));
 
-  renderSignals();
   btn.innerHTML='<i class="fas fa-satellite-dish fa-sm"></i> Nu scannen';
   btn.disabled=false;
 
   const s=loadSettings();
   if(s.enabled) autoTrade();
+  else renderDecisions(); // ook tonen als auto-trade uit staat
 
   const ts=new Date().toLocaleTimeString('nl',{hour:'2-digit',minute:'2-digit'});
   const best=results[0];
   const failTxt=failed.length?` · ${failed.length} paren overgeslagen`:'';
   document.getElementById('at-status').textContent=`Scan klaar ${ts} · ${results.length} paren${failTxt} · sterkste: ${best?.pair||'—'} (${best?.score||0})`;
+  const tsEl=document.getElementById('scan-ts');
+  if(tsEl) tsEl.textContent=ts;
   checkStrategyFit();
 }
 
-// ── Signalen weergeven ────────────────────────────────────
-function renderSignals(){
-  const buys  = scanResults.filter(r=>r.score>=28).slice(0,6);
-  const sells = scanResults.filter(r=>r.score<=-28).slice(0,6);
-
-  const fmtRow=(r,isBuy)=>{
-    const abs=Math.abs(r.score);
-    const color=isBuy?'var(--green)':'var(--red)';
-    const pct=abs+'%';
-    const label = r.pair.replace(/USDT$/,'').replace(/EUR$/,'€').replace(/BTC$/,'₿');
-    return `<div class="signal-row">
-      <span class="signal-pair">${label}</span>
-      <div class="score-bar"><div class="score-fill" style="width:${abs}%;background:${color};"></div></div>
-      <span class="score-num" style="color:${color};">${r.score>0?'+':''}${r.score}</span>
-    </div>`;
-  };
-
-  const buyEl=document.getElementById('signals-buy');
-  const sellEl=document.getElementById('signals-sell');
-  buyEl.innerHTML = buys.length ? buys.map(r=>fmtRow(r,true)).join('') : '<div style="color:#6868a0;font-size:12px;padding:8px 0;">Geen koop-signalen</div>';
-  sellEl.innerHTML= sells.length ? sells.map(r=>fmtRow(r,false)).join('') : '<div style="color:#6868a0;font-size:12px;padding:8px 0;">Geen verkoop-signalen</div>';
-}
 
 /// ── Marktintelligentie: Fear & Greed ────────────────────
 let fgValue = 50; // 0=extreme fear, 100=extreme greed; default neutraal
@@ -667,33 +639,28 @@ function autoTrade(){
   const log=loadLog();
   let changed=false;
 
-  const totalCap=paper.balance+paper.positions.reduce((t,p)=>t+posValueEUR(p),0);
   const kellySize=calcKellySize(paper);
+  const decisions=[];
 
   // Geen vaste drempel — markt rangschikt, wij volgen
-  // Koop: positieve score, nog geen positie, saldo beschikbaar
-  // Positiegrootte: Kelly × scorefractie (hogere score = groter belang)
-  // Verkoop: score draait negatief op een open positie
-
-  // Sorteer op score (beste kansen eerst)
   const ranked=[...scanResults].sort((a,b)=>b.score-a.score);
 
   for(const res of ranked){
     const pair=res.pair;
     const price=getPrice(pair)||res.price;
-    if(!price||price<=0) continue;
+    if(!price||price<=0){
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEEN PRIJS',detail:'Geen live prijs beschikbaar'});
+      continue;
+    }
     const idx=paper.positions.findIndex(p=>p.pair===pair);
     const alreadyOwned=idx!==-1;
 
     // ── KOPEN: score > 0 en we hebben nog geen positie ────
     if(res.score>0 && !alreadyOwned && paper.balance>=10){
-      // Positiegrootte: Kelly × hoe sterk het signaal is (0–1 schaal)
-      // Sterk signaal (score 80) → vol Kelly; zwak (score 5) → 5% van Kelly
       const scoreFraction=Math.min(1, res.score/100);
       const posSize=Math.min(paper.balance*0.95, Math.max(10, +(kellySize*scoreFraction).toFixed(2)));
       const qty=posSize/price;
-      if(qty<=0) continue;
-      // SL/TP puur op BB-breedte — ATR-proxy, geen vaste %
+      if(qty<=0){ decisions.push({pair,score:res.score,rsi:res.rsi,action:'OVERGESLAGEN',detail:'Qty=0 (prijs te hoog voor saldo)'}); continue; }
       const bbW=res.bb?.width||0.04;
       const slPct=Math.max(1.5, Math.min(10, price*bbW/4/price*100*1.5));
       const tpPct=slPct*2.5;
@@ -710,7 +677,13 @@ function autoTrade(){
         qty:+qty.toFixed(8), value:+posSize.toFixed(2), score:res.score, currency:'EUR',
         why:buildReason(res,'KOOP',slPct,tpPct,posSize,paper.balance+posSize,'EUR',0)
       });
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEKOCHT',
+        detail:`€${posSize.toFixed(0)} · SL ${slPct.toFixed(1)}% · TP ${tpPct.toFixed(1)}% · Kelly×${scoreFraction.toFixed(2)}`});
       changed=true;
+    } else if(res.score>0 && alreadyOwned){
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',detail:'Positieve score maar positie al open'});
+    } else if(res.score>0 && paper.balance<10){
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEEN SALDO',detail:`Saldo €${paper.balance.toFixed(0)} te laag`});
     }
 
     // ── VERKOPEN: score negatief op open positie ───────────
@@ -726,7 +699,13 @@ function autoTrade(){
         qty:+pos.qty.toFixed(8), pnl:+pnlEur.toFixed(4), score:res.score,
         why:buildReason(res,'VERKOOP',0,0,0,0,'EUR',0)
       });
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'VERKOCHT',
+        detail:`Score ${res.score} — signaal omgeslagen · P&L €${pnlEur.toFixed(2)}`});
       changed=true;
+    } else if(res.score<0 && !alreadyOwned){
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'OVERGESLAGEN',detail:`Score ${res.score} — negatief signaal, niet gekocht`});
+    } else if(res.score===0){
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'NEUTRAAL',detail:'Score 0 — geen richting'});
     }
 
     // ── TRAILING (ATR-gebaseerd, geen vaste percentages) ─
@@ -744,7 +723,39 @@ function autoTrade(){
     }
   }
 
+  lastDecisions=decisions;
   if(changed){ savePaper(paper); saveLog(log); renderAll(); }
+  renderDecisions();
+}
+
+// ── Beslissingen weergeven ────────────────────────────────
+function renderDecisions(){
+  const wrap=document.getElementById('decisions-wrap');
+  if(!wrap) return;
+  if(!lastDecisions.length){
+    wrap.innerHTML='<div style="color:#6868a0;font-size:12px;padding:8px 0;">Geen data — run scan eerst</div>';
+    return;
+  }
+  const colorMap={
+    'GEKOCHT':'var(--green)','VERKOCHT':'var(--red)',
+    'AL OPEN':'var(--blue)','OVERGESLAGEN':'#6868a0',
+    'GEEN SALDO':'var(--amber)','GEEN PRIJS':'#6868a0','NEUTRAAL':'#6868a0'
+  };
+  wrap.innerHTML=lastDecisions.map(d=>{
+    const col=colorMap[d.action]||'#6868a0';
+    const abs=Math.abs(d.score);
+    const barCol=d.score>0?'var(--green)':d.score<0?'var(--red)':'#6868a0';
+    const sym=d.pair.replace(/EUR$/,'');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1a1a2e;">
+      <span style="width:52px;font-weight:700;font-size:12px;color:#fff;flex-shrink:0;">${sym}</span>
+      <div style="width:70px;height:5px;background:#1e1e38;border-radius:3px;flex-shrink:0;overflow:hidden;">
+        <div style="height:100%;width:${Math.min(abs,100)}%;background:${barCol};border-radius:3px;"></div>
+      </div>
+      <span style="font-size:11px;font-family:monospace;width:32px;flex-shrink:0;color:${barCol};">${d.score>0?'+':''}${d.score}</span>
+      <span style="font-size:10px;font-weight:700;color:${col};width:90px;flex-shrink:0;">${d.action}</span>
+      <span style="font-size:11px;color:#6868a0;flex:1;">${d.detail}</span>
+    </div>`;
+  }).join('');
 }
 
 // ── Stop-Loss / Take-Profit controleren ──────────────────
