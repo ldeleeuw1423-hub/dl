@@ -384,9 +384,22 @@ function posPnlEUR(pos){
 function posValueUSDT(pos){ return posValueEUR(pos) * getEURUSDT(); }
 function posPnlUSDT(pos){ return posPnlEUR(pos) * getEURUSDT(); }
 function fmtPrice(price, currency){
-  if(currency==='EUR') return '€'+(price>=1?price.toLocaleString('nl',{maximumFractionDigits:2}):price.toFixed(5));
-  if(currency==='BTC') return '₿'+price.toFixed(6);
-  return price>=100?'$'+price.toLocaleString('nl',{maximumFractionDigits:0}):'$'+price.toFixed(price>=1?2:5);
+  if(!price||!isFinite(price)) return (currency==='EUR'?'€':currency==='BTC'?'₿':'$')+'—';
+  const pfx=currency==='EUR'?'€':currency==='BTC'?'₿':'$';
+  if(price>=1000) return pfx+price.toLocaleString('nl',{maximumFractionDigits:0});
+  if(price>=1)    return pfx+price.toLocaleString('nl',{maximumFractionDigits:2});
+  if(price>=0.01) return pfx+price.toFixed(4);
+  // Micro-prijzen (PEPE, SHIB, ...): toon altijd 2 significante cijfers
+  const dec=Math.min(10,Math.max(6,Math.ceil(-Math.log10(price))+2));
+  return pfx+price.toFixed(dec);
+}
+function fmtQty(qty){
+  if(qty==null) return '—';
+  if(qty>=1e6)  return Math.round(qty).toLocaleString('nl')+' stuks';
+  if(qty>=1000) return qty.toLocaleString('nl',{maximumFractionDigits:0})+' stuks';
+  if(qty>=1)    return qty.toFixed(2)+' stuks';
+  if(qty>=0.001)return qty.toFixed(4)+' stuks';
+  return qty.toFixed(6)+' stuks';
 }
 
 // ── Data ──────────────────────────────────────────────────
@@ -751,10 +764,52 @@ function autoTrade(){
         changed=true;
       }
     } else if(res.score>0 && alreadyOwned){
-      const scoreFraction=Math.min(1, res.score/100);
-      const rawSize=+(kellySize*scoreFraction).toFixed(2);
-      decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',
-        detail:`Positief signaal (Kelly zou €${rawSize.toFixed(0)} inleggen) maar positie al open`});
+      // Bijkopen als signaal sterk genoeg is (score >= 45) én positie nog niet te groot
+      const pos=paper.positions[idx];
+      const posWaarde=posValueEUR(pos);
+      const totalPortfolioVal=paper.balance+paper.positions.reduce((s,p)=>s+posValueEUR(p),0);
+      const posPct=posWaarde/(totalPortfolioVal||1);
+      const BIJKOOP_DREMPEL=45; // alleen bijkopen bij echt sterke kansen
+      const MAX_POS_PCT=0.40;   // max 40% van portfolio in één coin
+
+      if(res.score>=BIJKOOP_DREMPEL && posPct<MAX_POS_PCT && paper.balance>=10){
+        const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
+        const freePct=paper.balance/((paper.balance+totalDeployed)||1);
+        const freeBoost=freePct>0.5?Math.min(2.5,1+(freePct-0.5)*3):1;
+        const scoreFraction=Math.min(1,res.score/100);
+        // Bijkopen = 50% van wat een nieuwe positie zou zijn (voorzichtiger)
+        const addSize=Math.min(paper.balance*0.95, +(kellySize*scoreFraction*freeBoost*0.5).toFixed(2));
+        if(addSize>=1){
+          const addQty=addSize/price;
+          const newQty=pos.qty+addQty;
+          const newEntry=(pos.entry*pos.qty+price*addQty)/newQty; // gewogen gemiddelde entry
+          const bbW=res.bb?.width||0.04;
+          const slPct=Math.max(1.5,Math.min(10,price*bbW/4/price*100*1.5));
+          const tpPct=slPct*2.5;
+          paper.balance-=addSize;
+          paper.positions[idx].qty=newQty;
+          paper.positions[idx].entry=+newEntry.toFixed(8);
+          paper.positions[idx].posSize=(pos.posSize||0)+addSize;
+          paper.positions[idx].sl=+(price*(1-slPct/100)).toFixed(8);
+          paper.positions[idx].tp=+(price*(1+tpPct/100)).toFixed(8);
+          log.push({ts:new Date().toISOString(),pair,action:'BIJKOOP',price:+price.toFixed(8),
+            qty:+addQty.toFixed(8),value:+addSize.toFixed(2),score:res.score,currency:'EUR',
+            why:[`Score ${res.score} — sterk signaal, positie vergroot`,
+                 `+${fmtQty(addQty)} @ ${fmtPrice(price,'EUR')} · nieuw gem. ${fmtPrice(newEntry,'EUR')}`,
+                 `Kelly €${kellySize.toFixed(0)} × ${(scoreFraction*100).toFixed(0)}% × ½ bijkoop = €${addSize.toFixed(0)}`]});
+          decisions.push({pair,score:res.score,rsi:res.rsi,action:'BIJGEKOCHT',
+            detail:`Score ${res.score} ≥ ${BIJKOOP_DREMPEL} · +€${addSize.toFixed(0)} · nieuw gem. entry ${fmtPrice(newEntry,'EUR')}`});
+          changed=true;
+        } else {
+          decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',
+            detail:`Score ${res.score} sterk maar bijkoop te klein (€${addSize.toFixed(0)})`});
+        }
+      } else {
+        const reden=res.score<BIJKOOP_DREMPEL?`score ${res.score} < ${BIJKOOP_DREMPEL}`:
+                    posPct>=MAX_POS_PCT?`positie al ${(posPct*100).toFixed(0)}% van portfolio`:'onvoldoende saldo';
+        decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',
+          detail:`Positief signaal maar geen bijkoop — ${reden}`});
+      }
     }
 
     // ── VERKOPEN: score negatief op open positie ───────────
@@ -1046,7 +1101,7 @@ function renderPositions(){
         <div class="progress-labels"><span>SL ${slFmt}</span><span style="color:${barColor};">${curFmt}</span><span>TP ${tpFmt}</span></div>
         <div class="progress-bar"><div class="progress-fill" style="width:${barPct.toFixed(1)}%;background:${barColor};"></div></div>
       </div>`:''}
-      <div class="pos-meta">Ingekocht op ${entFmt} · ${pos.qty!=null?pos.qty.toFixed(pos.qty>=1?4:6):pos.qty} stuks</div>
+      <div class="pos-meta">Ingekocht op ${entFmt} · ${fmtQty(pos.qty)}</div>
     </div>`;
   }).join('')+'</div>';
 }
