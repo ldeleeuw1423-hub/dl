@@ -216,22 +216,36 @@ input:checked+.slider:before{background:var(--green);transform:translateX(22px);
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <div class="card-title" style="margin-bottom:0;flex:1;"><i class="fas fa-chart-candlestick" style="color:var(--amber);"></i> Live Chart</div>
       <select id="chart-pair" onchange="loadChart()" style="background:#0f0f1a;border:1px solid #2a2a48;color:#e0e0f0;border-radius:6px;padding:4px 8px;font-size:12px;">
-        <option value="XXBTZEUR">BTC/EUR</option>
-        <option value="XETHZEUR">ETH/EUR</option>
-        <option value="XXBTZUSD">BTC/USD</option>
-        <option value="XETHZUSD">ETH/USD</option>
-        <option value="SOLUSD">SOL/USD</option>
-        <option value="XXRPZUSD">XRP/USD</option>
-        <option value="ADAUSD">ADA/USD</option>
-        <option value="XDGUSD">DOGE/USD</option>
-        <option value="AVAXUSD">AVAX/USD</option>
-        <option value="DOTUSD">DOT/USD</option>
-        <option value="LINKUSD">LINK/USD</option>
+        <option value="BTCUSDT">BTC/USDT</option>
+        <option value="ETHUSDT">ETH/USDT</option>
+        <option value="SOLUSDT">SOL/USDT</option>
+        <option value="XRPUSDT">XRP/USDT</option>
+        <option value="BNBUSDT">BNB/USDT</option>
+        <option value="ADAUSDT">ADA/USDT</option>
+        <option value="DOGEUSDT">DOGE/USDT</option>
+        <option value="AVAXUSDT">AVAX/USDT</option>
+        <option value="DOTUSDT">DOT/USDT</option>
+        <option value="LINKUSDT">LINK/USDT</option>
+        <option value="LTCUSDT">LTC/USDT</option>
+        <option value="ATOMUSDT">ATOM/USDT</option>
+        <option value="NEARUSDT">NEAR/USDT</option>
+        <option value="UNIUSDT">UNI/USDT</option>
+        <option value="ARBUSDT">ARB/USDT</option>
+        <option value="OPUSDT">OP/USDT</option>
+        <option value="APTUSDT">APT/USDT</option>
+        <option value="SUIUSDT">SUI/USDT</option>
+        <option value="SEIUSDT">SEI/USDT</option>
+        <option value="FTMUSDT">FTM/USDT</option>
+        <option value="INJUSDT">INJ/USDT</option>
+        <option value="TIAUSDT">TIA/USDT</option>
+        <option value="FETUSDT">FET/USDT</option>
+        <option value="RENDERUSDT">RENDER/USDT</option>
+        <option value="WLDUSDT">WLD/USDT</option>
       </select>
       <select id="chart-tf" onchange="loadChart()" style="background:#0f0f1a;border:1px solid #2a2a48;color:#e0e0f0;border-radius:6px;padding:4px 8px;font-size:12px;">
-        <option value="60">1u</option>
-        <option value="240" selected>4u</option>
-        <option value="1440">1d</option>
+        <option value="1h">1u</option>
+        <option value="4h" selected>4u</option>
+        <option value="1d">1d</option>
       </select>
     </div>
     <div id="chart-wrap" style="height:420px;"></div>
@@ -250,10 +264,35 @@ input:checked+.slider:before{background:var(--green);transform:translateX(22px);
   </div>
 </div>
 
-<!-- ══ ROW 4: Scan beslissingen ══ -->
+<!-- ══ ROW 4: Analyse + Beslissingen ══ -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+
+  <!-- Signalen visueel -->
+  <div class="card">
+    <div class="card-title"><i class="fas fa-chart-bar" style="color:var(--blue);"></i> Signalen <span id="scan-ts" style="font-weight:400;font-size:11px;color:#6868a0;margin-left:6px;"></span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
+      <div>
+        <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Kopen</div>
+        <div id="signals-buy"><div style="color:#6868a0;font-size:12px;">Wacht op scan…</div></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Verkopen / negatief</div>
+        <div id="signals-sell"><div style="color:#6868a0;font-size:12px;">Wacht op scan…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Beslissingen per munt -->
+  <div class="card">
+    <div class="card-title"><i class="fas fa-brain" style="color:var(--blue);"></i> Scan beslissingen</div>
+    <div id="decisions-wrap" style="max-height:280px;overflow-y:auto;"><div class="empty" style="padding:10px;"><i></i>Wacht op scan…</div></div>
+  </div>
+</div>
+
+<!-- ══ ROW 5: Prestaties ══ -->
 <div class="card" style="margin-bottom:14px;">
-  <div class="card-title"><i class="fas fa-brain" style="color:var(--blue);"></i> Scan beslissingen <span id="scan-ts" style="font-weight:400;font-size:11px;color:#6868a0;margin-left:6px;"></span></div>
-  <div id="decisions-wrap"><div class="empty" style="padding:10px;"><i></i>Wacht op scan…</div></div>
+  <div class="card-title"><i class="fas fa-microscope" style="color:var(--amber);"></i> Zelfkritisch meetsysteem</div>
+  <div id="perf-wrap"><div class="empty" style="padding:10px;"><i class="fas fa-hourglass"></i>Nog geen afgesloten trades</div></div>
 </div>
 
 <!-- Reset -->
@@ -530,56 +569,71 @@ function computeScore(candles){
   return { score, rsi, ema9, ema21, ema50, emaScore, macdHist, bb, volRatio, price:cur };
 }
 
-// ── Kraken OHLCV ophalen ──────────────────────────────────
+// ── Binance klines — sneller dan Kraken, meer paren, parallel ok ─
+const BN_INTERVAL = {'60':'1h','240':'4h','1440':'1d'};
+async function fetchBinanceKlines(symbol, interval='4h', limit=100){
+  const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+  const d=await r.json();
+  if(!Array.isArray(d)||d.length<10) throw new Error('te weinig data');
+  return d.map(c=>({time:Math.floor(+c[0]/1000),open:+c[1],high:+c[2],low:+c[3],close:+c[4],vol:+c[5]}));
+}
+
+// Kraken OHLCV — alleen nog gebruikt als fallback voor parennamen die niet op Binance staan
 async function fetchKrakenOHLCV(pair, interval=240){
   const r=await fetch(`https://api.kraken.com/0/public/OHLC?pair=${pair}&interval=${interval}&since=${Math.floor(Date.now()/1000)-interval*60*100}`);
   const d=await r.json();
   if(d.error?.length) throw new Error(d.error[0]);
   const key=Object.keys(d.result).find(k=>k!=='last');
-  return d.result[key].map(c=>({
-    time:c[0], open:+c[1], high:+c[2], low:+c[3], close:+c[4], vol:+c[6]
-  }));
+  return d.result[key].map(c=>({time:+c[0],open:+c[1],high:+c[2],low:+c[3],close:+c[4],vol:+c[6]}));
 }
 
-// ── AI Scan ───────────────────────────────────────────────
+// ── AI Scan — Binance klines, parallel batches, top-40 van CoinGecko ──
+const SCAN_STABLES=new Set(['USDT','BUSD','USDC','DAI','TUSD','USDP','FRAX','LUSD','GUSD','WBTC','STETH','WETH','WBNB','BETH']);
 async function runScan(){
-  // Dynamisch: CMC top-movers die ook Kraken candle data hebben
-  const scanItems=(geckoCoins.length?geckoCoins:Object.keys(CMC_TO_KRAKEN).map(s=>({symbol:s})))
-    .map(c=>({sym:c.symbol,kp:CMC_TO_KRAKEN[c.symbol]})).filter(x=>x.kp);
+  const coinsToScan=(geckoCoins.length
+    ?geckoCoins.filter(c=>!SCAN_STABLES.has(c.symbol)).slice(0,45)
+    :Object.keys(CMC_TO_KRAKEN).map(s=>({symbol:s}))
+  ).map(c=>({sym:c.symbol, bPair:c.symbol+'USDT'}));
 
   const btn=document.getElementById('scan-btn');
   btn.innerHTML='<i class="fas fa-spinner fa-spin fa-sm"></i> Scannen…';
   btn.disabled=true;
-  document.getElementById('at-status').textContent='Bezig met scannen van '+scanItems.length+' paren…';
+  document.getElementById('at-status').textContent=`Bezig met scannen van ${coinsToScan.length} paren…`;
 
   const results=[], failed=[];
-  for(const {sym,kp} of scanItems){
-    try {
-      const candles=await fetchKrakenOHLCV(kp,240);
-      if(candles.length<30){ failed.push(sym+'(te weinig data)'); continue; }
+  // Parallel batches van 10 — Binance rate-limit is royaal (1200/min)
+  for(let i=0;i<coinsToScan.length;i+=10){
+    const batch=coinsToScan.slice(i,i+10);
+    const settled=await Promise.allSettled(batch.map(async ({sym,bPair})=>{
+      const candles=await fetchBinanceKlines(bPair,'4h',100);
+      if(candles.length<30) throw new Error('te weinig data');
       const res=computeScore(candles);
-      // EUR prijs uit CoinGecko — authoratief, geen aannames
       const coin=geckoCoins.find(c=>c.symbol===sym);
       if(coin?.current_price) res.price=coin.current_price;
       const displayPair=sym+'EUR';
       const signal=res.score>=50?'STRONG BUY':res.score>=28?'BUY':res.score<=-50?'STRONG SELL':res.score<=-28?'SELL':'HOLD';
-      results.push({kp,sym,pair:displayPair,signal,...res});
-    } catch(e){ failed.push(sym+'('+e.message.slice(0,30)+')'); }
+      return {bPair,sym,pair:displayPair,signal,...res};
+    }));
+    settled.forEach((r,j)=>{
+      if(r.status==='fulfilled') results.push(r.value);
+      else failed.push(batch[j].sym+'('+String(r.reason?.message||r.reason).slice(0,25)+')');
+    });
   }
   results.sort((a,b)=>b.score-a.score);
   scanResults=results;
-  if(failed.length) console.warn('Scan: paren mislukt →',failed.join(', '));
+  if(failed.length) console.warn('Scan: mislukt →',failed.join(', '));
 
   btn.innerHTML='<i class="fas fa-satellite-dish fa-sm"></i> Nu scannen';
   btn.disabled=false;
 
   const s=loadSettings();
   if(s.enabled) autoTrade();
-  else renderDecisions(); // ook tonen als auto-trade uit staat
+  else renderDecisions();
+  renderSignals();
 
   const ts=new Date().toLocaleTimeString('nl',{hour:'2-digit',minute:'2-digit'});
   const best=results[0];
-  const failTxt=failed.length?` · ${failed.length} paren overgeslagen`:'';
+  const failTxt=failed.length?` · ${failed.length} overgeslagen`:'';
   document.getElementById('at-status').textContent=`Scan klaar ${ts} · ${results.length} paren${failTxt} · sterkste: ${best?.pair||'—'} (${best?.score||0})`;
   const tsEl=document.getElementById('scan-ts');
   if(tsEl) tsEl.textContent=ts;
@@ -707,7 +761,7 @@ function autoTrade(){
       const pnlEur=posPnlEUR(pos);
       paper.balance+=pos.posSize+pnlEur;
       paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
-      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:'EUR',ts:new Date().toISOString()});
+      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:'EUR',score:res.score,ts:new Date().toISOString()});
       paper.positions.splice(idx,1);
       log.push({
         ts:new Date().toISOString(), pair, action:'VERKOOP', price:+price.toFixed(8),
@@ -771,6 +825,86 @@ function renderDecisions(){
       <span style="font-size:11px;color:#6868a0;flex:1;">${d.detail}</span>
     </div>`;
   }).join('');
+}
+
+// ── Visuele signalen (koop/verkoop bars) ─────────────────
+function renderSignals(){
+  const buyEl=document.getElementById('signals-buy');
+  const sellEl=document.getElementById('signals-sell');
+  if(!buyEl||!sellEl) return;
+  const buys=scanResults.filter(r=>r.score>0).slice(0,8);
+  const sells=scanResults.filter(r=>r.score<0).sort((a,b)=>a.score-b.score).slice(0,8);
+  const fmtRow=(r,isUp)=>{
+    const abs=Math.min(Math.abs(r.score),100);
+    const col=isUp?'var(--green)':'var(--red)';
+    const sym=r.pair.replace(/EUR$/,'');
+    return `<div class="signal-row">
+      <span class="signal-pair">${sym}</span>
+      <div class="score-bar"><div class="score-fill" style="width:${abs}%;background:${col};"></div></div>
+      <span class="score-num" style="color:${col};">${r.score>0?'+':''}${r.score}</span>
+    </div>`;
+  };
+  buyEl.innerHTML=buys.length?buys.map(r=>fmtRow(r,true)).join(''):'<div style="color:#6868a0;font-size:12px;">Geen positieve signalen</div>';
+  sellEl.innerHTML=sells.length?sells.map(r=>fmtRow(r,false)).join(''):'<div style="color:#6868a0;font-size:12px;">Geen negatieve signalen</div>';
+}
+
+// ── Zelfkritisch meetsysteem ──────────────────────────────
+function renderPerformance(){
+  const wrap=document.getElementById('perf-wrap');
+  if(!wrap) return;
+  const paper=loadPaper();
+  const closed=paper.closed||[];
+  if(closed.length<1){
+    wrap.innerHTML='<div style="color:#6868a0;font-size:12px;padding:8px 0;">Nog geen afgesloten trades — komt automatisch zodra er trades gesloten zijn</div>';
+    return;
+  }
+  const wins=closed.filter(t=>t.pnl>0);
+  const losses=closed.filter(t=>t.pnl<0);
+  const winRate=+(wins.length/closed.length*100).toFixed(1);
+  const totalWin=wins.reduce((s,t)=>s+t.pnl,0);
+  const totalLoss=Math.abs(losses.reduce((s,t)=>s+t.pnl,0));
+  const profitFactor=totalLoss>0?+(totalWin/totalLoss).toFixed(2):null;
+  const avgWin=wins.length?+(totalWin/wins.length).toFixed(2):0;
+  const avgLoss=losses.length?+(totalLoss/losses.length).toFixed(2):0;
+  const netPnl=closed.reduce((s,t)=>s+t.pnl,0);
+
+  // Score nauwkeurigheid: hoe goed voorspelt de score de uitkomst?
+  const brackets=[{min:0,max:25,label:'Zwak (0–25)'},{min:25,max:50,label:'Matig (25–50)'},{min:50,max:75,label:'Sterk (50–75)'},{min:75,max:101,label:'Zeer sterk (75+)'}];
+  const scoreAccuracy=brackets.map(b=>{
+    const trades=closed.filter(t=>t.score!=null&&Math.abs(t.score)>=b.min&&Math.abs(t.score)<b.max);
+    if(!trades.length) return null;
+    const wr=+(trades.filter(t=>t.pnl>0).length/trades.length*100).toFixed(0);
+    return {label:b.label,count:trades.length,wr};
+  }).filter(Boolean);
+
+  const kpiStyle='background:#0f0f1a;border-radius:8px;padding:12px;text-align:center;';
+  const kpiLabel='font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;';
+  const kpiVal='font-size:18px;font-weight:700;font-family:monospace;';
+
+  wrap.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;">
+      <div style="${kpiStyle}"><div style="${kpiLabel}">Trades</div><div style="${kpiVal}">${closed.length}</div><div style="font-size:10px;color:#6868a0;">${wins.length}W / ${losses.length}L</div></div>
+      <div style="${kpiStyle}"><div style="${kpiLabel}">Win rate</div><div style="${kpiVal};color:${winRate>=50?'var(--green)':'var(--red)'};">${winRate}%</div><div style="font-size:10px;color:#6868a0;">break-even=50%</div></div>
+      <div style="${kpiStyle}"><div style="${kpiLabel}">Gem. winst</div><div style="${kpiVal};color:var(--green);">+€${avgWin}</div><div style="font-size:10px;color:#6868a0;">per winnende trade</div></div>
+      <div style="${kpiStyle}"><div style="${kpiLabel}">Gem. verlies</div><div style="${kpiVal};color:var(--red);">-€${avgLoss}</div><div style="font-size:10px;color:#6868a0;">per verliezende trade</div></div>
+      <div style="${kpiStyle}"><div style="${kpiLabel}">Profit factor</div><div style="${kpiVal};color:${profitFactor>=1?'var(--green)':'var(--red)'};">${profitFactor??'—'}</div><div style="font-size:10px;color:#6868a0;">>1 = winstgevend</div></div>
+      <div style="${kpiStyle}"><div style="${kpiLabel}">Netto P&L</div><div style="${kpiVal};color:${netPnl>=0?'var(--green)':'var(--red)'};">${netPnl>=0?'+':''}€${netPnl.toFixed(0)}</div><div style="font-size:10px;color:#6868a0;">gerealiseerd</div></div>
+    </div>
+    ${scoreAccuracy.length?`
+    <div style="font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Score nauwkeurigheid — voorspelt de score de uitkomst?</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+      ${scoreAccuracy.map(b=>`<div style="${kpiStyle}">
+        <div style="${kpiLabel}">${b.label}</div>
+        <div style="${kpiVal};color:${b.wr>=50?'var(--green)':'var(--red)'};">${b.wr}%</div>
+        <div style="font-size:10px;color:#6868a0;">${b.count} trade${b.count!==1?'s':''}</div>
+        <div style="margin-top:5px;height:4px;background:#1e1e38;border-radius:2px;overflow:hidden;"><div style="height:100%;width:${b.wr}%;background:${b.wr>=50?'var(--green)':'var(--red)'};border-radius:2px;"></div></div>
+      </div>`).join('')}
+    </div>`:''}
+    <div style="margin-top:12px;font-size:11px;color:#6868a0;line-height:1.6;">
+      ${profitFactor!==null&&profitFactor<1?'⚠️ Profit factor onder 1 — de verliezen zijn groter dan de winsten. De app leert hiervan: Kelly verkleint automatisch de posities.':''}
+      ${winRate<40?'⚠️ Win rate onder 40% — meer trades verliezen dan winnen. Mogelijk slechte marktomstandigheden of te vroeg instappen.':''}
+      ${winRate>=55&&profitFactor>=1.5?'✓ Goede resultaten — win rate en profit factor zijn beide sterk.':''}
+    </div>`;
 }
 
 // ── Stop-Loss / Take-Profit controleren ──────────────────
@@ -957,8 +1091,8 @@ function renderLog(){
           ${pnlStr}
         </div>
         <div class="log-meta">${e.ts?.slice(0,16).replace('T',' ')||''}${e.score!==undefined?' · score '+e.score:''}</div>
-        ${why.length?`<div class="log-reason" onclick="this.nextSibling.classList.toggle('open')">
-          <i class="fas fa-chevron-right fa-xs"></i> Waarom deze trade?
+        ${why.length?`<div class="log-reason" onclick="this.querySelector('.log-reason-detail').classList.toggle('open');this.querySelector('i').style.transform=this.querySelector('.log-reason-detail').classList.contains('open')?'rotate(90deg)':''">
+          <i class="fas fa-chevron-right fa-xs" style="transition:transform .2s;"></i> Waarom deze trade?
           <div class="log-reason-detail">${why.map(l=>`<div style="padding:2px 0;color:#9090b8;">· ${l}</div>`).join('')}</div>
         </div>`:''}
       </div>
@@ -1001,17 +1135,17 @@ function checkStrategyFit(){
   el.textContent=txt; el.style.color=color;
 }
 
-// ── Live Chart ────────────────────────────────────────────
+// ── Live Chart — Binance klines ───────────────────────────
 async function loadChart(){
   const pair=document.getElementById('chart-pair').value;
-  const tf=parseInt(document.getElementById('chart-tf').value);
+  const tf=document.getElementById('chart-tf').value; // '1h','4h','1d'
   const wrap=document.getElementById('chart-wrap');
   const status=document.getElementById('chart-status');
   status.textContent='Laden…';
   if(chartObj){ try{ chartObj.remove(); }catch(e){} chartObj=null; }
   wrap.innerHTML='';
   try {
-    const candles=await fetchKrakenOHLCV(pair,tf);
+    const candles=await fetchBinanceKlines(pair,tf,200);
     chartObj=LightweightCharts.createChart(wrap,{
       autoSize:true, height:420,
       layout:{background:{color:'#0d0d1a'},textColor:'#a0a0c0'},
@@ -1034,7 +1168,7 @@ async function loadChart(){
     const e21s=chartObj.addLineSeries({color:'rgba(245,158,11,.7)',lineWidth:1,priceLineVisible:false});
     e9s.setData(ema9s); e21s.setData(ema21s);
     chartObj.timeScale().fitContent();
-    status.textContent=`${pair} · ${tf}m · ${candles.length} kaarsen`;
+    status.textContent=`${pair} · ${tf} · ${candles.length} kaarsen`;
   } catch(e){ status.textContent='Fout: '+e.message; }
 }
 
@@ -1061,6 +1195,8 @@ function renderAll(){
   renderKPIs();
   renderPositions();
   renderLog();
+  renderSignals();
+  renderPerformance();
 }
 
 // ══════════════════════════════════════════════════════════
