@@ -281,19 +281,66 @@ let livePrices = {};
 let scanResults = [];
 let chartObj = null;
 
+// Alles wat gunstig kan zijn: USDT, EUR én BTC cross-paren
 const BINANCE_PAIRS = [
+  // vs USDT
   'BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT',
-  'ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT'
+  'ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT',
+  // vs EUR
+  'BTCEUR','ETHEUR','XRPEUR','BNBEUR','ADAEUR','DOGEEUR','DOTEUR',
+  // vs BTC (cross — welke coin verslaat BTC?)
+  'ETHBTC','SOLBTC','XRPBTC','ADABTC','DOTBTC','LINKBTC','AVAXBTC',
+  // conversiekoersen
+  'EURUSDT'
 ];
 
-// Kraken → display paar mapping
+// Kraken pair → Binance display naam
 const KRAKEN_MAP = {
+  // USD paren
   'XXBTZUSD':'BTCUSDT','XETHZUSD':'ETHUSDT','SOLUSD':'SOLUSDT','XRPUSD':'XRPUSDT',
   'ADAUSD':'ADAUSDT','DOGEUSD':'DOGEUSDT','AVAXUSD':'AVAXUSDT','DOTUSD':'DOTUSDT',
-  'LINKUSD':'LINKUSDT','BNBUSD':'BNBUSDT'
+  'LINKUSD':'LINKUSDT','BNBUSD':'BNBUSDT',
+  // EUR paren
+  'XXBTZEUR':'BTCEUR','XETHZEUR':'ETHEUR','XXRPZEUR':'XRPEUR','ADAEUR':'ADAEUR',
+  'DOTEUR':'DOTEUR','DOGEEUR':'DOGEEUR','SOLEUR':'SOLEUR','LINKEUR':'LINKEUR','AVAXEUR':'AVAXEUR',
+  // BTC cross paren
+  'XETHXXBT':'ETHBTC','SOLXBT':'SOLBTC','XXRPXXBT':'XRPBTC','ADAXBT':'ADABTC',
+  'DOTXBT':'DOTBTC','LINKXBT':'LINKBTC','AVAXBTC':'AVAXBTC'
 };
 function krakenToDisplay(kp){ return KRAKEN_MAP[kp] || kp; }
-function getPrice(pair){ return livePrices[pair] || livePrices[pair.replace('USDT','USD')] || null; }
+function getPairCurrency(pair){
+  if(pair.endsWith('EUR')) return 'EUR';
+  if(pair.endsWith('BTC')) return 'BTC';
+  return 'USDT';
+}
+function getEURUSDT(){ return livePrices['EURUSDT'] || 1.10; }
+function getBTCUSDT(){ return livePrices['BTCUSDT'] || 65000; }
+function getPrice(pair){
+  if(livePrices[pair]) return livePrices[pair];
+  const sym = pair.replace(/EUR$|USDT$|BTC$/, '');
+  // Bereken via USDT als directe EUR/BTC prijs niet beschikbaar
+  if(pair.endsWith('EUR') && livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getEURUSDT();
+  if(pair.endsWith('BTC') && livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getBTCUSDT();
+  return livePrices[pair.replace('USDT','USD')] || null;
+}
+function posValueUSDT(pos){
+  const cur = getPrice(pos.pair) || pos.entry;
+  const c = pos.currency || 'USDT';
+  if(c === 'EUR') return cur * pos.qty * getEURUSDT();
+  if(c === 'BTC') return cur * pos.qty * getBTCUSDT();
+  return cur * pos.qty;
+}
+function posPnlUSDT(pos){
+  const cur = getPrice(pos.pair) || pos.entry;
+  const c = pos.currency || 'USDT';
+  const mul = c==='EUR' ? getEURUSDT() : c==='BTC' ? getBTCUSDT() : 1;
+  return (cur - pos.entry) * pos.qty * mul;
+}
+function fmtPrice(price, currency){
+  if(currency==='EUR') return '€'+(price>=1?price.toLocaleString('nl',{maximumFractionDigits:2}):price.toFixed(5));
+  if(currency==='BTC') return '₿'+price.toFixed(6);
+  return price>=100?'$'+price.toLocaleString('nl',{maximumFractionDigits:0}):'$'+price.toFixed(price>=1?2:5);
+}
 
 // ── Data ──────────────────────────────────────────────────
 function loadPaper(){
@@ -337,13 +384,17 @@ async function fetchPrices(){
 
 function renderTicker(){
   const el = document.getElementById('ticker-track');
-  const items = BINANCE_PAIRS.map(p=>{
+  const displayPairs = BINANCE_PAIRS.filter(p=>p!=='EURUSDT');
+  const items = displayPairs.map(p=>{
     const pr = livePrices[p];
     if(!pr) return '';
-    const sym = p.replace('USDT','');
+    const isEUR = p.endsWith('EUR');
+    const sym = p.replace('USDT','').replace('EUR','');
+    const pfx = isEUR ? '€' : '$';
+    const prFmt = pr>=100 ? pr.toLocaleString('nl',{maximumFractionDigits:0}) : pr.toFixed(pr>=1?2:5);
     return `<div class="tick-item">
-      <span class="tick-sym">${sym}</span>
-      <span class="tick-price">${pr>=100?pr.toLocaleString('nl',{maximumFractionDigits:0}):'$'+pr.toFixed(pr>=1?2:5)}</span>
+      <span class="tick-sym">${sym}${isEUR?'<span style="color:#6868a0;font-size:10px;">€</span>':''}</span>
+      <span class="tick-price">${pfx}${prFmt}</span>
     </div>`;
   }).join('<span style="color:#2a2a48;padding:0 4px;">·</span>');
   const html = items + '<span style="color:#2a2a48;padding:0 14px;">·</span>' + items;
@@ -465,8 +516,9 @@ function renderSignals(){
     const abs=Math.abs(r.score);
     const color=isBuy?'var(--green)':'var(--red)';
     const pct=abs+'%';
+    const label = r.pair.replace(/USDT$/,'').replace(/EUR$/,'€').replace(/BTC$/,'₿');
     return `<div class="signal-row">
-      <span class="signal-pair">${r.pair.replace('USDT','')}</span>
+      <span class="signal-pair">${label}</span>
       <div class="score-bar"><div class="score-fill" style="width:${abs}%;background:${color};"></div></div>
       <span class="score-num" style="color:${color};">${r.score>0?'+':''}${r.score}</span>
     </div>`;
@@ -494,19 +546,21 @@ function autoTrade(){
 
     // ── KOPEN ─────────────────────────────────────────────
     if(res.score>=s.scoreBuy && !alreadyOwned && paper.balance>=10){
-      // Positiegrootte: % van vrij saldo × signaal-sterkte
+      const currency = getPairCurrency(pair);
       const mult=res.score>=70?2.5:res.score>=50?1.8:1.0;
       const posSize=Math.min(paper.balance*0.95, Math.max(10, +(paper.balance*s.riskPct*mult).toFixed(2)));
-      const qty=posSize/price;
+      // qty berekend in native valuta
+      const mul = currency==='EUR'?getEURUSDT():currency==='BTC'?getBTCUSDT():1;
+      const nativeAmt = mul>1 ? posSize/mul : posSize;
+      const qty=nativeAmt/price;
 
-      // SL/TP op basis van volatiliteit (BB-breedte)
       const bbW=res.bb?.width||0.04;
       const slPct=Math.max(1.5, Math.min(8, bbW*100*1.2));
       const tpPct=slPct*2.5;
 
       paper.balance-=posSize;
       paper.positions.push({
-        pair, side:'BUY', entry:price, qty, posSize,
+        pair, currency, side:'BUY', entry:price, qty, posSize,
         sl:+(price*(1-slPct/100)).toFixed(6),
         tp:+(price*(1+tpPct/100)).toFixed(6),
         ts:new Date().toISOString(),
@@ -515,8 +569,8 @@ function autoTrade(){
 
       log.push({
         ts:new Date().toISOString(), pair, action:'KOOP', price:+price.toFixed(6),
-        qty:+qty.toFixed(6), value:+posSize.toFixed(2), score:res.score,
-        why: buildReason(res, 'KOOP', slPct, tpPct, posSize, paper.balance+posSize)
+        qty:+qty.toFixed(6), value:+posSize.toFixed(2), score:res.score, currency,
+        why: buildReason(res, 'KOOP', slPct, tpPct, posSize, paper.balance+posSize, currency)
       });
       changed=true;
     }
@@ -524,17 +578,36 @@ function autoTrade(){
     // ── VERKOPEN (signaal) ────────────────────────────────
     if(res.score<=s.scoreSell && alreadyOwned){
       const pos=paper.positions[hasPos];
-      const pnl=(price-pos.entry)*pos.qty;
-      paper.balance+=pos.entry*pos.qty+pnl;
-      paper.realizedPnl=(paper.realizedPnl||0)+pnl;
-      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnl.toFixed(4),ts:new Date().toISOString()});
+      const pnlUsdt=posPnlUSDT(pos);
+      paper.balance+=pos.posSize+pnlUsdt;
+      paper.realizedPnl=(paper.realizedPnl||0)+pnlUsdt;
+      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlUsdt.toFixed(4),currency:pos.currency||'USDT',ts:new Date().toISOString()});
       paper.positions.splice(hasPos,1);
       log.push({
         ts:new Date().toISOString(), pair, action:'VERKOOP', price:+price.toFixed(6),
-        qty:+pos.qty.toFixed(6), pnl:+pnl.toFixed(4), score:res.score,
-        why: buildReason(res,'VERKOOP',0,0,0,0)
+        qty:+pos.qty.toFixed(6), pnl:+pnlUsdt.toFixed(4), score:res.score,
+        why: buildReason(res,'VERKOOP',0,0,0,0,pos.currency||'USDT')
       });
       changed=true;
+    }
+
+    // ── TRAILING STOP ─────────────────────────────────────
+    if(alreadyOwned){
+      const pos=paper.positions[hasPos];
+      const pnlPct=(price-pos.entry)/pos.entry*100;
+      // Zodra 3% winst: zet SL omhoog naar break-even
+      if(pnlPct>=3 && pos.sl<pos.entry){
+        paper.positions[hasPos].sl=+(pos.entry*1.002).toFixed(6); // 0.2% boven entry
+        changed=true;
+      }
+      // Zodra 6% winst: sleep SL mee op 50% van de winst
+      if(pnlPct>=6){
+        const trailSL=+(price*(1-(pnlPct*0.5)/100)).toFixed(6);
+        if(trailSL>paper.positions[hasPos].sl){
+          paper.positions[hasPos].sl=trailSL;
+          changed=true;
+        }
+      }
     }
   }
 
@@ -553,15 +626,17 @@ function checkSLTP(){
     if(pos.sl && cur<=pos.sl){ hitPrice=pos.sl; hitReason='Stop-Loss geraakt'; }
     if(pos.tp && cur>=pos.tp){ hitPrice=pos.tp; hitReason='Take-Profit bereikt'; }
     if(hitPrice){
-      const pnl=(hitPrice-pos.entry)*pos.qty;
-      paper.balance+=pos.entry*pos.qty+pnl;
-      paper.realizedPnl=(paper.realizedPnl||0)+pnl;
-      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnl.toFixed(4),ts:new Date().toISOString(),reason:hitReason});
+      const c = pos.currency||'USDT';
+      const convMul = c==='EUR'?getEURUSDT():c==='BTC'?getBTCUSDT():1;
+      const pnlUsdt = (hitPrice-pos.entry)*pos.qty*convMul;
+      paper.balance+=pos.posSize+pnlUsdt;
+      paper.realizedPnl=(paper.realizedPnl||0)+pnlUsdt;
+      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnlUsdt.toFixed(4),currency:c,ts:new Date().toISOString(),reason:hitReason});
       paper.positions.splice(i,1);
       log.push({
         ts:new Date().toISOString(), pair:pos.pair, action:hitReason,
-        price:+hitPrice.toFixed(6), qty:+pos.qty.toFixed(6), pnl:+pnl.toFixed(4),
-        why:[hitReason+` · ${pnl>=0?'Winst':'Verlies'}: ${pnl>=0?'+':''}$${pnl.toFixed(2)}`]
+        price:+hitPrice.toFixed(6), qty:+pos.qty.toFixed(6), pnl:+pnlUsdt.toFixed(4),
+        why:[hitReason+` · ${pnlUsdt>=0?'Winst':'Verlies'}: ${pnlUsdt>=0?'+':''}$${pnlUsdt.toFixed(2)}`]
       });
       changed=true;
     }
@@ -593,14 +668,8 @@ function buildReason(res, action, slPct, tpPct, posSize, freeWas){
 function renderKPIs(){
   const paper=loadPaper();
   let upnl=0;
-  paper.positions.forEach(pos=>{
-    const cur=getPrice(pos.pair)||pos.entry;
-    upnl+=(cur-pos.entry)*pos.qty;
-  });
-  const posVal=paper.positions.reduce((s,pos)=>{
-    const cur=getPrice(pos.pair)||pos.entry;
-    return s+cur*pos.qty;
-  },0);
+  paper.positions.forEach(pos=>{ upnl+=posPnlUSDT(pos); });
+  const posVal=paper.positions.reduce((s,pos)=>s+posValueUSDT(pos),0);
   const total=paper.balance+posVal;
   const totalPct=(total-paper.start)/paper.start*100;
   const realized=paper.realizedPnl||0;
@@ -634,11 +703,12 @@ function renderPositions(){
 
   wrap.innerHTML='<div class="pos-grid">'+paper.positions.map((pos,i)=>{
     const cur=getPrice(pos.pair)||pos.entry;
-    const val=cur*pos.qty;
-    const pnl=(cur-pos.entry)*pos.qty;
+    const currency=pos.currency||'USDT';
+    const val=posValueUSDT(pos);
+    const pnl=posPnlUSDT(pos);
     const pnlPct=(cur-pos.entry)/pos.entry*100;
     const isUp=pnl>=0;
-    const sym=pos.pair.replace('USDT','');
+    const sym=pos.pair.replace(/USDT$|EUR$|BTC$/,'');
     const coinIcons={BTC:'₿',ETH:'Ξ',SOL:'◎',XRP:'✕',BNB:'⬡',ADA:'₳',DOGE:'Ð',AVAX:'▲',DOT:'●',LINK:'⬡'};
     const icon=coinIcons[sym]||sym[0];
 
@@ -649,23 +719,25 @@ function renderPositions(){
       barPct=range>0?Math.max(0,Math.min(100,(cur-pos.sl)/range*100)):50;
       barColor=barPct>65?'var(--green)':barPct<35?'var(--red)':'var(--amber)';
     }
-    const entFmt=pos.entry>=1?'$'+pos.entry.toLocaleString('nl',{maximumFractionDigits:2}):'$'+pos.entry.toFixed(5);
-    const slFmt=pos.sl?'$'+pos.sl.toLocaleString('nl',{maximumFractionDigits:pos.sl>=1?2:5}):'—';
-    const tpFmt=pos.tp?'$'+pos.tp.toLocaleString('nl',{maximumFractionDigits:pos.tp>=1?2:5}):'—';
-    const curFmt=cur>=1?'$'+cur.toLocaleString('nl',{maximumFractionDigits:2}):'$'+cur.toFixed(5);
+    const entFmt=fmtPrice(pos.entry,currency);
+    const slFmt=pos.sl?fmtPrice(pos.sl,currency):'—';
+    const tpFmt=pos.tp?fmtPrice(pos.tp,currency):'—';
+    const curFmt=fmtPrice(cur,currency);
+    const currBadge=currency!=='USDT'?`<span style="font-size:9px;background:rgba(99,130,255,.2);color:#6382ff;padding:1px 5px;border-radius:4px;margin-left:4px;">${currency}</span>`:'';
+    const valFmt='$'+val.toLocaleString('nl',{maximumFractionDigits:0});
 
     return `<div class="pos-card ${isUp?'up':'down'}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:9px;">
           <div style="width:34px;height:34px;border-radius:50%;background:rgba(99,130,255,.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--blue);">${icon}</div>
           <div>
-            <div class="pos-coin">${sym}</div>
+            <div class="pos-coin">${sym}${currBadge}</div>
             <div style="font-size:10px;color:#6868a0;">${pos.ts?.slice(0,10)||'—'}</div>
           </div>
         </div>
         <button onclick="sluitPositie(${i})" class="btn btn-danger btn-sm">Sluiten</button>
       </div>
-      <div class="pos-val">$${val>=1?val.toLocaleString('nl',{maximumFractionDigits:0}):val.toFixed(2)}</div>
+      <div class="pos-val">${valFmt}</div>
       <div class="pos-pnl ${isUp?'up':'down'}">${isUp?'+':''}${pnlPct.toFixed(2)}% &nbsp;·&nbsp; ${isUp?'+':''}$${Math.abs(pnl).toFixed(2)}</div>
       ${pos.sl&&pos.tp?`
       <div class="progress-wrap">
