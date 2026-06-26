@@ -964,16 +964,18 @@ function renderSignals(){
   sellEl.innerHTML=sells.length?sells.map(r=>fmtRow(r,false)).join(''):'<div style="color:#6868a0;font-size:12px;">Geen negatieve signalen</div>';
 }
 
-// ── Zelfkritisch meetsysteem ──────────────────────────────
+// ── Verliesanalyse & meetsysteem ─────────────────────────
 function renderPerformance(){
   const wrap=document.getElementById('perf-wrap');
   if(!wrap) return;
   const paper=loadPaper();
   const closed=paper.closed||[];
   if(closed.length<1){
-    wrap.innerHTML='<div style="color:#6868a0;font-size:12px;padding:8px 0;">Nog geen afgesloten trades — komt automatisch zodra er trades gesloten zijn</div>';
+    wrap.innerHTML='<div style="color:#6868a0;font-size:12px;padding:8px 0;">Nog geen afgesloten trades</div>';
     return;
   }
+
+  // ── Basis metrics ─────────────────────────────────────
   const wins=closed.filter(t=>t.pnl>0);
   const losses=closed.filter(t=>t.pnl<0);
   const winRate=+(wins.length/closed.length*100).toFixed(1);
@@ -984,43 +986,115 @@ function renderPerformance(){
   const avgLoss=losses.length?+(totalLoss/losses.length).toFixed(2):0;
   const netPnl=closed.reduce((s,t)=>s+t.pnl,0);
 
-  // Score nauwkeurigheid: hoe goed voorspelt de score de uitkomst?
-  const brackets=[{min:0,max:25,label:'Zwak (0–25)'},{min:25,max:50,label:'Matig (25–50)'},{min:50,max:75,label:'Sterk (50–75)'},{min:75,max:101,label:'Zeer sterk (75+)'}];
-  const scoreAccuracy=brackets.map(b=>{
-    const trades=closed.filter(t=>t.score!=null&&Math.abs(t.score)>=b.min&&Math.abs(t.score)<b.max);
-    if(!trades.length) return null;
-    const wr=+(trades.filter(t=>t.pnl>0).length/trades.length*100).toFixed(0);
-    return {label:b.label,count:trades.length,wr};
+  // ── P&L per coin ──────────────────────────────────────
+  const byCoin={};
+  closed.forEach(t=>{
+    const sym=(t.pair||'').replace(/EUR$|USDT$/,'');
+    if(!byCoin[sym]) byCoin[sym]={pnl:0,w:0,l:0,n:0};
+    byCoin[sym].pnl+=t.pnl; byCoin[sym].n++;
+    t.pnl>0?byCoin[sym].w++:byCoin[sym].l++;
+  });
+  const coinList=Object.entries(byCoin).sort((a,b)=>a[1].pnl-b[1].pnl);
+  const maxAbsPnl=Math.max(...coinList.map(([,v])=>Math.abs(v.pnl)),1);
+
+  // ── Exit-reden verdeling ──────────────────────────────
+  const byReason={};
+  closed.forEach(t=>{
+    const r=t.reason||'Scan-signaal';
+    if(!byReason[r]) byReason[r]={pnl:0,w:0,l:0,n:0};
+    byReason[r].pnl+=t.pnl; byReason[r].n++;
+    t.pnl>0?byReason[r].w++:byReason[r].l++;
+  });
+
+  // ── Score brackets ─────────────────────────────────────
+  const brackets=[{min:0,max:25,label:'Zwak 0–25'},{min:25,max:50,label:'Matig 25–50'},{min:50,max:75,label:'Sterk 50–75'},{min:75,max:101,label:'Zeer sterk 75+'}];
+  const scoreAcc=brackets.map(b=>{
+    const tt=closed.filter(t=>t.score!=null&&Math.abs(t.score)>=b.min&&Math.abs(t.score)<b.max);
+    if(!tt.length) return null;
+    const wr=+(tt.filter(t=>t.pnl>0).length/tt.length*100).toFixed(0);
+    const pnl=tt.reduce((s,t)=>s+t.pnl,0);
+    return {label:b.label,n:tt.length,wr,pnl};
   }).filter(Boolean);
 
-  const kpiStyle='background:#0f0f1a;border-radius:8px;padding:12px;text-align:center;';
-  const kpiLabel='font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;';
-  const kpiVal='font-size:18px;font-weight:700;font-family:monospace;';
+  // ── Auto-bevindingen ──────────────────────────────────
+  const bevindingen=[];
+  const slTrades=closed.filter(t=>t.reason?.includes('Stop-Loss'));
+  const tpTrades=closed.filter(t=>t.reason?.includes('Take-Profit'));
+  const slRate=slTrades.length/closed.length;
+  if(slRate>0.5) bevindingen.push(`⚠️ ${(slRate*100).toFixed(0)}% van de trades eindigt via Stop-Loss — SL is mogelijk te strak of instapmoment te vroeg.`);
+  if(tpTrades.length>0 && tpTrades.length/closed.length>0.3) bevindingen.push(`✓ Take-Profit wordt ${(tpTrades.length/closed.length*100).toFixed(0)}% van de tijd bereikt — TP-niveau werkt goed.`);
+  if(avgLoss>avgWin*1.5) bevindingen.push(`⚠️ Gem. verlies (€${avgLoss}) is meer dan 1.5× het gem. winst (€${avgWin}) — verliezen lopen te lang door.`);
+  if(avgWin>avgLoss*1.2) bevindingen.push(`✓ Gem. winst (€${avgWin}) overtreft gem. verlies (€${avgLoss}) — risico/rendement is gezond.`);
+  const worstCoins=coinList.filter(([,v])=>v.pnl<0&&v.l===v.n).slice(0,3);
+  worstCoins.forEach(([sym,v])=>bevindingen.push(`⚠️ ${sym} verliest iedere trade (${v.n}×) — totaal -€${Math.abs(v.pnl).toFixed(0)}. Overweeg deze coin te vermijden.`));
+  const weakScoreBracket=scoreAcc.find(b=>b.label.startsWith('Zwak'));
+  if(weakScoreBracket&&weakScoreBracket.wr<35) bevindingen.push(`⚠️ Zwakke signalen (score 0–25) winnen slechts ${weakScoreBracket.wr}% — te lage drempel voor instap.`);
+  if(winRate>=55&&profitFactor>=1.2) bevindingen.push(`✓ Sterke resultaten: win rate ${winRate}% en profit factor ${profitFactor}.`);
+  if(netPnl<0&&closed.length>=10) bevindingen.push(`⚠️ Nettopositeit is negatief na ${closed.length} trades — strategie verliest geld in de huidige markt.`);
+
+  // ── HTML samenstellen ────────────────────────────────
+  const ks='background:#0f0f1a;border-radius:8px;padding:10px;text-align:center;';
+  const kl='font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;';
+  const kv='font-size:17px;font-weight:700;font-family:monospace;';
+  const sec=(t)=>`<div style="font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin:16px 0 8px;">${t}</div>`;
 
   wrap.innerHTML=`
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;">
-      <div style="${kpiStyle}"><div style="${kpiLabel}">Trades</div><div style="${kpiVal}">${closed.length}</div><div style="font-size:10px;color:#6868a0;">${wins.length}W / ${losses.length}L</div></div>
-      <div style="${kpiStyle}"><div style="${kpiLabel}">Win rate</div><div style="${kpiVal};color:${winRate>=50?'var(--green)':'var(--red)'};">${winRate}%</div><div style="font-size:10px;color:#6868a0;">break-even=50%</div></div>
-      <div style="${kpiStyle}"><div style="${kpiLabel}">Gem. winst</div><div style="${kpiVal};color:var(--green);">+€${avgWin}</div><div style="font-size:10px;color:#6868a0;">per winnende trade</div></div>
-      <div style="${kpiStyle}"><div style="${kpiLabel}">Gem. verlies</div><div style="${kpiVal};color:var(--red);">-€${avgLoss}</div><div style="font-size:10px;color:#6868a0;">per verliezende trade</div></div>
-      <div style="${kpiStyle}"><div style="${kpiLabel}">Profit factor</div><div style="${kpiVal};color:${profitFactor>=1?'var(--green)':'var(--red)'};">${profitFactor??'—'}</div><div style="font-size:10px;color:#6868a0;">>1 = winstgevend</div></div>
-      <div style="${kpiStyle}"><div style="${kpiLabel}">Netto P&L</div><div style="${kpiVal};color:${netPnl>=0?'var(--green)':'var(--red)'};">${netPnl>=0?'+':''}€${netPnl.toFixed(0)}</div><div style="font-size:10px;color:#6868a0;">gerealiseerd</div></div>
-    </div>
-    ${scoreAccuracy.length?`
-    <div style="font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Score nauwkeurigheid — voorspelt de score de uitkomst?</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
-      ${scoreAccuracy.map(b=>`<div style="${kpiStyle}">
-        <div style="${kpiLabel}">${b.label}</div>
-        <div style="${kpiVal};color:${b.wr>=50?'var(--green)':'var(--red)'};">${b.wr}%</div>
-        <div style="font-size:10px;color:#6868a0;">${b.count} trade${b.count!==1?'s':''}</div>
-        <div style="margin-top:5px;height:4px;background:#1e1e38;border-radius:2px;overflow:hidden;"><div style="height:100%;width:${b.wr}%;background:${b.wr>=50?'var(--green)':'var(--red)'};border-radius:2px;"></div></div>
-      </div>`).join('')}
-    </div>`:''}
-    <div style="margin-top:12px;font-size:11px;color:#6868a0;line-height:1.6;">
-      ${profitFactor!==null&&profitFactor<1?'⚠️ Profit factor onder 1 — de verliezen zijn groter dan de winsten. De app leert hiervan: Kelly verkleint automatisch de posities.':''}
-      ${winRate<40?'⚠️ Win rate onder 40% — meer trades verliezen dan winnen. Mogelijk slechte marktomstandigheden of te vroeg instappen.':''}
-      ${winRate>=55&&profitFactor>=1.5?'✓ Goede resultaten — win rate en profit factor zijn beide sterk.':''}
-    </div>`;
+  ${sec('Overzicht')}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;">
+    <div style="${ks}"><div style="${kl}">Trades</div><div style="${kv}">${closed.length}</div><div style="font-size:10px;color:#6868a0;">${wins.length}W / ${losses.length}L</div></div>
+    <div style="${ks}"><div style="${kl}">Win rate</div><div style="${kv};color:${winRate>=50?'var(--green)':'var(--red)'};">${winRate}%</div></div>
+    <div style="${ks}"><div style="${kl}">Gem. winst</div><div style="${kv};color:var(--green);">+€${avgWin}</div></div>
+    <div style="${ks}"><div style="${kl}">Gem. verlies</div><div style="${kv};color:var(--red);">-€${avgLoss}</div></div>
+    <div style="${ks}"><div style="${kl}">Profit factor</div><div style="${kv};color:${profitFactor>=1?'var(--green)':'var(--red)'};">${profitFactor??'—'}</div></div>
+    <div style="${ks}"><div style="${kl}">Netto P&L</div><div style="${kv};color:${netPnl>=0?'var(--green)':'var(--red)'};">${netPnl>=0?'+':''}€${netPnl.toFixed(0)}</div></div>
+  </div>
+
+  ${sec('P&L per coin — slechtste eerst')}
+  <div style="display:grid;gap:5px;">
+    ${coinList.map(([sym,v])=>{
+      const isPos=v.pnl>=0;
+      const barW=Math.round(Math.abs(v.pnl)/maxAbsPnl*100);
+      const col=isPos?'var(--green)':'var(--red)';
+      const wr=+(v.w/v.n*100).toFixed(0);
+      return `<div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:54px;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${sym}</span>
+        <div style="flex:1;height:6px;background:#1e1e38;border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${barW}%;background:${col};border-radius:3px;"></div>
+        </div>
+        <span style="font-size:11px;font-family:monospace;color:${col};width:60px;text-align:right;flex-shrink:0;">${isPos?'+':''}€${Math.abs(v.pnl).toFixed(0)}</span>
+        <span style="font-size:10px;color:#6868a0;width:48px;flex-shrink:0;">${v.w}W/${v.l}L</span>
+      </div>`;
+    }).join('')}
+  </div>
+
+  ${sec('Waarom gesloten?')}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;">
+    ${Object.entries(byReason).map(([r,v])=>{
+      const wr=+(v.w/v.n*100).toFixed(0);
+      const col=v.pnl>=0?'var(--green)':'var(--red)';
+      return `<div style="${ks}">
+        <div style="${kl}">${r}</div>
+        <div style="font-size:12px;font-weight:700;color:${col};">${v.n}× · ${wr}% win</div>
+        <div style="font-size:11px;color:${col};font-family:monospace;">${v.pnl>=0?'+':''}€${v.pnl.toFixed(0)}</div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  ${scoreAcc.length?`${sec('Score nauwkeurigheid')}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">
+    ${scoreAcc.map(b=>`<div style="${ks}">
+      <div style="${kl}">${b.label}</div>
+      <div style="${kv};color:${b.wr>=50?'var(--green)':'var(--red)'};">${b.wr}%</div>
+      <div style="font-size:10px;color:#6868a0;">${b.n} trades</div>
+      <div style="font-size:10px;color:${b.pnl>=0?'var(--green)':'var(--red)'};">${b.pnl>=0?'+':''}€${b.pnl.toFixed(0)}</div>
+      <div style="margin-top:4px;height:3px;background:#1e1e38;border-radius:2px;overflow:hidden;"><div style="height:100%;width:${b.wr}%;background:${b.wr>=50?'var(--green)':'var(--red)'};"></div></div>
+    </div>`).join('')}
+  </div>`:''}
+
+  ${bevindingen.length?`${sec('Bevindingen')}
+  <div style="display:grid;gap:6px;">
+    ${bevindingen.map(b=>`<div style="font-size:11px;color:${b.startsWith('⚠️')?'#f59e0b':'var(--green)'};line-height:1.5;padding:6px 10px;background:#0f0f1a;border-radius:6px;">${b}</div>`).join('')}
+  </div>`:''}`;
 }
 
 // ── Stop-Loss / Take-Profit controleren ──────────────────
