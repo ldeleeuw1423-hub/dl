@@ -584,6 +584,20 @@ function calcAdaptiveWeights(closed){
   return {...weights,_accuracy:accuracy,_n:withData.length};
 }
 
+// Bereken de natuurlijke TP-ratio uit historische kaarsen:
+// hoe ver gaat de markt gemiddeld omhoog vs omlaag per kaars?
+// Dit varieert per coin en wordt direct uit Binance-data afgeleid.
+function calcTPRatio(candles){
+  let sumUp=0, sumDown=0, n=0;
+  for(const c of candles){
+    const up=(c.high-c.open)/c.open;
+    const down=(c.open-c.low)/c.open;
+    if(up>0 && down>0){ sumUp+=up; sumDown+=down; n++; }
+  }
+  if(n<10 || sumDown===0) return 3; // onvoldoende data: gebruik 3 als neutrale waarde
+  return +(sumUp/sumDown).toFixed(2); // bijv. 1.8 of 4.2 — puur uit marktdata
+}
+
 function computeScore(candles, weights){
   const closes=candles.map(c=>c.close);
   const cur=closes[closes.length-1];
@@ -607,8 +621,9 @@ function computeScore(candles, weights){
   const composite=(rsiScore*(W.rsi||1.2)+emaScore*(W.ema||1.0)+macdScore*(W.macd||0.8)+bbScore*(W.bb||0.8)+volScore*(W.vol||0.4))/totalW;
   const score=Math.round(composite*100);
 
+  const tpRatio=calcTPRatio(candles); // per-coin, uit echte marktdata
   const indicators={rsi:+rsiScore.toFixed(3),ema:+emaScore.toFixed(3),macd:+macdScore.toFixed(3),bb:+bbScore.toFixed(3),vol:+volScore.toFixed(3)};
-  return { score, rsi, ema9, ema21, ema50, emaScore, macdHist, bb, volRatio, price:cur, indicators };
+  return { score, rsi, ema9, ema21, ema50, emaScore, macdHist, bb, volRatio, price:cur, indicators, tpRatio };
 }
 
 // ── Binance klines — sneller dan Kraken, meer paren, parallel ok ─
@@ -796,7 +811,7 @@ function autoTrade(){
         const bbW=res.bb?.width||0;
         // SL = BB-breedte × slMultiplier (geleerd uit data). Geen vaste bounds.
         const slPct=(bbW>0?bbW*100:5)*lastLearning.slMultiplier;
-        const tpPct=slPct*3.5;
+        const tpPct=slPct*(res.tpRatio||3);
         paper.balance-=posSize;
         paper.positions.push({
           pair, currency:'EUR', side:'BUY', entry:price, qty, posSize,
@@ -804,7 +819,7 @@ function autoTrade(){
           tp:+(price*(1+tpPct/100)).toFixed(8),
           atrPct:+slPct.toFixed(3),
           ts:new Date().toISOString(), score:res.score, rsi:res.rsi,
-          indicators:res.indicators
+          indicators:res.indicators, tpRatio:res.tpRatio
         });
         log.push({
           ts:new Date().toISOString(), pair, action:'KOOP', price:+price.toFixed(8),
@@ -837,7 +852,7 @@ function autoTrade(){
           const newEntry=(pos.entry*pos.qty+price*addQty)/newQty;
           const bbW=res.bb?.width||0;
           const slPct=(bbW>0?bbW*100:5)*lastLearning.slMultiplier;
-          const tpPct=slPct*3.5;
+          const tpPct=slPct*(res.tpRatio||3);
           paper.balance-=addSize;
           paper.positions[idx].qty=newQty;
           paper.positions[idx].entry=+newEntry.toFixed(8);
@@ -910,7 +925,7 @@ function autoTrade(){
           if(addSize<1) continue;
           const bbW=res.bb?.width||0;
           const slPct=bbW>0?bbW*100*lastLearning.slMultiplier:5*lastLearning.slMultiplier;
-          const tpPct=slPct*3.5;
+          const tpPct=slPct*(res.tpRatio||3);
           const idx2=paper.positions.findIndex(p=>p.pair===pair);
           if(idx2===-1){
             // Nieuwe positie
