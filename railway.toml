@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python trader/bot.py"
+restartPolicyType = "always"
+
+[[services]]
+name = "autotrader"
