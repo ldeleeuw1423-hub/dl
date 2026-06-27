@@ -600,7 +600,10 @@ function calcTPRatio(candles){
 
 function computeScore(candles, weights){
   const closes=candles.map(c=>c.close);
+  const highs=candles.map(c=>c.high);
+  const lows=candles.map(c=>c.low);
   const cur=closes[closes.length-1];
+
   const rsi=calcRSI(closes);
   const ema9=calcEMA(closes,9), ema21=calcEMA(closes,21), ema50=calcEMA(closes,50);
   const {hist:macdHist}=calcMACD(closes);
@@ -609,21 +612,49 @@ function computeScore(candles, weights){
   const vol15=candles.slice(-15,-5).reduce((s,c)=>s+c.vol,0)/10;
   const volRatio=vol15>0?vol5/vol15:1;
 
-  // Scores -1 → +1
-  const rsiScore   = rsi<30?1:rsi<40?.5:rsi>70?-1:rsi>60?-.5:0;
-  const emaScore   = ema9>ema21&&ema21>ema50?1:ema9<ema21&&ema21<ema50?-1:ema9>ema21?0.4:-.4;
-  const macdScore  = macdHist>0?Math.min(macdHist/cur*500,1):Math.max(macdHist/cur*500,-1);
-  const bbScore    = bb.pct<0.2?0.8:bb.pct>0.8?-0.8:bb.pct<0.4?.3:bb.pct>0.6?-.3:0;
-  const volScore   = volRatio>1.5?0.4:volRatio<0.6?-0.2:0;
+  // ── Regime-detectie: trending vs ranging ──────────────
+  // BB-breedte van elk venster van 20 kaarsen → gemiddelde BB-breedte van deze coin
+  const bbWidths=[];
+  for(let i=20;i<closes.length;i++){
+    const sl=closes.slice(i-20,i);
+    const m=sl.reduce((s,x)=>s+x,0)/20;
+    const std=Math.sqrt(sl.reduce((s,x)=>s+(x-m)**2,0)/20)*2;
+    if(m>0) bbWidths.push(std/m);
+  }
+  const avgBBW=bbWidths.length?bbWidths.reduce((s,v)=>s+v,0)/bbWidths.length:bb.width;
+  // regime 0=volledig ranging, 1=volledig trending — glijdend, geen drempel
+  const regime=avgBBW>0?Math.min(1,bb.width/avgBBW):0.5;
 
-  const W=weights||{rsi:1.2,ema:1.0,macd:0.8,bb:0.8,vol:0.4};
-  const totalW=(W.rsi||1.2)+(W.ema||1.0)+(W.macd||0.8)+(W.bb||0.8)+(W.vol||0.4);
-  const composite=(rsiScore*(W.rsi||1.2)+emaScore*(W.ema||1.0)+macdScore*(W.macd||0.8)+bbScore*(W.bb||0.8)+volScore*(W.vol||0.4))/totalW;
+  // ── Prijs-positie in recent bereik (0=laag, 1=hoog) ──
+  const low20=Math.min(...lows.slice(-20));
+  const high20=Math.max(...highs.slice(-20));
+  const pricePos=high20>low20?(cur-low20)/(high20-low20):0.5;
+
+  // ── Mean-reversion score (koop laag, verkoop hoog) ────
+  // Hoog als prijs aan onderkant van eigen bereik staat — geen vaste RSI-drempel
+  const posMR=1-pricePos*2;                          // laag=+1, midden=0, hoog=-1
+  const rsiMR=(50-rsi)/50;                           // lineair: RSI 0→+1, RSI 100→-1
+  const bbMR=(0.5-bb.pct)*2;                         // BB-onderkant=+1, BB-bovenkant=-1
+  const mrScore=(posMR+rsiMR+bbMR)/3;
+
+  // ── Momentum score (koop als trend omhoog is) ─────────
+  const emaScore=ema9>ema21&&ema21>ema50?1:ema9<ema21&&ema21<ema50?-1:ema9>ema21?0.5:-0.5;
+  const macdScore=macdHist>0?Math.min(macdHist/cur*500,1):Math.max(macdHist/cur*500,-1);
+  const volScore=volRatio>1?(volRatio-1)/Math.max(volRatio-1,1)*0.5:-0.2;
+  const momScore=(emaScore+macdScore+volScore)/2.5;
+
+  // ── Regime-gewogen combinatie ─────────────────────────
+  // ranging→mean reversion, trending→momentum — automatisch geschakeld
+  const composite=(1-regime)*mrScore + regime*momScore;
   const score=Math.round(composite*100);
 
-  const tpRatio=calcTPRatio(candles); // per-coin, uit echte marktdata
-  const indicators={rsi:+rsiScore.toFixed(3),ema:+emaScore.toFixed(3),macd:+macdScore.toFixed(3),bb:+bbScore.toFixed(3),vol:+volScore.toFixed(3)};
-  return { score, rsi, ema9, ema21, ema50, emaScore, macdHist, bb, volRatio, price:cur, indicators, tpRatio };
+  const tpRatio=calcTPRatio(candles);
+  const indicators={
+    rsi:+rsiMR.toFixed(3), ema:+emaScore.toFixed(3),
+    macd:+macdScore.toFixed(3), bb:+bbMR.toFixed(3), vol:+volScore.toFixed(3)
+  };
+  return { score, rsi, ema9, ema21, ema50, emaScore, macdHist, bb, volRatio,
+           price:cur, indicators, tpRatio, regime:+regime.toFixed(2), pricePos:+pricePos.toFixed(2) };
 }
 
 // ── Binance klines — sneller dan Kraken, meer paren, parallel ok ─
@@ -827,7 +858,7 @@ function autoTrade(){
           why:buildReason(res,'KOOP',slPct,tpPct,posSize,paper.balance+posSize,'EUR',0)
         });
         decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEKOCHT',
-          detail:`${kellyReason} · ${qty.toFixed(qty>=1?4:6)} stuks · SL ${slPct.toFixed(1)}% · TP ${tpPct.toFixed(1)}%`});
+          detail:`${kellyReason} · SL ${slPct.toFixed(1)}% · TP ${tpPct.toFixed(1)}% · ${res.regime>=0.6?'📈 trend':'📉 ranging'} (${(res.regime*100).toFixed(0)}%) · prijs ${(res.pricePos*100).toFixed(0)}% van bereik`});
         changed=true;
       }
       }
