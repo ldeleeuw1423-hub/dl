@@ -2,6 +2,32 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Trading app — ontwerpprincipes (docs/trading.html)
+
+Deze regels gelden ALTIJD bij het werken aan `docs/trading.html`. Niet vragen, gewoon toepassen.
+
+**Geen hardcoded waardes, geen aannames.**
+Elke waarde die nu een getal is (drempels, minimums, percentages) moet komen uit de handelsdata of een berekening daarop. Voorbeelden van wat NIET mag:
+- `posSize < 300` — hardcoded minimum
+- `score >= 55` — hardcoded drempel
+- `riskLevel = 'aggressive'` — hardcoded instelling
+- `lossAvgScore + 20` — hardcoded marge
+
+**Intelligent leersysteem, geen vaste regels.**
+Het systeem leert van elke trade wat werkt. Positiegrootte komt van Kelly (berekend uit win rate + winst/verlies ratio). Drempels komen uit data, niet uit aannames. Als iets niet werkt, past het systeem zich aan — het sluit geen coins uit en maakt geen aannames over "te vroeg".
+
+**Posities lopen door tot SL of TP.**
+Niet verkopen omdat een scan even negatief is. SL en TP zijn de enige uitstapmechanismen. Zo kunnen winnaars echt doorlopen.
+
+**Elke wijziging deployen naar gh-pages.**
+Na elke commit op de dev branch ook deployen:
+```bash
+git checkout gh-pages
+git show <dev-branch>:docs/trading.html > trading.html
+git add trading.html && git commit -m "Deploy: ..." && git push origin gh-pages
+git checkout <dev-branch>
+```
+
 ## What this project is
 
 InfraEstimator is a SaaS platform for project estimation in Dutch underground infrastructure (gas & electricity network management). Target users are projectmanagers, engineers and omgevingsmanagers at network operators (Liander/Stedin/Enexis). The platform generates hour estimations, risk registers (RISMAN), permit analyses, and GIS analyses from project data and KML/GeoJSON uploads.
