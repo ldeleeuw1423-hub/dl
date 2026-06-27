@@ -717,7 +717,7 @@ function calcAdaptiveThreshold(paper, base=28){
 // ── Intelligentie: Kelly positiegroottes ─────────────────
 function calcKellySize(paper){
   const recent=(paper.closed||[]).slice(-20);
-  const base=paper.balance*0.20; // 20% als startpunt (geen handelsgeschiedenis)
+  const base=paper.balance*0.25; // 25% als startpunt
   if(recent.length<5) return Math.min(base, paper.balance*0.95);
   const wins=recent.filter(t=>t.pnl>0);
   const losses=recent.filter(t=>t.pnl<0);
@@ -786,9 +786,9 @@ function autoTrade(){
       const pctOfPortfolio=(posSize/(paper.balance||1)*100).toFixed(1);
       const kellyReason=`Kelly €${kellySize.toFixed(0)}${freeBoost>1?' × vrij-saldo ×'+freeBoost.toFixed(1):''} = €${rawSize.toFixed(0)} (${pctOfPortfolio}% van saldo)`;
 
-      if(posSize<1){
+      if(posSize<300){
         decisions.push({pair,score:res.score,rsi:res.rsi,action:'TE ZWAK',
-          detail:`${kellyReason} — te klein om te kopen`});
+          detail:`${kellyReason} — minimaal €300 per positie`});
       } else if(paper.balance<posSize){
         decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEEN SALDO',
           detail:`Nodig €${posSize.toFixed(0)}, beschikbaar €${paper.balance.toFixed(0)}`});
@@ -796,7 +796,7 @@ function autoTrade(){
         const qty=posSize/price;
         const bbW=res.bb?.width||0.04;
         // Zelfleer: slMultiplier verbreedt SL als die te vaak geraakt wordt
-        const slPct=Math.max(1.5, Math.min(15, price*bbW/4/price*100*1.5*lastLearning.slMultiplier));
+        const slPct=Math.max(6, Math.min(15, bbW*100*1.5*lastLearning.slMultiplier));
         const tpPct=slPct*3.5;
         paper.balance-=posSize;
         paper.positions.push({
@@ -837,7 +837,7 @@ function autoTrade(){
           const newQty=pos.qty+addQty;
           const newEntry=(pos.entry*pos.qty+price*addQty)/newQty;
           const bbW=res.bb?.width||0.04;
-          const slPct=Math.max(1.5,Math.min(10,price*bbW/4/price*100*1.5));
+          const slPct=Math.max(6, Math.min(15, bbW*100*1.5));
           const tpPct=slPct*3.5;
           paper.balance-=addSize;
           paper.positions[idx].qty=newQty;
@@ -865,26 +865,16 @@ function autoTrade(){
       }
     }
 
-    // ── VERKOPEN: score negatief op open positie ───────────
-    if(res.score<0 && alreadyOwned){
-      const pos=paper.positions[idx];
-      const pnlEur=posPnlEUR(pos);
-      paper.balance+=pos.posSize+pnlEur;
-      paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
-      paper.closed.push({pair,entry:pos.entry,exit:price,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:'EUR',score:res.score,ts:new Date().toISOString(),indicators:pos.indicators});
-      paper.positions.splice(idx,1);
-      log.push({
-        ts:new Date().toISOString(), pair, action:'VERKOOP', price:+price.toFixed(8),
-        qty:+pos.qty.toFixed(8), pnl:+pnlEur.toFixed(4), score:res.score,
-        why:buildReason(res,'VERKOOP',0,0,0,0,'EUR',0)
-      });
-      decisions.push({pair,score:res.score,rsi:res.rsi,action:'VERKOCHT',
-        detail:`Score ${res.score} — signaal omgeslagen · P&L €${pnlEur.toFixed(2)}`});
-      changed=true;
-    } else if(res.score<0 && !alreadyOwned){
+    // Posities worden gesloten via SL/TP — niet op basis van scan-signaal.
+    // Zo kan een positie doorlopen naar de echte winst.
+    if(res.score<0 && !alreadyOwned){
       decisions.push({pair,score:res.score,rsi:res.rsi,action:'OVERGESLAGEN',detail:`Score ${res.score} — negatief signaal, niet gekocht`});
-    } else if(res.score===0){
+    } else if(res.score===0 && !alreadyOwned){
       decisions.push({pair,score:res.score,rsi:res.rsi,action:'NEUTRAAL',detail:'Score 0 — geen richting'});
+    } else if(alreadyOwned && res.score<0){
+      const pos=paper.positions[idx];
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',
+        detail:`Negatief signaal maar SL/TP bepalen uitstap · P&L nu €${posPnlEUR(pos).toFixed(0)}`});
     }
 
     // ── TRAILING (ATR-gebaseerd, geen vaste percentages) ─
@@ -919,7 +909,7 @@ function autoTrade(){
           const addSize=Math.min(paper.balance*0.95,perKandidaat);
           if(addSize<50) continue;
           const bbW=res.bb?.width||0.04;
-          const slPct=Math.max(1.5,Math.min(15,price*bbW/4/price*100*1.5*lastLearning.slMultiplier));
+          const slPct=Math.max(6, Math.min(15, bbW*100*1.5*lastLearning.slMultiplier));
           const tpPct=slPct*3.5;
           const idx2=paper.positions.findIndex(p=>p.pair===pair);
           if(idx2===-1){
