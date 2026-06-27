@@ -776,15 +776,15 @@ function autoTrade(){
     // ── KOPEN: score > 0 en we hebben nog geen positie ────
     if(res.score>0 && !alreadyOwned){
       {
-      // Vrij-saldo multiplier: hoe meer cash ongebruikt, hoe groter de inzet bij sterke signalen
+      // Vrij-saldo multiplier: hoe meer cash ongebruikt, hoe groter de inzet
       const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
       const freePct=paper.balance/((paper.balance+totalDeployed)||1);
-      const freeBoost=freePct>0.5?Math.min(2.5, 1+(freePct-0.5)*3):1;
-      const scoreFraction=Math.min(1, res.score/100);
-      const rawSize=+(kellySize*scoreFraction*freeBoost).toFixed(2);
+      const freeBoost=freePct>0.5?Math.min(2.0, 1+(freePct-0.5)*2):1;
+      // Score bepaalt rangschikking, niet positiegrootte — Kelly doet dat al
+      const rawSize=+(kellySize*freeBoost).toFixed(2);
       const posSize=Math.min(paper.balance*0.95, rawSize);
       const pctOfPortfolio=(posSize/(paper.balance||1)*100).toFixed(1);
-      const kellyReason=`Kelly €${kellySize.toFixed(0)} × score ${(scoreFraction*100).toFixed(0)}%${freeBoost>1?' × vrij-saldo ×'+freeBoost.toFixed(1):''} = €${rawSize.toFixed(0)} (${pctOfPortfolio}% van saldo)`;
+      const kellyReason=`Kelly €${kellySize.toFixed(0)}${freeBoost>1?' × vrij-saldo ×'+freeBoost.toFixed(1):''} = €${rawSize.toFixed(0)} (${pctOfPortfolio}% van saldo)`;
 
       if(posSize<1){
         decisions.push({pair,score:res.score,rsi:res.rsi,action:'TE ZWAK',
@@ -797,7 +797,7 @@ function autoTrade(){
         const bbW=res.bb?.width||0.04;
         // Zelfleer: slMultiplier verbreedt SL als die te vaak geraakt wordt
         const slPct=Math.max(1.5, Math.min(15, price*bbW/4/price*100*1.5*lastLearning.slMultiplier));
-        const tpPct=slPct*2.5;
+        const tpPct=slPct*3.5;
         paper.balance-=posSize;
         paper.positions.push({
           pair, currency:'EUR', side:'BUY', entry:price, qty, posSize,
@@ -829,17 +829,16 @@ function autoTrade(){
       if(res.score>=BIJKOOP_DREMPEL && posPct<MAX_POS_PCT && paper.balance>=10){
         const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
         const freePct=paper.balance/((paper.balance+totalDeployed)||1);
-        const freeBoost=freePct>0.5?Math.min(2.5,1+(freePct-0.5)*3):1;
-        const scoreFraction=Math.min(1,res.score/100);
-        // Bijkopen = 50% van wat een nieuwe positie zou zijn (voorzichtiger)
-        const addSize=Math.min(paper.balance*0.95, +(kellySize*scoreFraction*freeBoost*0.5).toFixed(2));
+        const freeBoost=freePct>0.5?Math.min(2.0,1+(freePct-0.5)*2):1;
+        // Bijkopen = 50% van een volledige positie
+        const addSize=Math.min(paper.balance*0.95, +(kellySize*freeBoost*0.5).toFixed(2));
         if(addSize>=1){
           const addQty=addSize/price;
           const newQty=pos.qty+addQty;
-          const newEntry=(pos.entry*pos.qty+price*addQty)/newQty; // gewogen gemiddelde entry
+          const newEntry=(pos.entry*pos.qty+price*addQty)/newQty;
           const bbW=res.bb?.width||0.04;
           const slPct=Math.max(1.5,Math.min(10,price*bbW/4/price*100*1.5));
-          const tpPct=slPct*2.5;
+          const tpPct=slPct*3.5;
           paper.balance-=addSize;
           paper.positions[idx].qty=newQty;
           paper.positions[idx].entry=+newEntry.toFixed(8);
@@ -850,7 +849,7 @@ function autoTrade(){
             qty:+addQty.toFixed(8),value:+addSize.toFixed(2),score:res.score,currency:'EUR',
             why:[`Score ${res.score} — sterk signaal, positie vergroot`,
                  `+${fmtQty(addQty)} @ ${fmtPrice(price,'EUR')} · nieuw gem. ${fmtPrice(newEntry,'EUR')}`,
-                 `Kelly €${kellySize.toFixed(0)} × ${(scoreFraction*100).toFixed(0)}% × ½ bijkoop = €${addSize.toFixed(0)}`]});
+                 `Kelly €${kellySize.toFixed(0)} × ½ bijkoop = €${addSize.toFixed(0)}`]});
           decisions.push({pair,score:res.score,rsi:res.rsi,action:'BIJGEKOCHT',
             detail:`Score ${res.score} ≥ ${BIJKOOP_DREMPEL} · +€${addSize.toFixed(0)} · nieuw gem. entry ${fmtPrice(newEntry,'EUR')}`});
           changed=true;
@@ -908,19 +907,20 @@ function autoTrade(){
     const totaalV=paper.balance+paper.positions.reduce((s,p)=>s+posValueEUR(p),0);
     if(paper.balance/totaalV>0.05 && paper.balance>20){
       const teInzetten=paper.balance*0.95;
-      const kandidaten=ranked.filter(r=>r.score>0).slice(0,10);
+      // Max 5 kandidaten zodat elke positie substantieel is
+      const kandidaten=ranked.filter(r=>r.score>0).slice(0,5);
       if(kandidaten.length){
-        const perKandidaat=Math.floor(teInzetten/kandidaten.length);
+        const perKandidaat=Math.max(100, Math.floor(teInzetten/kandidaten.length));
         for(const res of kandidaten){
-          if(paper.balance<10) break;
+          if(paper.balance<50) break;
           const pair=res.pair;
           const price=getPrice(pair)||res.price;
           if(!price||price<=0) continue;
           const addSize=Math.min(paper.balance*0.95,perKandidaat);
-          if(addSize<5) continue;
+          if(addSize<50) continue;
           const bbW=res.bb?.width||0.04;
           const slPct=Math.max(1.5,Math.min(15,price*bbW/4/price*100*1.5*lastLearning.slMultiplier));
-          const tpPct=slPct*2.5;
+          const tpPct=slPct*3.5;
           const idx2=paper.positions.findIndex(p=>p.pair===pair);
           if(idx2===-1){
             // Nieuwe positie
