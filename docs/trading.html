@@ -786,9 +786,9 @@ function autoTrade(){
       const pctOfPortfolio=(posSize/(paper.balance||1)*100).toFixed(1);
       const kellyReason=`Kelly €${kellySize.toFixed(0)}${freeBoost>1?' × vrij-saldo ×'+freeBoost.toFixed(1):''} = €${rawSize.toFixed(0)} (${pctOfPortfolio}% van saldo)`;
 
-      if(posSize<300){
+      if(posSize<1){
         decisions.push({pair,score:res.score,rsi:res.rsi,action:'TE ZWAK',
-          detail:`${kellyReason} — minimaal €300 per positie`});
+          detail:`${kellyReason} — Kelly geeft geen positie`});
       } else if(paper.balance<posSize){
         decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEEN SALDO',
           detail:`Nodig €${posSize.toFixed(0)}, beschikbaar €${paper.balance.toFixed(0)}`});
