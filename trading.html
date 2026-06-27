@@ -776,11 +776,10 @@ function autoTrade(){
     // ── KOPEN: score > 0 en we hebben nog geen positie ────
     if(res.score>0 && !alreadyOwned){
       {
-      // Vrij-saldo multiplier: hoe meer cash ongebruikt, hoe groter de inzet
+      // Vrij-saldo multiplier: lineair op basis van hoeveel % van portfolio vrij is
       const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
       const freePct=paper.balance/((paper.balance+totalDeployed)||1);
-      const freeBoost=freePct>0.5?Math.min(2.0, 1+(freePct-0.5)*2):1;
-      // Score bepaalt rangschikking, niet positiegrootte — Kelly doet dat al
+      const freeBoost=1+freePct; // 100% vrij → 2×, 50% vrij → 1.5×, 0% vrij → 1×
       const rawSize=+(kellySize*freeBoost).toFixed(2);
       const posSize=Math.min(paper.balance*0.95, rawSize);
       const pctOfPortfolio=(posSize/(paper.balance||1)*100).toFixed(1);
@@ -794,9 +793,9 @@ function autoTrade(){
           detail:`Nodig €${posSize.toFixed(0)}, beschikbaar €${paper.balance.toFixed(0)}`});
       } else {
         const qty=posSize/price;
-        const bbW=res.bb?.width||0.04;
-        // Zelfleer: slMultiplier verbreedt SL als die te vaak geraakt wordt
-        const slPct=Math.max(6, Math.min(15, bbW*100*1.5*lastLearning.slMultiplier));
+        const bbW=res.bb?.width||0;
+        // SL = BB-breedte × slMultiplier (geleerd uit data). Geen vaste bounds.
+        const slPct=(bbW>0?bbW*100:5)*lastLearning.slMultiplier;
         const tpPct=slPct*3.5;
         paper.balance-=posSize;
         paper.positions.push({
@@ -818,26 +817,26 @@ function autoTrade(){
       }
       }
     } else if(res.score>0 && alreadyOwned){
-      // Bijkopen als signaal sterk genoeg is (score >= 45) én positie nog niet te groot
+      // Bijkopen als signaal positief is én positie niet groter dan Kelly toestaat
       const pos=paper.positions[idx];
       const posWaarde=posValueEUR(pos);
       const totalPortfolioVal=paper.balance+paper.positions.reduce((s,p)=>s+posValueEUR(p),0);
       const posPct=posWaarde/(totalPortfolioVal||1);
-      const BIJKOOP_DREMPEL=45; // alleen bijkopen bij echt sterke kansen
-      const MAX_POS_PCT=0.40;   // max 40% van portfolio in één coin
+      // Kelly bepaalt hoeveel % van portfolio max in één positie mag
+      const kellyPct=kellySize/(totalPortfolioVal||1);
 
-      if(res.score>=BIJKOOP_DREMPEL && posPct<MAX_POS_PCT && paper.balance>=10){
+      if(posPct<kellyPct && paper.balance>=1){
         const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
         const freePct=paper.balance/((paper.balance+totalDeployed)||1);
-        const freeBoost=freePct>0.5?Math.min(2.0,1+(freePct-0.5)*2):1;
+        const freeBoost=1+freePct; // lineair: hoe meer vrij saldo, hoe groter de bijkoop
         // Bijkopen = 50% van een volledige positie
         const addSize=Math.min(paper.balance*0.95, +(kellySize*freeBoost*0.5).toFixed(2));
         if(addSize>=1){
           const addQty=addSize/price;
           const newQty=pos.qty+addQty;
           const newEntry=(pos.entry*pos.qty+price*addQty)/newQty;
-          const bbW=res.bb?.width||0.04;
-          const slPct=Math.max(6, Math.min(15, bbW*100*1.5));
+          const bbW=res.bb?.width||0;
+          const slPct=(bbW>0?bbW*100:5)*lastLearning.slMultiplier;
           const tpPct=slPct*3.5;
           paper.balance-=addSize;
           paper.positions[idx].qty=newQty;
@@ -858,10 +857,9 @@ function autoTrade(){
             detail:`Score ${res.score} sterk maar bijkoop te klein (€${addSize.toFixed(0)})`});
         }
       } else {
-        const reden=res.score<BIJKOOP_DREMPEL?`score ${res.score} < ${BIJKOOP_DREMPEL}`:
-                    posPct>=MAX_POS_PCT?`positie al ${(posPct*100).toFixed(0)}% van portfolio`:'onvoldoende saldo';
+        const reden=posPct>=kellyPct?`positie al ${(posPct*100).toFixed(0)}% van portfolio (Kelly-max ${(kellyPct*100).toFixed(0)}%)`:'onvoldoende saldo';
         decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',
-          detail:`Positief signaal maar geen bijkoop — ${reden}`});
+          detail:`Geen bijkoop — ${reden}`});
       }
     }
 
@@ -892,24 +890,26 @@ function autoTrade(){
     }
   }
 
-  // ── BUDGET-RONDE: als >5% nog vrij, inzetten op beste kansen ──
+  // ── BUDGET-RONDE: vrij saldo inzetten via Kelly over beste kansen ──
   {
     const totaalV=paper.balance+paper.positions.reduce((s,p)=>s+posValueEUR(p),0);
-    if(paper.balance/totaalV>0.05 && paper.balance>20){
-      const teInzetten=paper.balance*0.95;
-      // Max 5 kandidaten zodat elke positie substantieel is
-      const kandidaten=ranked.filter(r=>r.score>0).slice(0,5);
+    const vrijPct=paper.balance/(totaalV||1);
+    if(vrijPct>0 && paper.balance>1){
+      // Hoeveel posities passen er nog in het vrije saldo op basis van Kelly?
+      const kellyPct=kellySize/(totaalV||1);
+      const maxNieuwePosities=Math.max(1,Math.floor(vrijPct/kellyPct));
+      const kandidaten=ranked.filter(r=>r.score>0).slice(0,maxNieuwePosities);
       if(kandidaten.length){
-        const perKandidaat=Math.max(100, Math.floor(teInzetten/kandidaten.length));
+        const perKandidaat=Math.floor(paper.balance*0.95/kandidaten.length);
         for(const res of kandidaten){
-          if(paper.balance<50) break;
+          if(paper.balance<1) break;
           const pair=res.pair;
           const price=getPrice(pair)||res.price;
           if(!price||price<=0) continue;
           const addSize=Math.min(paper.balance*0.95,perKandidaat);
-          if(addSize<50) continue;
-          const bbW=res.bb?.width||0.04;
-          const slPct=Math.max(6, Math.min(15, bbW*100*1.5*lastLearning.slMultiplier));
+          if(addSize<1) continue;
+          const bbW=res.bb?.width||0;
+          const slPct=bbW>0?bbW*100*lastLearning.slMultiplier:5*lastLearning.slMultiplier;
           const tpPct=slPct*3.5;
           const idx2=paper.positions.findIndex(p=>p.pair===pair);
           if(idx2===-1){
@@ -927,9 +927,9 @@ function autoTrade(){
             if(di>=0) decisions[di]=dec; else decisions.push(dec);
             changed=true;
           } else {
-            // Bijkopen bestaande positie (max 40% portfolio)
+            // Bijkopen bestaande positie — Kelly bepaalt max
             const pos=paper.positions[idx2];
-            if(posValueEUR(pos)/totaalV>=0.40) continue;
+            if(posValueEUR(pos)/totaalV>=kellyPct) continue;
             const addQty=addSize/price;
             const newQty=pos.qty+addQty;
             const newEntry=(pos.entry*pos.qty+price*addQty)/newQty;
