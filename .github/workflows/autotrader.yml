@@ -1,0 +1,43 @@
+name: AutoTrader
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # elke 5 minuten
+  workflow_dispatch:          # ook handmatig te starten via GitHub UI
+
+permissions:
+  contents: write             # nodig om state terug te committen
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: claude/powershell-integration-03r6dh
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installeer dependencies
+        run: pip install aiohttp
+
+      - name: Run scan
+        env:
+          START_BALANCE:    ${{ vars.START_BALANCE || '10000' }}
+          LIVE_TRADING:     'false'
+          CRYPTOPANIC_KEY:  ${{ secrets.CRYPTOPANIC_KEY }}
+        run: python -m trader.run_once
+
+      - name: Sla state op
+        run: |
+          git config user.name  "AutoTrader Bot"
+          git config user.email "autotrader@noreply"
+          git add trader/data/ trader/logs/ 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "chore: trader state update [skip ci]"
+          git push || true
