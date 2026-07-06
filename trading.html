@@ -2,1874 +2,1542 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>TradingBot Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate"/>
+<title>AutoTrader</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:'Segoe UI',system-ui,sans-serif; background:#0f0f1a; color:#e0e0e0; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,sans-serif;background:#0a0a14;color:#e0e0f0;min-height:100vh;}
+:root{--green:#00d4aa;--red:#ff5555;--blue:#6382ff;--amber:#f59e0b;--bg1:#0a0a14;--bg2:#12121f;--bg3:#1a1a2e;--bg4:#252540;--border:#2a2a48;}
 
-.sidebar { width:220px; min-height:100vh; background:#13132a; border-right:1px solid #252540; position:fixed; top:0;left:0;bottom:0; overflow-y:auto; z-index:20; }
-.sidebar-item { display:flex; align-items:center; gap:10px; padding:10px 18px; color:#7878a0; cursor:pointer; border-radius:6px; margin:2px 8px; font-size:13.5px; transition:all .15s; }
-.sidebar-item:hover { background:rgba(255,255,255,.06); color:#e0e0e0; }
-.sidebar-item.active { background:rgba(0,212,170,.1); color:#00d4aa; border-left:3px solid #00d4aa; }
-.sidebar-section { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#3a3a5c; padding:14px 18px 4px; }
+/* Layout */
+.topbar{display:flex;align-items:center;gap:14px;padding:10px 20px;background:#12121f;border-bottom:1px solid #1e1e38;position:sticky;top:0;z-index:100;}
+.topbar-logo{font-size:16px;font-weight:800;color:#fff;letter-spacing:-0.5px;white-space:nowrap;}
+.topbar-logo span{color:var(--green);}
+#price-ticker{flex:1;overflow:hidden;position:relative;height:26px;}
+#ticker-track{display:flex;gap:28px;position:absolute;white-space:nowrap;animation:scroll-ticker 30s linear infinite;}
+#ticker-track:hover{animation-play-state:paused;}
+@keyframes scroll-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tick-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;}
+.tick-sym{font-weight:700;color:#a0a0c0;}
+.tick-price{font-family:monospace;font-weight:600;color:#fff;}
+.tick-chg{font-size:11px;font-weight:700;}
+#status-dot{width:8px;height:8px;border-radius:50%;background:#ff5555;flex-shrink:0;transition:background .3s;}
+#status-dot.live{background:var(--green);}
+.main{padding:18px 20px;max-width:1400px;margin:0 auto;}
 
-.main { margin-left:220px; min-height:100vh; }
-.topbar { background:#13132a; border-bottom:1px solid #252540; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
-.content { padding:24px; }
+/* Cards */
+.card{background:#12121f;border:1px solid #1e1e38;border-radius:12px;padding:18px;}
+.card-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.card-title i{opacity:.7;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
 
-.card { background:#1a1a2e; border-radius:10px; padding:20px; border:1px solid #252540; }
-.kpi { background:#1a1a2e; border-radius:10px; padding:18px 20px; border:1px solid #252540; border-left:4px solid; }
+/* Toggle */
+.toggle{position:relative;display:inline-block;width:48px;height:26px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.slider{position:absolute;inset:0;background:#2a2a48;border-radius:26px;cursor:pointer;transition:.2s;}
+.slider:before{content:'';position:absolute;width:20px;height:20px;left:3px;top:3px;background:#7878a0;border-radius:50%;transition:.2s;}
+input:checked+.slider{background:rgba(0,212,170,.3);}
+input:checked+.slider:before{background:var(--green);transform:translateX(22px);}
 
-table { width:100%; border-collapse:collapse; font-size:13px; }
-thead th { background:#252540; padding:10px 14px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:#7878a0; white-space:nowrap; }
-tbody td { padding:10px 14px; border-top:1px solid #1e1e38; vertical-align:middle; }
-tbody tr:hover td { background:#1e1e38; }
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:1px solid #2a2a48;background:transparent;color:#c0c0d8;cursor:pointer;font-size:12px;font-weight:600;transition:.15s;}
+.btn:hover{background:#1e1e38;color:#fff;}
+.btn-primary{background:rgba(0,212,170,.12);border-color:rgba(0,212,170,.35);color:var(--green);}
+.btn-primary:hover{background:rgba(0,212,170,.22);}
+.btn-danger{background:rgba(255,85,85,.1);border-color:rgba(255,85,85,.3);color:#ff5555;}
+.btn-sm{padding:4px 10px;font-size:11px;}
 
-.badge { display:inline-flex; align-items:center; padding:2px 10px; border-radius:99px; font-size:11px; font-weight:700; }
-.badge-buy   { background:rgba(0,212,170,.15);  color:#00d4aa; }
-.badge-sell  { background:rgba(255,85,85,.15);  color:#ff5555; }
-.badge-win   { background:rgba(0,212,170,.12);  color:#00d4aa; }
-.badge-loss  { background:rgba(255,85,85,.12);  color:#ff5555; }
-.badge-open  { background:rgba(99,130,255,.15); color:#6382ff; }
-.badge-run   { background:rgba(0,212,170,.12);  color:#00d4aa; }
-.badge-stop  { background:rgba(120,120,160,.12);color:#7878a0; }
-.badge-paper { background:rgba(245,158,11,.12); color:#f59e0b; }
-.badge-live  { background:rgba(255,85,85,.15);  color:#ff5555; }
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;}
+.kpi{background:#0f0f1a;border-radius:10px;padding:14px;text-align:center;}
+.kpi-label{font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;}
+.kpi-value{font-size:22px;font-weight:700;font-family:monospace;color:#fff;}
+.kpi-sub{font-size:11px;color:#6868a0;margin-top:3px;}
 
-.pos { color:#00d4aa; } .neg { color:#ff5555; } .neu { color:#e0e0e0; } .muted { color:#7878a0; }
-.page { display:none; } .page.active { display:block; }
+/* Position card */
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+.pos-card{background:#0f0f1a;border-radius:10px;padding:14px;border:1px solid #1e1e38;transition:border-color .2s;}
+.pos-card.up{border-color:rgba(0,212,170,.25);}
+.pos-card.down{border-color:rgba(255,85,85,.25);}
+.pos-coin{font-size:17px;font-weight:800;color:#fff;}
+.pos-val{font-size:21px;font-weight:700;font-family:monospace;color:#fff;margin:5px 0;}
+.pos-pnl{font-size:16px;font-weight:700;}
+.pos-pnl.up{color:var(--green);}
+.pos-pnl.down{color:var(--red);}
+.pos-meta{font-size:11px;color:#6868a0;margin-top:6px;}
+.progress-wrap{margin:9px 0 4px;}
+.progress-labels{display:flex;justify-content:space-between;font-size:10px;color:#6868a0;margin-bottom:3px;}
+.progress-bar{height:4px;background:#1e1e38;border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:2px;transition:width .4s;}
 
-.filter-input { background:#252540; border:1px solid #2e2e50; border-radius:6px; color:#e0e0e0; padding:7px 12px; font-size:13px; outline:none; }
-.filter-input:focus { border-color:#00d4aa; }
-select.filter-input option { background:#1a1a2e; }
+/* Log */
+.log-entry{padding:11px 14px;border-bottom:1px solid #1a1a2e;display:flex;align-items:flex-start;gap:10px;}
+.log-entry:last-child{border-bottom:none;}
+.log-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:1px;}
+.log-badge.buy{background:rgba(0,212,170,.15);color:var(--green);}
+.log-badge.sell{background:rgba(255,85,85,.15);color:var(--red);}
+.log-pair{font-weight:700;font-size:13px;color:#fff;}
+.log-price{font-family:monospace;font-size:12px;color:#a0a0c0;}
+.log-meta{font-size:11px;color:#6868a0;margin-top:2px;}
+.log-reason{font-size:11px;color:#9090b8;margin-top:5px;line-height:1.55;cursor:pointer;}
+.log-reason-detail{display:none;margin-top:5px;}
+.log-reason-detail.open{display:block;}
 
-.btn { padding:8px 16px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; border:none; transition:all .15s; display:inline-flex; align-items:center; gap:6px; }
-.btn-primary { background:#00d4aa; color:#0f0f1a; }
-.btn-primary:hover { background:#00b894; }
-.btn-danger { background:rgba(255,85,85,.15); color:#ff5555; border:1px solid rgba(255,85,85,.3); }
-.btn-danger:hover { background:rgba(255,85,85,.25); }
-.btn-ghost { background:#252540; color:#e0e0e0; border:1px solid #2e2e50; }
-.btn-ghost:hover { background:#2e2e50; }
-.btn-warning { background:rgba(245,158,11,.15); color:#f59e0b; border:1px solid rgba(245,158,11,.3); }
+/* Signal bars */
+.signal-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #1a1a2e;}
+.signal-row:last-child{border-bottom:none;}
+.signal-pair{font-weight:700;font-size:12px;color:#fff;width:80px;flex-shrink:0;}
+.score-bar{flex:1;height:6px;background:#1e1e38;border-radius:3px;overflow:hidden;}
+.score-fill{height:100%;border-radius:3px;}
+.score-num{font-size:12px;font-weight:700;font-family:monospace;width:36px;text-align:right;flex-shrink:0;}
 
-.form-group { margin-bottom:14px; }
-.form-label { font-size:11px; font-weight:600; color:#7878a0; text-transform:uppercase; letter-spacing:.5px; display:block; margin-bottom:5px; }
-.form-input { width:100%; background:#252540; border:1px solid #2e2e50; border-radius:6px; color:#e0e0e0; padding:9px 12px; font-size:13px; outline:none; }
-.form-input:focus { border-color:#00d4aa; }
-.form-input::placeholder { color:#3a3a5c; }
-select.form-input option { background:#1a1a2e; }
-textarea.form-input { resize:vertical; min-height:80px; }
+/* Chart */
+#chart-wrap{background:#0d0d1a;border-radius:8px;overflow:hidden;height:420px;}
 
-.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px; }
-.modal-box { background:#1a1a2e; border:1px solid #252540; border-radius:12px; padding:28px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; }
+/* Status bar */
+.status-bar{font-size:11px;color:#6868a0;padding:8px 12px;background:#0f0f1a;border-radius:6px;margin-top:10px;}
 
-.toggle { position:relative; display:inline-block; width:42px; height:22px; }
-.toggle input { opacity:0; width:0; height:0; }
-.toggle-slider { position:absolute; cursor:pointer; inset:0; background:#252540; border-radius:22px; transition:.3s; }
-.toggle-slider:before { position:absolute; content:""; height:16px; width:16px; left:3px; bottom:3px; background:#7878a0; border-radius:50%; transition:.3s; }
-.toggle input:checked + .toggle-slider { background:rgba(0,212,170,.3); }
-.toggle input:checked + .toggle-slider:before { transform:translateX(20px); background:#00d4aa; }
+/* Scrollable log */
+.log-scroll{max-height:340px;overflow-y:auto;}
+.log-scroll::-webkit-scrollbar{width:4px;}
+.log-scroll::-webkit-scrollbar-track{background:#0f0f1a;}
+.log-scroll::-webkit-scrollbar-thumb{background:#2a2a48;border-radius:2px;}
 
-.drop-zone { border:2px dashed #252540; border-radius:10px; padding:36px 24px; text-align:center; cursor:pointer; transition:all .2s; }
-.drop-zone:hover { border-color:#00d4aa; background:rgba(0,212,170,.04); }
-input[type=file] { display:none; }
+/* Empty state */
+.empty{text-align:center;padding:30px;color:#6868a0;font-size:13px;}
+.empty i{display:block;font-size:28px;margin-bottom:10px;opacity:.4;}
 
-.price-ticker { font-family:monospace; font-size:13px; font-weight:600; }
-.pos-badge { background:rgba(0,212,170,.1); color:#00d4aa; padding:2px 8px; border-radius:4px; font-size:11px; }
-.neg-badge { background:rgba(255,85,85,.1); color:#ff5555; padding:2px 8px; border-radius:4px; font-size:11px; }
+/* Pos/neg colors */
+.pos{color:var(--green)!important;}
+.neg{color:var(--red)!important;}
+.neu{color:#a0a0c0!important;}
 
-::-webkit-scrollbar { width:5px; height:5px; }
-::-webkit-scrollbar-track { background:#0f0f1a; }
-::-webkit-scrollbar-thumb { background:#252540; border-radius:3px; }
+/* Responsive */
+@media(max-width:700px){
+  .grid2,.grid3{grid-template-columns:1fr;}
+  .kpi-row{grid-template-columns:1fr 1fr;}
+  .main{padding:10px;}
+}
 </style>
 </head>
 <body>
 
-<!-- ══════════════ SIDEBAR ══════════════ -->
-<div class="sidebar">
-  <div style="padding:18px; border-bottom:1px solid #252540; margin-bottom:6px;">
-    <div style="color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">
-      <i class="fas fa-chart-line" style="color:#00d4aa;"></i> TradingBot
-    </div>
-    <div style="font-size:11px;color:#7878a0;margin-top:3px;" id="mode-label">
-      <span class="badge badge-paper" style="font-size:10px;">PAPER</span> Simulatie modus
-    </div>
-  </div>
-  <nav>
-    <div class="sidebar-section">Analyse</div>
-    <div class="sidebar-item active" onclick="showPage('overview')"><i class="fas fa-th-large fa-sm"></i> Overzicht</div>
-    <div class="sidebar-item" onclick="showPage('trades')"><i class="fas fa-exchange-alt fa-sm"></i> Trades</div>
-    <div class="sidebar-item" onclick="showPage('performance')"><i class="fas fa-chart-area fa-sm"></i> Performance</div>
-    <div class="sidebar-item" onclick="showPage('pairs')"><i class="fas fa-coins fa-sm"></i> Pairs</div>
-
-    <div class="sidebar-section">Trading</div>
-    <div class="sidebar-item" onclick="showPage('paper')"><i class="fas fa-flask fa-sm"></i> Paper Trading</div>
-    <div class="sidebar-item" onclick="showPage('strategies')"><i class="fas fa-robot fa-sm"></i> Strategieën</div>
-
-    <div class="sidebar-section">AI & Leren</div>
-    <div class="sidebar-item" onclick="showPage('ai')"><i class="fas fa-brain fa-sm"></i> AI Analyse</div>
-
-    <div class="sidebar-section">Instellingen</div>
-    <div class="sidebar-item" onclick="showPage('apis')"><i class="fas fa-plug fa-sm"></i> API Verbindingen</div>
-    <div class="sidebar-item" onclick="showPage('import')"><i class="fas fa-file-upload fa-sm"></i> CSV Import</div>
-  </nav>
-  <div style="position:absolute;bottom:16px;left:0;right:0;padding:0 12px;">
-    <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.2);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:8px;">
-      <div id="status-dot" style="width:8px;height:8px;border-radius:50%;background:#00d4aa;box-shadow:0 0 6px #00d4aa;"></div>
-      <div style="font-size:12px;color:#00d4aa;font-weight:600;" id="status-text">Actief</div>
-      <div style="font-size:11px;color:#7878a0;margin-left:auto;" id="last-update">—</div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════ MAIN ══════════════ -->
-<div class="main">
+<!-- ══ TOPBAR ══ -->
 <div class="topbar">
-  <div style="font-size:17px;font-weight:700;color:#fff;" id="page-title">Overzicht</div>
-  <div style="display:flex;align-items:center;gap:10px;">
-    <div id="live-prices" style="display:flex;gap:12px;font-size:12px;"></div>
-    <select class="filter-input" id="global-period" onchange="renderAll()" style="width:130px;">
-      <option value="all">Alle tijd</option>
-      <option value="7">7 dagen</option>
-      <option value="30" selected>30 dagen</option>
-      <option value="90">90 dagen</option>
-    </select>
-    <button class="btn btn-ghost" onclick="refreshAll()"><i class="fas fa-sync-alt fa-sm" id="refresh-icon"></i> Ververs</button>
-  </div>
+  <div class="topbar-logo">Auto<span>Trader</span></div>
+  <div id="status-dot"></div>
+  <div id="price-ticker"><div id="ticker-track"><span style="color:#3a3a5c;font-size:12px;">Prijzen laden…</span></div></div>
 </div>
 
-<div class="content">
+<div class="main">
 
-<!-- ═══ PAGE: OVERZICHT ═══ -->
-<div class="page active" id="page-overview">
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:20px;">
-    <div class="kpi" style="border-left-color:#00d4aa;">
-      <div class="form-label">Totaal P&L</div>
-      <div id="kpi-pnl" style="font-size:24px;font-weight:700;margin-top:6px;" class="pos">+0.00 USDT</div>
-      <div id="kpi-pnl-sub" style="font-size:11px;margin-top:2px;" class="muted">gesloten trades</div>
-    </div>
-    <div class="kpi" style="border-left-color:#6382ff;">
-      <div class="form-label">Win Rate</div>
-      <div id="kpi-wr" style="font-size:24px;font-weight:700;margin-top:6px;" class="neu">0%</div>
-      <div id="kpi-wl" style="font-size:11px;margin-top:2px;" class="muted">0W / 0L</div>
-    </div>
-    <div class="kpi" style="border-left-color:#f59e0b;">
-      <div class="form-label">Trades</div>
-      <div id="kpi-trades" style="font-size:24px;font-weight:700;margin-top:6px;" class="neu">0</div>
-      <div id="kpi-open" style="font-size:11px;margin-top:2px;" class="muted">0 open</div>
-    </div>
-    <div class="kpi" style="border-left-color:#00d4aa;">
-      <div class="form-label">Paper Saldo</div>
-      <div id="kpi-paper-bal" style="font-size:24px;font-weight:700;margin-top:6px;" class="neu">—</div>
-      <div id="kpi-paper-pnl" style="font-size:11px;margin-top:2px;" class="muted">—</div>
-    </div>
-    <div class="kpi" style="border-left-color:#6382ff;">
-      <div class="form-label">Strategieën</div>
-      <div id="kpi-strats" style="font-size:24px;font-weight:700;margin-top:6px;" class="neu">0</div>
-      <div id="kpi-strats-sub" style="font-size:11px;margin-top:2px;" class="muted">0 actief</div>
-    </div>
-    <div class="kpi" style="border-left-color:#f59e0b;">
-      <div class="form-label">API's</div>
-      <div id="kpi-apis" style="font-size:24px;font-weight:700;margin-top:6px;" class="neu">0</div>
-      <div id="kpi-apis-sub" style="font-size:11px;margin-top:2px;" class="muted">verbonden</div>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:20px;">
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-        <div style="font-size:14px;font-weight:600;color:#fff;">Cumulatieve P&L</div>
-        <div class="muted" style="font-size:11px;" id="chart-pnl-sub">—</div>
+<!-- ══ ROW 1: Control + Portfolio KPIs ══ -->
+<div style="display:grid;grid-template-columns:280px 1fr;gap:14px;margin-bottom:14px;">
+
+  <!-- Auto-trade control -->
+  <div class="card" id="control-card" style="border-color:rgba(0,212,170,.15);">
+    <div class="card-title"><i class="fas fa-robot" style="color:var(--green);"></i> Auto Trading</div>
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+      <label class="toggle" style="transform:scale(1.2);transform-origin:left;">
+        <input type="checkbox" id="at-toggle" onchange="setAutoTrade(this.checked)">
+        <div class="slider"></div>
+      </label>
+      <div>
+        <div style="font-size:16px;font-weight:700;" id="at-label">UIT</div>
+        <div style="font-size:11px;color:#6868a0;margin-top:2px;">Paper modus</div>
       </div>
-      <canvas id="chart-pnl" height="160"></canvas>
     </div>
-    <div class="card">
-      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;">Win / Loss</div>
-      <canvas id="chart-wl" height="160"></canvas>
-      <div id="wl-legend" style="display:flex;justify-content:center;gap:16px;margin-top:10px;font-size:12px;"></div>
+
+    <div id="at-desc" style="font-size:11px;color:#6868a0;line-height:1.6;background:#0f0f1a;border-radius:6px;padding:8px 10px;margin-bottom:12px;">
+      Zet AAN om automatisch te kopen en verkopen op basis van AI-signalen.
+    </div>
+
+    <button class="btn btn-primary" onclick="runScan()" style="width:100%;justify-content:center;margin-bottom:8px;" id="scan-btn">
+      <i class="fas fa-satellite-dish fa-sm"></i> Nu scannen
+    </button>
+
+    <div class="status-bar" id="at-status">Wacht op scan…</div>
+
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e1e38;">
+      <div style="font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Strategie check</div>
+      <div id="strat-check" style="font-size:11px;color:#6868a0;">—</div>
     </div>
   </div>
+
+  <!-- Portfolio KPIs -->
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:600;color:#fff;">Recente Trades</div>
-      <span onclick="showPage('trades')" style="font-size:12px;color:#00d4aa;cursor:pointer;">Alle <i class="fas fa-arrow-right fa-xs"></i></span>
+    <div class="card-title"><i class="fas fa-wallet" style="color:var(--amber);"></i> Portfolio</div>
+    <div class="kpi-row" style="margin-bottom:0;">
+      <div class="kpi">
+        <div class="kpi-label">Totale waarde</div>
+        <div class="kpi-value" id="kpi-total">$—</div>
+        <div class="kpi-sub" id="kpi-total-pct">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Winst/verlies</div>
+        <div class="kpi-value" id="kpi-pnl">$—</div>
+        <div class="kpi-sub" id="kpi-pnl-pct">ongerealiseerd</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Vrij saldo</div>
+        <div class="kpi-value" id="kpi-free">$—</div>
+        <div class="kpi-sub" id="kpi-free-sub">beschikbaar</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Gerealiseerd</div>
+        <div class="kpi-value" id="kpi-realized">$0</div>
+        <div class="kpi-sub">afgesloten trades</div>
+      </div>
     </div>
-    <table><thead><tr><th>Tijdstip</th><th>Pair</th><th>Side</th><th>Prijs</th><th>Qty</th><th>P&L</th><th>Status</th></tr></thead>
-    <tbody id="recent-tbody"></tbody></table>
   </div>
 </div>
 
-<!-- ═══ PAGE: TRADES ═══ -->
-<div class="page" id="page-trades">
-  <div class="card" style="margin-bottom:14px;">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <input class="filter-input" id="f-pair" placeholder="Pair..." oninput="renderTradesTable()" style="width:130px;">
-      <select class="filter-input" id="f-side" onchange="renderTradesTable()" style="width:110px;"><option value="">Side</option><option>BUY</option><option>SELL</option></select>
-      <select class="filter-input" id="f-res" onchange="renderTradesTable()" style="width:120px;"><option value="">Resultaat</option><option value="win">Win</option><option value="loss">Loss</option><option value="open">Open</option></select>
-      <div class="muted" style="margin-left:auto;font-size:12px;" id="f-count">0 trades</div>
-    </div>
+<!-- ══ ROW 2: Posities (full width) ══ -->
+<div class="card" style="margin-bottom:14px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div class="card-title" style="margin-bottom:0;"><i class="fas fa-layer-group" style="color:var(--blue);"></i> Open Posities</div>
+    <button class="btn btn-sm" onclick="refreshPrices()"><i class="fas fa-sync fa-xs" id="refresh-spin"></i> Ververs</button>
   </div>
+  <div id="positions-wrap">
+    <div class="empty"><i class="fas fa-inbox"></i>Geen posities — zet Auto Trading aan</div>
+  </div>
+</div>
+
+<!-- ══ ROW 3: Chart (groot) + Trade Log (ernaast) ══ -->
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;">
+
+  <!-- Live chart — groot -->
   <div class="card">
-    <table>
-      <thead><tr><th>#</th><th>Tijdstip</th><th>Pair</th><th>Side</th><th>Instap</th><th>Uitstap</th><th>Qty</th><th>P&L USDT</th><th>P&L %</th><th>Status</th></tr></thead>
-      <tbody id="trades-tbody"></tbody>
-    </table>
-    <div style="padding:10px 14px;font-size:12px;color:#7878a0;border-top:1px solid #252540;display:flex;justify-content:space-between;">
-      <span id="trades-fl"></span><span id="trades-fr"></span>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ PAGE: PERFORMANCE ═══ -->
-<div class="page" id="page-performance">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-    <div class="card"><div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;">Dagelijkse P&L</div><canvas id="chart-daily" height="200"></canvas></div>
-    <div class="card"><div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;">P&L per Pair</div><canvas id="chart-perpair" height="200"></canvas></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-    <div class="card"><div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;">Drawdown</div><canvas id="chart-dd" height="160"></canvas></div>
-    <div class="card"><div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:14px;">Statistieken</div><div id="stats-tbl"></div></div>
-  </div>
-</div>
-
-<!-- ═══ PAGE: PAIRS ═══ -->
-<div class="page" id="page-pairs">
-  <div id="pairs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE: PAPER TRADING
-════════════════════════════════════════════════════════ -->
-<div class="page" id="page-paper">
-  <!-- Paper portfolio header -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;">
-    <div class="kpi" style="border-left-color:#f59e0b;">
-      <div class="form-label">Vrij saldo</div>
-      <div id="pp-free" style="font-size:22px;font-weight:700;margin-top:6px;" class="neu">—</div>
-    </div>
-    <div class="kpi" style="border-left-color:#00d4aa;">
-      <div class="form-label">Portfolio waarde</div>
-      <div id="pp-total" style="font-size:22px;font-weight:700;margin-top:6px;" class="neu">—</div>
-    </div>
-    <div class="kpi" style="border-left-color:#6382ff;">
-      <div class="form-label">Gerealiseerde P&L</div>
-      <div id="pp-rpnl" style="font-size:22px;font-weight:700;margin-top:6px;" class="neu">—</div>
-    </div>
-    <div class="kpi" style="border-left-color:#7878a0;">
-      <div class="form-label">Ongerealiseerde P&L</div>
-      <div id="pp-upnl" style="font-size:22px;font-weight:700;margin-top:6px;" class="neu">—</div>
-    </div>
-  </div>
-
-  <div style="display:grid;grid-template-columns:340px 1fr;gap:14px;margin-bottom:14px;">
-    <!-- Order form -->
-    <div class="card">
-      <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:16px;"><i class="fas fa-plus-circle" style="color:#00d4aa;"></i> Nieuwe Paper Order</div>
-      <div class="form-group">
-        <label class="form-label">Pair</label>
-        <input class="form-input" id="po-pair" placeholder="BTCUSDT" list="pair-list" oninput="updateOrderForm()">
-        <datalist id="pair-list">
-          <option value="BTCUSDT"><option value="ETHUSDT"><option value="BNBUSDT">
-          <option value="SOLUSDT"><option value="XRPUSDT"><option value="ADAUSDT">
-          <option value="DOGEUSDT"><option value="AVAXUSDT"><option value="DOTUSDT">
-        </datalist>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Huidige prijs</label>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <input class="form-input" id="po-price" placeholder="0.00" type="number" step="any">
-          <button class="btn btn-ghost" onclick="fetchPriceForOrder()" style="white-space:nowrap;"><i class="fas fa-sync-alt fa-xs"></i> Live</button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Hoeveelheid (base)</label>
-        <input class="form-input" id="po-qty" placeholder="0.001" type="number" step="any" oninput="calcOrderTotal()">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Bedrag USDT</label>
-        <input class="form-input" id="po-usdt" placeholder="15" type="number" step="any" oninput="calcOrderQty()">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Stop Loss (optioneel)</label>
-        <input class="form-input" id="po-sl" placeholder="bijv. 65000" type="number" step="any">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Take Profit (optioneel)</label>
-        <input class="form-input" id="po-tp" placeholder="bijv. 72000" type="number" step="any">
-      </div>
-      <div style="display:flex;gap:8px;margin-top:4px;">
-        <button class="btn btn-primary" onclick="placePaperOrder('BUY')" style="flex:1;justify-content:center;"><i class="fas fa-arrow-up fa-xs"></i> BUY</button>
-        <button class="btn btn-danger" onclick="placePaperOrder('SELL')" style="flex:1;justify-content:center;"><i class="fas fa-arrow-down fa-xs"></i> SELL</button>
-      </div>
-      <div id="order-msg" style="margin-top:10px;font-size:12px;min-height:18px;"></div>
-    </div>
-
-    <!-- Open positions -->
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-        <div style="font-size:14px;font-weight:600;color:#fff;">Open Posities</div>
-        <button class="btn btn-ghost" onclick="refreshPaperPositions()" style="font-size:12px;padding:5px 10px;"><i class="fas fa-sync fa-xs"></i> Prijzen bijwerken</button>
-      </div>
-      <table>
-        <thead><tr><th>Pair</th><th>Side</th><th>Instap</th><th>Prijs nu</th><th>Qty</th><th>U-PnL</th><th>SL/TP</th><th></th></tr></thead>
-        <tbody id="positions-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Closed paper trades -->
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:600;color:#fff;">Gesloten Paper Trades</div>
-      <button class="btn btn-danger" onclick="if(confirm('Paper data wissen?'))resetPaper()" style="font-size:12px;padding:5px 10px;"><i class="fas fa-trash fa-xs"></i> Reset</button>
-    </div>
-    <table>
-      <thead><tr><th>Tijdstip</th><th>Pair</th><th>Side</th><th>Instap</th><th>Uitstap</th><th>Qty</th><th>P&L USDT</th><th>P&L %</th></tr></thead>
-      <tbody id="paper-closed-tbody"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE: STRATEGIEËN
-════════════════════════════════════════════════════════ -->
-<div class="page" id="page-strategies">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-    <div style="font-size:14px;color:#7878a0;">Definieer strategieën en koppel ze aan pairs. In paper-modus genereren ze signalen zonder echt te handelen.</div>
-    <button class="btn btn-primary" onclick="openStrategyModal()"><i class="fas fa-plus fa-xs"></i> Strategie toevoegen</button>
-  </div>
-  <div id="strategies-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
-  <div id="strategies-signals" style="margin-top:20px;"></div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE: API VERBINDINGEN
-════════════════════════════════════════════════════════ -->
-<div class="page" id="page-apis">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-    <div style="font-size:14px;color:#7878a0;">Koppel exchange-accounts. Schakel eerst Paper mode aan om te testen zonder echt geld.</div>
-    <button class="btn btn-primary" onclick="openApiModal()"><i class="fas fa-plus fa-xs"></i> API toevoegen</button>
-  </div>
-
-  <!-- Paper mode banner -->
-  <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
-    <i class="fas fa-flask" style="color:#f59e0b;font-size:20px;"></i>
-    <div style="flex:1;">
-      <div style="font-weight:600;color:#f59e0b;">Paper Trading Modus</div>
-      <div style="font-size:12px;color:#7878a0;margin-top:2px;">Alle orders worden gesimuleerd — geen echt geld. Schakel LIVE alleen in als je klaar bent.</div>
-    </div>
-    <label class="toggle"><input type="checkbox" id="global-live-toggle" onchange="toggleGlobalLive(this)"><div class="toggle-slider"></div></label>
-    <div style="font-size:13px;font-weight:600;" id="live-toggle-label">PAPER</div>
-  </div>
-
-  <div id="apis-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;"></div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE: AI ANALYSE (Kraken + zelflerende engine)
-════════════════════════════════════════════════════════ -->
-<div class="page" id="page-ai">
-
-  <!-- Header + controls -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-    <div>
-      <div style="font-size:14px;color:#7878a0;">Live Kraken marktanalyse · indicators berekend op 1h OHLCV · systeem leert elke dag van resultaten</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <select class="filter-input" id="ai-tf" onchange="runAiScan()" style="width:110px;">
-        <option value="60">1 uur</option>
-        <option value="240">4 uur</option>
-        <option value="1440">1 dag</option>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <div class="card-title" style="margin-bottom:0;flex:1;"><i class="fas fa-chart-candlestick" style="color:var(--amber);"></i> Live Chart</div>
+      <select id="chart-pair" onchange="loadChart()" style="background:#0f0f1a;border:1px solid #2a2a48;color:#e0e0f0;border-radius:6px;padding:4px 8px;font-size:12px;">
+        <option value="BTCUSDT">BTC/USDT</option>
+        <option value="ETHUSDT">ETH/USDT</option>
+        <option value="SOLUSDT">SOL/USDT</option>
+        <option value="XRPUSDT">XRP/USDT</option>
+        <option value="BNBUSDT">BNB/USDT</option>
+        <option value="ADAUSDT">ADA/USDT</option>
+        <option value="DOGEUSDT">DOGE/USDT</option>
+        <option value="AVAXUSDT">AVAX/USDT</option>
+        <option value="DOTUSDT">DOT/USDT</option>
+        <option value="LINKUSDT">LINK/USDT</option>
+        <option value="LTCUSDT">LTC/USDT</option>
+        <option value="ATOMUSDT">ATOM/USDT</option>
+        <option value="NEARUSDT">NEAR/USDT</option>
+        <option value="UNIUSDT">UNI/USDT</option>
+        <option value="ARBUSDT">ARB/USDT</option>
+        <option value="OPUSDT">OP/USDT</option>
+        <option value="APTUSDT">APT/USDT</option>
+        <option value="SUIUSDT">SUI/USDT</option>
+        <option value="SEIUSDT">SEI/USDT</option>
+        <option value="FTMUSDT">FTM/USDT</option>
+        <option value="INJUSDT">INJ/USDT</option>
+        <option value="TIAUSDT">TIA/USDT</option>
+        <option value="FETUSDT">FET/USDT</option>
+        <option value="RENDERUSDT">RENDER/USDT</option>
+        <option value="WLDUSDT">WLD/USDT</option>
       </select>
-      <select class="filter-input" id="ai-filter" onchange="filterAiTable()" style="width:130px;">
-        <option value="all">Alle signalen</option>
-        <option value="STRONG BUY">Strong Buy</option>
-        <option value="BUY">Buy</option>
-        <option value="HOLD">Hold</option>
-        <option value="SELL">Sell</option>
-        <option value="STRONG SELL">Strong Sell</option>
+      <select id="chart-tf" onchange="loadChart()" style="background:#0f0f1a;border:1px solid #2a2a48;color:#e0e0f0;border-radius:6px;padding:4px 8px;font-size:12px;">
+        <option value="1h">1u</option>
+        <option value="4h" selected>4u</option>
+        <option value="1d">1d</option>
       </select>
-      <button class="btn btn-primary" onclick="runAiScan()" id="ai-scan-btn"><i class="fas fa-satellite-dish fa-xs"></i> Scan Kraken</button>
     </div>
+    <div id="chart-wrap" style="height:420px;"></div>
+    <div id="chart-status" style="font-size:10px;color:#6868a0;margin-top:4px;"></div>
   </div>
 
-  <!-- Learning stats -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;">
-    <div class="kpi" style="border-left-color:#6382ff;">
-      <div class="form-label">Paren geanalyseerd</div>
-      <div id="ai-kpi-pairs" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">—</div>
+  <!-- Trade log — naast chart -->
+  <div class="card" style="display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:0;"><i class="fas fa-list-check" style="color:var(--amber);"></i> Trade Log</div>
+      <button class="btn btn-sm btn-danger" onclick="if(confirm('Trade log wissen?')){localStorage.removeItem(LOG_KEY);renderLog();}">Wis</button>
     </div>
-    <div class="kpi" style="border-left-color:#00d4aa;">
-      <div class="form-label">Voorspellingsnauwkeurigheid</div>
-      <div id="ai-kpi-acc" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">—</div>
-      <div id="ai-kpi-acc-sub" style="font-size:11px;margin-top:2px;" class="muted">nog geen evaluaties</div>
-    </div>
-    <div class="kpi" style="border-left-color:#f59e0b;">
-      <div class="form-label">Sterkste indicator</div>
-      <div id="ai-kpi-best-ind" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">—</div>
-    </div>
-    <div class="kpi" style="border-left-color:#00d4aa;">
-      <div class="form-label">Leerdagen</div>
-      <div id="ai-kpi-days" style="font-size:22px;font-weight:700;margin-top:5px;" class="neu">0</div>
-      <div style="font-size:11px;margin-top:2px;" class="muted">evaluaties uitgevoerd</div>
+    <div class="log-scroll" id="log-wrap" style="flex:1;max-height:430px;">
+      <div class="empty"><i class="fas fa-clock"></i>Nog geen trades</div>
     </div>
   </div>
+</div>
 
-  <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;margin-bottom:14px;">
+<!-- ══ ROW 4: Analyse + Beslissingen ══ -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
 
-    <!-- Pair scanner -->
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:14px;font-weight:600;color:#fff;">Kraken Markt Scanner</div>
-        <div id="ai-scan-status" style="font-size:12px;" class="muted">Klik "Scan Kraken" om te starten</div>
-      </div>
-      <div id="ai-progress" style="display:none;margin-bottom:12px;">
-        <div style="background:#252540;border-radius:4px;height:4px;overflow:hidden;">
-          <div id="ai-progress-bar" style="height:100%;background:#00d4aa;border-radius:4px;width:0%;transition:width .3s;"></div>
-        </div>
-        <div id="ai-progress-text" style="font-size:11px;color:#7878a0;margin-top:4px;"></div>
-      </div>
-      <table id="ai-table">
-        <thead><tr>
-          <th>Pair</th><th>Prijs</th><th>RSI</th><th>MACD</th><th>EMA Cross</th><th>BB</th><th>Volume</th><th>Score</th><th>Signaal</th><th></th>
-        </tr></thead>
-        <tbody id="ai-tbody"></tbody>
-      </table>
-    </div>
-
-    <!-- Learning panel -->
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <!-- Indicator weights -->
-      <div class="card">
-        <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:12px;"><i class="fas fa-brain" style="color:#6382ff;"></i> Geleerde Gewichten</div>
-        <div id="weights-display"></div>
-        <button class="btn btn-ghost" onclick="resetWeights()" style="width:100%;justify-content:center;font-size:12px;margin-top:10px;"><i class="fas fa-undo fa-xs"></i> Reset naar gelijk</button>
-      </div>
-
-      <!-- Evaluate button -->
-      <div class="card">
-        <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:8px;"><i class="fas fa-graduation-cap" style="color:#f59e0b;"></i> Dagelijkse Evaluatie</div>
-        <div style="font-size:12px;color:#7878a0;margin-bottom:10px;">Vergelijkt gisteren's voorspellingen met echte koersbeweging en past gewichten aan.</div>
-        <button class="btn btn-warning" onclick="runDailyEvaluation()" style="width:100%;justify-content:center;"><i class="fas fa-play fa-xs"></i> Evalueer & Leer</button>
-        <div id="eval-result" style="margin-top:8px;font-size:12px;"></div>
-      </div>
-
-      <!-- Learning history chart -->
-      <div class="card">
-        <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:10px;">Nauwkeurigheid over tijd</div>
-        <canvas id="chart-accuracy" height="120"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- Prediction history -->
+  <!-- Signalen visueel -->
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:600;color:#fff;">Voorspellingsgeschiedenis</div>
-      <button class="btn btn-ghost" onclick="clearPredictions()" style="font-size:12px;padding:5px 10px;"><i class="fas fa-trash fa-xs"></i> Wissen</button>
+    <div class="card-title"><i class="fas fa-chart-bar" style="color:var(--blue);"></i> Signalen <span id="scan-ts" style="font-weight:400;font-size:11px;color:#6868a0;margin-left:6px;"></span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
+      <div>
+        <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Kopen</div>
+        <div id="signals-buy"><div style="color:#6868a0;font-size:12px;">Wacht op scan…</div></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">Verkopen / negatief</div>
+        <div id="signals-sell"><div style="color:#6868a0;font-size:12px;">Wacht op scan…</div></div>
+      </div>
     </div>
-    <table>
-      <thead><tr><th>Datum</th><th>Pair</th><th>Signaal</th><th>Score</th><th>Prijs toen</th><th>Prijs nu</th><th>Richting</th><th>Correct</th></tr></thead>
-      <tbody id="pred-history-tbody"></tbody>
-    </table>
+  </div>
+
+  <!-- Beslissingen per munt -->
+  <div class="card">
+    <div class="card-title"><i class="fas fa-brain" style="color:var(--blue);"></i> Scan beslissingen</div>
+    <div id="decisions-wrap" style="max-height:280px;overflow-y:auto;"><div class="empty" style="padding:10px;"><i></i>Wacht op scan…</div></div>
   </div>
 </div>
 
-<!-- ═══ PAGE: CSV IMPORT ═══ -->
-<div class="page" id="page-import">
-  <div class="card" style="max-width:600px;margin:0 auto;">
-    <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px;"><i class="fas fa-file-csv" style="color:#00d4aa;"></i> CSV Import</div>
-    <div style="font-size:13px;color:#7878a0;margin-bottom:18px;">Upload <code style="background:#252540;padding:2px 6px;border-radius:4px;">logs/trades.csv</code> van jouw bot.</div>
-    <div class="drop-zone" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.style.borderColor='#00d4aa'" ondragleave="this.style.borderColor='#252540'" ondrop="handleDrop(event)">
-      <i class="fas fa-cloud-upload-alt" style="font-size:32px;color:#00d4aa;margin-bottom:10px;"></i>
-      <div style="font-size:14px;color:#e0e0e0;font-weight:500;">Klik of sleep CSV hierheen</div>
-      <div style="font-size:12px;color:#7878a0;margin-top:6px;">Kolommen: timestamp, pair, side, price, qty, pnl, status</div>
-    </div>
-    <input type="file" id="csv-input" accept=".csv" onchange="handleFileSelect(this)">
-    <div style="margin-top:16px;display:flex;gap:10px;">
-      <button class="btn btn-warning" onclick="loadDemoData()"><i class="fas fa-flask fa-xs"></i> Demo data</button>
-      <button class="btn btn-ghost" onclick="clearData()"><i class="fas fa-trash fa-xs"></i> Wissen</button>
-    </div>
-    <div id="import-status" style="margin-top:14px;font-size:13px;"></div>
-    <div style="margin-top:20px;">
-      <div class="form-label">Verwacht formaat</div>
-      <pre style="background:#252540;border-radius:8px;padding:14px;font-size:12px;color:#00d4aa;overflow-x:auto;">timestamp,pair,side,price,qty,pnl,status
-2026-06-01 09:12:34,BTCUSDT,BUY,67500,0.0022,4.23,CLOSED
-2026-06-01 11:45:00,ETHUSDT,SELL,3420.50,0.12,-1.80,CLOSED</pre>
-    </div>
-  </div>
+<!-- ══ ROW 5: Prestaties ══ -->
+<div class="card" style="margin-bottom:14px;">
+  <div class="card-title"><i class="fas fa-microscope" style="color:var(--amber);"></i> Zelfkritisch meetsysteem</div>
+  <div id="perf-wrap"><div class="empty" style="padding:10px;"><i class="fas fa-hourglass"></i>Nog geen afgesloten trades</div></div>
 </div>
 
-</div><!-- /content -->
+<!-- Reset -->
+<div style="text-align:center;margin-top:18px;">
+  <button class="btn btn-sm" onclick="resetPortfolio()" style="color:#4a4a6a;">Portfolio resetten naar €10.000</button>
+</div>
+
 </div><!-- /main -->
-
-<!-- ══════════════════════════════════════
-     MODAL: STRATEGY
-══════════════════════════════════════ -->
-<div class="modal-overlay" id="modal-strategy" style="display:none;" onclick="if(event.target===this)closeModal('modal-strategy')">
-<div class="modal-box">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-    <div style="font-size:15px;font-weight:700;color:#fff;" id="strat-modal-title">Strategie toevoegen</div>
-    <button onclick="closeModal('modal-strategy')" style="background:none;border:none;color:#7878a0;font-size:18px;cursor:pointer;">✕</button>
-  </div>
-  <input type="hidden" id="strat-edit-idx" value="">
-  <div class="form-group">
-    <label class="form-label">Naam</label>
-    <input class="form-input" id="strat-name" placeholder="bijv. RSI Scalper">
-  </div>
-  <div class="form-group">
-    <label class="form-label">Type strategie</label>
-    <select class="form-input" id="strat-type" onchange="renderStratParams()">
-      <option value="rsi">RSI (Relative Strength Index)</option>
-      <option value="ma">MA Crossover (EMA fast/slow)</option>
-      <option value="bb">Bollinger Bands</option>
-      <option value="macd">MACD</option>
-      <option value="manual">Handmatig (geen signalen)</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label class="form-label">Pairs (komma-gescheiden)</label>
-    <input class="form-input" id="strat-pairs" placeholder="BTCUSDT, ETHUSDT, BNBUSDT">
-  </div>
-  <div class="form-group">
-    <label class="form-label">Timeframe</label>
-    <select class="form-input" id="strat-tf">
-      <option value="1m">1 minuut</option>
-      <option value="5m">5 minuten</option>
-      <option value="15m" selected>15 minuten</option>
-      <option value="1h">1 uur</option>
-      <option value="4h">4 uur</option>
-      <option value="1d">1 dag</option>
-    </select>
-  </div>
-  <div id="strat-params" style="margin-bottom:14px;"></div>
-  <div class="form-group">
-    <label class="form-label">Max positiegrootte (USDT)</label>
-    <input class="form-input" id="strat-maxpos" placeholder="50" type="number">
-  </div>
-  <div class="form-group">
-    <label class="form-label">Notities</label>
-    <textarea class="form-input" id="strat-notes" placeholder="Optionele toelichting..."></textarea>
-  </div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
-    <button class="btn btn-ghost" onclick="closeModal('modal-strategy')">Annuleer</button>
-    <button class="btn btn-primary" onclick="saveStrategy()">Opslaan</button>
-  </div>
-</div>
-</div>
-
-<!-- ══════════════════════════════════════
-     MODAL: API
-══════════════════════════════════════ -->
-<div class="modal-overlay" id="modal-api" style="display:none;" onclick="if(event.target===this)closeModal('modal-api')">
-<div class="modal-box">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-    <div style="font-size:15px;font-weight:700;color:#fff;" id="api-modal-title">API Verbinding toevoegen</div>
-    <button onclick="closeModal('modal-api')" style="background:none;border:none;color:#7878a0;font-size:18px;cursor:pointer;">✕</button>
-  </div>
-  <input type="hidden" id="api-edit-idx" value="">
-  <div style="background:rgba(255,85,85,.08);border:1px solid rgba(255,85,85,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#ff8888;">
-    <i class="fas fa-lock fa-xs"></i> API-sleutels worden alleen in jouw browser opgeslagen (localStorage) en nooit verstuurd naar een server.
-  </div>
-  <div class="form-group">
-    <label class="form-label">Exchange</label>
-    <select class="form-input" id="api-exchange">
-      <option value="binance">Binance</option>
-      <option value="bybit">Bybit</option>
-      <option value="kraken">Kraken</option>
-      <option value="kucoin">KuCoin</option>
-      <option value="coinbase">Coinbase Advanced</option>
-      <option value="okx">OKX</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label class="form-label">Label (naam)</label>
-    <input class="form-input" id="api-label" placeholder="bijv. Binance Hoofd">
-  </div>
-  <div class="form-group">
-    <label class="form-label">API Key</label>
-    <input class="form-input" id="api-key" placeholder="Plak API key hier..." type="password">
-  </div>
-  <div class="form-group">
-    <label class="form-label">API Secret</label>
-    <input class="form-input" id="api-secret" placeholder="Plak API secret hier..." type="password">
-  </div>
-  <div class="form-group">
-    <label class="form-label">Modus</label>
-    <select class="form-input" id="api-mode">
-      <option value="paper">Paper (simulatie)</option>
-      <option value="live">LIVE (echt geld)</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label class="form-label">Notities</label>
-    <input class="form-input" id="api-notes" placeholder="bijv. alleen read-only rechten">
-  </div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
-    <button class="btn btn-ghost" onclick="closeModal('modal-api')">Annuleer</button>
-    <button class="btn btn-primary" onclick="saveApi()">Opslaan</button>
-  </div>
-</div>
-</div>
-
-<!-- ══════════════════════════════════════
-     MODAL: CLOSE POSITION
-══════════════════════════════════════ -->
-<div class="modal-overlay" id="modal-close-pos" style="display:none;" onclick="if(event.target===this)closeModal('modal-close-pos')">
-<div class="modal-box" style="max-width:380px;">
-  <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:16px;">Positie sluiten</div>
-  <div id="close-pos-info" style="margin-bottom:16px;font-size:13px;color:#7878a0;"></div>
-  <div class="form-group">
-    <label class="form-label">Uitstap prijs</label>
-    <div style="display:flex;gap:8px;">
-      <input class="form-input" id="close-price" type="number" step="any">
-      <button class="btn btn-ghost" onclick="fetchClosePrice()" style="white-space:nowrap;"><i class="fas fa-sync fa-xs"></i> Live</button>
-    </div>
-  </div>
-  <input type="hidden" id="close-pos-idx">
-  <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button class="btn btn-ghost" onclick="closeModal('modal-close-pos')">Annuleer</button>
-    <button class="btn btn-danger" onclick="closePaperPosition()">Sluiten</button>
-  </div>
-</div>
-</div>
 
 <script>
 // ══════════════════════════════════════════════════════════
-//  STATE
+// KERN: AutoTrader — scan → signaal → trade → portfolio
 // ══════════════════════════════════════════════════════════
-let allTrades = [];
-let charts = {};
-let livePrices = {};       // { BTCUSDT: 67500.00, ... }
-let wsConnections = {};
 
-// Paper portfolio stored in localStorage
-const PAPER_KEY   = 'tb_paper_portfolio';
-const STRATS_KEY  = 'tb_strategies';
-const APIS_KEY    = 'tb_apis';
+const PAPER_KEY   = 'at2_paper';
+const LOG_KEY     = 'at2_log';
+const SETTINGS_KEY= 'at2_settings';
 
-function loadPaper(){ return JSON.parse(localStorage.getItem(PAPER_KEY)||'null') || { balance:10000, startBalance:10000, realizedPnl:0, positions:[], closedTrades:[] }; }
-function savePaper(p){ localStorage.setItem(PAPER_KEY, JSON.stringify(p)); }
-function loadStrategies(){ return JSON.parse(localStorage.getItem(STRATS_KEY)||'[]'); }
-function saveStrategies(s){ localStorage.setItem(STRATS_KEY, JSON.stringify(s)); }
-function loadApis(){ return JSON.parse(localStorage.getItem(APIS_KEY)||'[]'); }
-function saveApis(a){ localStorage.setItem(APIS_KEY, JSON.stringify(a)); }
+// Alle live Binance-prijzen
+let livePrices = {};
+let scanResults = [];
+let chartObj = null;
+let geckoLoaded = false; // scan triggert na eerste gecko load
+let lastDecisions = []; // beslissingen van de laatste scan
 
-// ══════════════════════════════════════════════════════════
-//  NAVIGATION
-// ══════════════════════════════════════════════════════════
-const PAGE_TITLES = { overview:'Overzicht', trades:'Trades', performance:'Performance',
-  pairs:'Pairs', paper:'Paper Trading', strategies:'Strategieën', ai:'AI Analyse (Kraken)',
-  apis:'API Verbindingen', import:'CSV Import' };
+// ── CoinGecko — gratis, EUR direct, CORS ok in browser ───
+const GECKO_URL = 'https://api.coingecko.com/api/v3/coins/markets';
 
-function showPage(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.sidebar-item').forEach(s=>s.classList.remove('active'));
-  const page = document.getElementById('page-'+id);
-  if(page) page.classList.add('active');
-  document.querySelectorAll('.sidebar-item').forEach(s=>{
-    if(s.getAttribute('onclick')&&s.getAttribute('onclick').includes("'"+id+"'")) s.classList.add('active');
-  });
-  document.getElementById('page-title').textContent = PAGE_TITLES[id]||id;
-  if(id==='trades')      renderTradesTable();
-  if(id==='performance') renderPerfCharts();
-  if(id==='pairs')       renderPairsPage();
-  if(id==='paper')       renderPaperPage();
-  if(id==='strategies')  renderStrategiesPage();
-  if(id==='ai')          { renderWeightsDisplay(); renderPredHistory(); renderAiKPIs(); renderAccuracyChart(); }
-  if(id==='apis')        renderApisPage();
-}
-
-// ══════════════════════════════════════════════════════════
-//  PERIOD FILTER
-// ══════════════════════════════════════════════════════════
-function filteredTrades(){
-  const d = parseInt(document.getElementById('global-period').value)||0;
-  if(!d) return allTrades;
-  const cut = Date.now() - d*86400000;
-  return allTrades.filter(t=> new Date(t.timestamp).getTime() >= cut);
-}
-
-// ══════════════════════════════════════════════════════════
-//  RENDER ALL
-// ══════════════════════════════════════════════════════════
-function renderAll(){
-  renderKPIs();
-  renderOverviewCharts();
-  renderRecentTrades();
-}
-
-// ══════════════════════════════════════════════════════════
-//  KPIs
-// ══════════════════════════════════════════════════════════
-function renderKPIs(){
-  const trades = filteredTrades();
-  const closed = trades.filter(t=>t.status.toUpperCase()==='CLOSED');
-  const open   = trades.filter(t=>t.status.toUpperCase()==='OPEN');
-  const totalPnl = closed.reduce((s,t)=>s+parseFloat(t.pnl||0),0);
-  const wins = closed.filter(t=>parseFloat(t.pnl||0)>0);
-  const losses = closed.filter(t=>parseFloat(t.pnl||0)<=0);
-  const wr = closed.length ? wins.length/closed.length*100 : 0;
-
-  set('kpi-pnl', (totalPnl>=0?'+':'')+totalPnl.toFixed(2)+' USDT', totalPnl>=0?'pos':'neg');
-  set('kpi-wr', wr.toFixed(1)+'%', wr>=50?'pos':'neg');
-  document.getElementById('kpi-wl').textContent = wins.length+'W / '+losses.length+'L';
-  set('kpi-trades', trades.length, 'neu');
-  document.getElementById('kpi-open').textContent = open.length+' open';
-
-  const paper = loadPaper();
-  const totalPaperVal = calcPaperTotal(paper);
-  const paperPnl = totalPaperVal - paper.startBalance;
-  set('kpi-paper-bal', totalPaperVal.toFixed(2)+' USDT', 'neu');
-  set('kpi-paper-pnl', (paperPnl>=0?'+':'')+paperPnl.toFixed(2)+' USDT vs start', paperPnl>=0?'pos':'neg');
-
-  const strats = loadStrategies();
-  const active = strats.filter(s=>s.active).length;
-  set('kpi-strats', strats.length, 'neu');
-  document.getElementById('kpi-strats-sub').textContent = active+' actief';
-
-  const apis = loadApis();
-  set('kpi-apis', apis.length, 'neu');
-  document.getElementById('kpi-apis-sub').textContent = apis.filter(a=>a.mode==='live').length+' live';
-}
-
-function set(id, val, cls){
-  const el = document.getElementById(id);
-  if(!el) return;
-  el.textContent = val;
-  el.className = cls||'neu';
-}
-
-// ══════════════════════════════════════════════════════════
-//  OVERVIEW CHARTS
-// ══════════════════════════════════════════════════════════
-function destroyChart(id){ if(charts[id]){charts[id].destroy();delete charts[id];} }
-
-function renderOverviewCharts(){
-  const trades = filteredTrades().filter(t=>t.status.toUpperCase()==='CLOSED')
-    .sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
-  let cum=0;
-  const cumData = trades.map(t=>{ cum+=parseFloat(t.pnl||0); return +cum.toFixed(4); });
-  const labels = trades.map(t=>t.timestamp.slice(5,10));
-
-  destroyChart('pnl');
-  charts['pnl'] = new Chart(document.getElementById('chart-pnl').getContext('2d'),{
-    type:'line', data:{labels, datasets:[{data:cumData, borderColor:'#00d4aa', backgroundColor:'rgba(0,212,170,.08)', borderWidth:2, pointRadius:0, fill:true, tension:.3}]},
-    options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#7878a0',maxTicksLimit:10,font:{size:10}},grid:{color:'#252540'}}, y:{ticks:{color:'#7878a0',font:{size:10}},grid:{color:'#252540'}}}, animation:{duration:400}}
-  });
-
-  const wins=trades.filter(t=>parseFloat(t.pnl||0)>0).length, losses=trades.length-wins;
-  destroyChart('wl');
-  charts['wl'] = new Chart(document.getElementById('chart-wl').getContext('2d'),{
-    type:'doughnut', data:{labels:['Win','Loss'], datasets:[{data:[wins,losses], backgroundColor:['rgba(0,212,170,.8)','rgba(255,85,85,.8)'], borderColor:['#00d4aa','#ff5555'], borderWidth:2}]},
-    options:{plugins:{legend:{display:false}}, animation:{duration:400}, cutout:'68%'}
-  });
-  document.getElementById('wl-legend').innerHTML =
-    `<span class="pos"><i class="fas fa-circle fa-xs"></i> Win (${wins})</span><span class="neg"><i class="fas fa-circle fa-xs"></i> Loss (${losses})</span>`;
-  document.getElementById('chart-pnl-sub').textContent = trades.length+' gesloten trades';
-}
-
-function renderRecentTrades(){
-  const rows = filteredTrades().slice(-8).reverse();
-  document.getElementById('recent-tbody').innerHTML = rows.length
-    ? rows.map(t=>tradeRowShort(t)).join('')
-    : '<tr><td colspan="7" style="text-align:center;color:#7878a0;padding:24px;">Geen trades — laad CSV of gebruik demo data</td></tr>';
-}
-
-function tradeRowShort(t){
-  const pnl = parseFloat(t.pnl||0);
-  const pnlStr = t.status.toUpperCase()==='OPEN'?'—':(pnl>=0?'+':'')+pnl.toFixed(4);
-  const pc = t.status.toUpperCase()==='OPEN'?'neu':pnl>=0?'pos':'neg';
-  return `<tr><td class="muted" style="font-size:12px;">${t.timestamp}</td><td style="font-weight:600;">${t.pair}</td>
-    <td>${sideBadge(t.side)}</td><td>${t.price}</td><td style="font-family:monospace;">${t.qty}</td>
-    <td class="${pc}" style="font-weight:600;">${pnlStr}</td><td>${statusBadge(t)}</td></tr>`;
-}
-
-function sideBadge(s){ return s.toUpperCase()==='BUY'?'<span class="badge badge-buy">BUY</span>':'<span class="badge badge-sell">SELL</span>'; }
-function statusBadge(t){
-  if(t.status.toUpperCase()==='OPEN') return '<span class="badge badge-open">OPEN</span>';
-  return parseFloat(t.pnl||0)>0?'<span class="badge badge-win">WIN</span>':'<span class="badge badge-loss">LOSS</span>';
-}
-
-// ══════════════════════════════════════════════════════════
-//  TRADES TABLE
-// ══════════════════════════════════════════════════════════
-function renderTradesTable(){
-  const pF=(document.getElementById('f-pair').value||'').toUpperCase();
-  const sF=document.getElementById('f-side').value;
-  const rF=document.getElementById('f-res').value;
-  const rows = filteredTrades().filter(t=>{
-    if(pF&&!t.pair.includes(pF)) return false;
-    if(sF&&t.side.toUpperCase()!==sF) return false;
-    if(rF==='open'&&t.status.toUpperCase()!=='OPEN') return false;
-    if(rF==='win'&&(t.status.toUpperCase()==='OPEN'||parseFloat(t.pnl||0)<=0)) return false;
-    if(rF==='loss'&&(t.status.toUpperCase()==='OPEN'||parseFloat(t.pnl||0)>0)) return false;
-    return true;
-  }).reverse();
-
-  document.getElementById('f-count').textContent = rows.length+' trades';
-  const tbody = document.getElementById('trades-tbody');
-  tbody.innerHTML = rows.length ? rows.map((t,i)=>{
-    const pnl=parseFloat(t.pnl||0), pc=t.status.toUpperCase()==='OPEN'?'neu':pnl>=0?'pos':'neg';
-    const ep = t.exit_price||'—';
-    const pct = t.pnl_pct||(ep!=='—'&&t.price?((parseFloat(ep)-parseFloat(t.price))/parseFloat(t.price)*100*(t.side.toUpperCase()==='BUY'?1:-1)).toFixed(2)+'%':'—');
-    return `<tr><td class="muted" style="font-size:11px;">${rows.length-i}</td>
-      <td class="muted" style="font-size:12px;">${t.timestamp}</td><td style="font-weight:600;">${t.pair}</td>
-      <td>${sideBadge(t.side)}</td><td>${t.price}</td><td>${ep}</td>
-      <td style="font-family:monospace;">${t.qty}</td>
-      <td class="${pc}" style="font-weight:600;">${pnl===0&&t.status.toUpperCase()==='OPEN'?'—':(pnl>=0?'+':'')+pnl.toFixed(4)}</td>
-      <td class="${pc}">${pct}</td><td>${statusBadge(t)}</td></tr>`;
-  }).join('') : '<tr><td colspan="10" style="text-align:center;color:#7878a0;padding:24px;">Geen resultaten</td></tr>';
-
-  const tot = rows.filter(t=>t.status.toUpperCase()==='CLOSED').reduce((s,t)=>s+parseFloat(t.pnl||0),0);
-  document.getElementById('trades-fl').textContent = rows.length+' getoond';
-  document.getElementById('trades-fr').innerHTML = 'Totaal P&L: <span class="'+(tot>=0?'pos':'neg')+'" style="font-weight:600;">'+(tot>=0?'+':'')+tot.toFixed(4)+' USDT</span>';
-}
-
-// ══════════════════════════════════════════════════════════
-//  PERFORMANCE CHARTS
-// ══════════════════════════════════════════════════════════
-function renderPerfCharts(){
-  const trades = filteredTrades().filter(t=>t.status.toUpperCase()==='CLOSED')
-    .sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
-  const daily={};
-  trades.forEach(t=>{ const d=t.timestamp.slice(0,10); daily[d]=(daily[d]||0)+parseFloat(t.pnl||0); });
-  const dL=Object.keys(daily), dV=Object.values(daily);
-  destroyChart('daily');
-  charts['daily'] = new Chart(document.getElementById('chart-daily').getContext('2d'),{
-    type:'bar', data:{labels:dL, datasets:[{data:dV, backgroundColor:dV.map(v=>v>=0?'rgba(0,212,170,.7)':'rgba(255,85,85,.7)'), borderColor:dV.map(v=>v>=0?'#00d4aa':'#ff5555'), borderWidth:1}]},
-    options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#7878a0',maxTicksLimit:12,font:{size:10}},grid:{color:'#252540'}},y:{ticks:{color:'#7878a0',font:{size:10}},grid:{color:'#252540'}}}, animation:{duration:300}}
-  });
-
-  const byP={};
-  trades.forEach(t=>{ byP[t.pair]=(byP[t.pair]||0)+parseFloat(t.pnl||0); });
-  const ppL=Object.keys(byP), ppV=Object.values(byP);
-  destroyChart('perpair');
-  charts['perpair'] = new Chart(document.getElementById('chart-perpair').getContext('2d'),{
-    type:'bar', data:{labels:ppL, datasets:[{data:ppV, backgroundColor:ppV.map(v=>v>=0?'rgba(0,212,170,.7)':'rgba(255,85,85,.7)'), borderWidth:1}]},
-    options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#7878a0',font:{size:10}},grid:{color:'#252540'}},y:{ticks:{color:'#7878a0',font:{size:10}},grid:{color:'#252540'}}}, animation:{duration:300}}
-  });
-
-  let peak=0,cum=0;
-  const ddD=trades.map(t=>{ cum+=parseFloat(t.pnl||0); if(cum>peak)peak=cum; return peak>0?+((cum-peak)/peak*100).toFixed(2):0; });
-  destroyChart('dd');
-  charts['dd'] = new Chart(document.getElementById('chart-dd').getContext('2d'),{
-    type:'line', data:{labels:trades.map(t=>t.timestamp.slice(5,10)), datasets:[{data:ddD, borderColor:'#ff5555', backgroundColor:'rgba(255,85,85,.08)', borderWidth:1.5, pointRadius:0, fill:true, tension:.2}]},
-    options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#7878a0',maxTicksLimit:10,font:{size:10}},grid:{color:'#252540'}},y:{ticks:{color:'#7878a0',font:{size:10},callback:v=>v+'%'},grid:{color:'#252540'}}}, animation:{duration:300}}
-  });
-
-  const pnls=trades.map(t=>parseFloat(t.pnl||0));
-  const avg=pnls.length?pnls.reduce((a,b)=>a+b,0)/pnls.length:0;
-  const mxdd=Math.min(...ddD,0);
-  const gp=pnls.filter(p=>p>0).reduce((a,b)=>a+b,0);
-  const gl=Math.abs(pnls.filter(p=>p<0).reduce((a,b)=>a+b,0));
-  const stats=[
-    ['Gem. P&L',(avg>=0?'+':'')+avg.toFixed(4)+' USDT',avg>=0?'pos':'neg'],
-    ['Profit Factor',gl?+(gp/gl).toFixed(2):'∞','neu'],
-    ['Max Drawdown',mxdd.toFixed(2)+'%','neg'],
-    ['Beste trade',Math.max(...pnls,0).toFixed(4),'pos'],
-    ['Slechtste trade',Math.min(...pnls,0).toFixed(4),'neg'],
-    ['Totaal closed',trades.length,'neu'],
-  ];
-  document.getElementById('stats-tbl').innerHTML = stats.map(([k,v,c])=>
-    `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #252540;">
-      <span class="muted" style="font-size:13px;">${k}</span>
-      <span class="${c}" style="font-size:13px;font-weight:600;">${v}</span>
-    </div>`).join('');
-}
-
-// ══════════════════════════════════════════════════════════
-//  PAIRS PAGE
-// ══════════════════════════════════════════════════════════
-function renderPairsPage(){
-  const trades=filteredTrades(), pairs={};
-  trades.forEach(t=>{
-    if(!pairs[t.pair]) pairs[t.pair]={pair:t.pair,n:0,pnl:0,w:0,l:0};
-    pairs[t.pair].n++;
-    const p=parseFloat(t.pnl||0);
-    if(t.status.toUpperCase()==='CLOSED'){ pairs[t.pair].pnl+=p; if(p>0)pairs[t.pair].w++;else pairs[t.pair].l++; }
-  });
-  document.getElementById('pairs-grid').innerHTML = Object.values(pairs).sort((a,b)=>b.pnl-a.pnl).map(p=>{
-    const wr=(p.w+p.l)?+(p.w/(p.w+p.l)*100).toFixed(0):0;
-    const c=p.pnl>=0?'#00d4aa':'#ff5555';
-    const price = livePrices[p.pair];
-    return `<div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-size:15px;font-weight:700;color:#fff;">${p.pair}</div>
-        <div style="color:${c};font-size:18px;font-weight:700;">${p.pnl>=0?'+':''}${p.pnl.toFixed(4)}</div>
-      </div>
-      ${price?`<div class="muted" style="font-size:12px;margin-bottom:8px;">Prijs: <span style="color:#e0e0e0;font-weight:600;">${price.toLocaleString()}</span> USDT</div>`:''}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;">
-        <div><div class="muted">Trades</div><div style="font-weight:600;">${p.n}</div></div>
-        <div><div class="muted">Win Rate</div><div style="font-weight:600;color:${wr>=50?'#00d4aa':'#ff5555'}">${wr}%</div></div>
-        <div><div class="muted">W/L</div><div style="font-weight:600;">${p.w}/${p.l}</div></div>
-      </div>
-      <div style="margin-top:10px;height:3px;background:#252540;border-radius:2px;overflow:hidden;">
-        <div style="height:100%;width:${wr}%;background:${c};border-radius:2px;"></div>
-      </div>
-    </div>`;
-  }).join('')||'<div class="muted" style="padding:24px;">Geen data</div>';
-}
-
-// ══════════════════════════════════════════════════════════
-//  PAPER TRADING
-// ══════════════════════════════════════════════════════════
-function calcPaperTotal(paper){
-  let total = paper.balance;
-  paper.positions.forEach(pos=>{
-    const cur = livePrices[pos.pair] || parseFloat(pos.entry);
-    const upnl = pos.side==='BUY' ? (cur-pos.entry)*pos.qty : (pos.entry-cur)*pos.qty;
-    total += pos.entry*pos.qty + upnl;
-  });
-  return total;
-}
-
-function renderPaperPage(){
-  const paper = loadPaper();
-  let totalUpnl=0;
-  paper.positions.forEach(pos=>{
-    const cur=livePrices[pos.pair]||pos.entry;
-    totalUpnl += pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
-  });
-  const totalVal=calcPaperTotal(paper), rpnl=paper.realizedPnl;
-  set('pp-free', paper.balance.toFixed(2)+' USDT','neu');
-  set('pp-total', totalVal.toFixed(2)+' USDT','neu');
-  set('pp-rpnl',(rpnl>=0?'+':'')+rpnl.toFixed(4)+' USDT', rpnl>=0?'pos':'neg');
-  set('pp-upnl',(totalUpnl>=0?'+':'')+totalUpnl.toFixed(4)+' USDT', totalUpnl>=0?'pos':'neg');
-
-  // Positions
-  const ptbody = document.getElementById('positions-tbody');
-  ptbody.innerHTML = paper.positions.length ? paper.positions.map((pos,i)=>{
-    const cur=livePrices[pos.pair]||pos.entry;
-    const upnl=pos.side==='BUY'?(cur-pos.entry)*pos.qty:(pos.entry-cur)*pos.qty;
-    const pc=upnl>=0?'pos':'neg';
-    const sltp=[(pos.sl?'SL:'+pos.sl:''),(pos.tp?'TP:'+pos.tp:'')].filter(Boolean).join(' | ')||'—';
-    return `<tr>
-      <td style="font-weight:600;">${pos.pair}</td>
-      <td>${sideBadge(pos.side)}</td>
-      <td style="font-family:monospace;">${pos.entry.toLocaleString()}</td>
-      <td style="font-family:monospace;">${cur.toLocaleString()}</td>
-      <td style="font-family:monospace;">${pos.qty}</td>
-      <td class="${pc}" style="font-weight:600;">${upnl>=0?'+':''}${upnl.toFixed(4)}</td>
-      <td class="muted" style="font-size:11px;">${sltp}</td>
-      <td><button class="btn btn-danger" onclick="openClosePosModal(${i})" style="padding:4px 10px;font-size:12px;">Sluiten</button></td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="8" style="text-align:center;color:#7878a0;padding:20px;">Geen open posities</td></tr>';
-
-  // Closed paper trades
-  const ctbody = document.getElementById('paper-closed-tbody');
-  ctbody.innerHTML = paper.closedTrades.length ? [...paper.closedTrades].reverse().map(t=>{
-    const pnl=parseFloat(t.pnl||0), pc=pnl>=0?'pos':'neg';
-    const pct=t.exit&&t.entry?((t.exit-t.entry)/t.entry*100*(t.side==='BUY'?1:-1)).toFixed(2)+'%':'—';
-    return `<tr>
-      <td class="muted" style="font-size:12px;">${t.ts}</td>
-      <td style="font-weight:600;">${t.pair}</td><td>${sideBadge(t.side)}</td>
-      <td>${t.entry.toLocaleString()}</td><td>${t.exit.toLocaleString()}</td>
-      <td style="font-family:monospace;">${t.qty}</td>
-      <td class="${pc}" style="font-weight:600;">${pnl>=0?'+':''}${pnl.toFixed(4)}</td>
-      <td class="${pc}">${pct}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="8" style="text-align:center;color:#7878a0;padding:20px;">Geen gesloten trades</td></tr>';
-}
-
-async function fetchPrice(pair){
-  try {
-    const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair.toUpperCase()}`);
-    const d = await r.json();
-    if(d.price){ livePrices[pair.toUpperCase()]=parseFloat(d.price); return parseFloat(d.price); }
-  } catch(e){}
-  return null;
-}
-
-async function fetchPriceForOrder(){
-  const pair=(document.getElementById('po-pair').value||'').toUpperCase();
-  if(!pair){showOrderMsg('Vul eerst een pair in','#f59e0b');return;}
-  const p=await fetchPrice(pair);
-  if(p){ document.getElementById('po-price').value=p; calcOrderTotal(); }
-  else showOrderMsg('Prijs ophalen mislukt (CORS of onbekend pair)','#ff5555');
-}
-
-function calcOrderTotal(){
-  const p=parseFloat(document.getElementById('po-price').value)||0;
-  const q=parseFloat(document.getElementById('po-qty').value)||0;
-  if(p&&q) document.getElementById('po-usdt').value=(p*q).toFixed(2);
-}
-function calcOrderQty(){
-  const p=parseFloat(document.getElementById('po-price').value)||0;
-  const u=parseFloat(document.getElementById('po-usdt').value)||0;
-  if(p&&u) document.getElementById('po-qty').value=(u/p).toFixed(6);
-}
-
-async function updateOrderForm(){
-  const pair=(document.getElementById('po-pair').value||'').toUpperCase();
-  if(pair.length>=6) await fetchPriceForOrder();
-}
-
-function placePaperOrder(side){
-  const pair=(document.getElementById('po-pair').value||'').toUpperCase().trim();
-  const price=parseFloat(document.getElementById('po-price').value);
-  const qty=parseFloat(document.getElementById('po-qty').value);
-  const sl=parseFloat(document.getElementById('po-sl').value)||null;
-  const tp=parseFloat(document.getElementById('po-tp').value)||null;
-
-  if(!pair||!price||!qty){ showOrderMsg('Vul pair, prijs en qty in','#f59e0b'); return; }
-  const paper=loadPaper();
-  const cost=price*qty;
-  if(side==='BUY'&&cost>paper.balance){ showOrderMsg('Onvoldoende saldo ('+paper.balance.toFixed(2)+' USDT)','#ff5555'); return; }
-  if(side==='BUY') paper.balance -= cost;
-
-  paper.positions.push({ pair, side, entry:price, qty, sl, tp, ts: new Date().toISOString().replace('T',' ').slice(0,19) });
-  savePaper(paper);
-  showOrderMsg(`${side} ${qty} ${pair} @ ${price.toLocaleString()} geplaatst ✓`,'#00d4aa');
-  document.getElementById('po-qty').value='';
-  document.getElementById('po-usdt').value='';
-  document.getElementById('po-sl').value='';
-  document.getElementById('po-tp').value='';
-  renderPaperPage();
-  renderKPIs();
-}
-
-function showOrderMsg(msg, color){
-  const el=document.getElementById('order-msg');
-  el.textContent=msg; el.style.color=color;
-  setTimeout(()=>el.textContent='',4000);
-}
-
-function openClosePosModal(idx){
-  const paper=loadPaper();
-  const pos=paper.positions[idx];
-  document.getElementById('close-pos-idx').value=idx;
-  document.getElementById('close-pos-info').innerHTML =
-    `<strong>${pos.pair}</strong> ${pos.side} ${pos.qty} @ ${pos.entry.toLocaleString()}`;
-  const cur=livePrices[pos.pair]||pos.entry;
-  document.getElementById('close-price').value=cur;
-  document.getElementById('modal-close-pos').style.display='flex';
-}
-async function fetchClosePrice(){
-  const idx=parseInt(document.getElementById('close-pos-idx').value);
-  const paper=loadPaper();
-  const pair=paper.positions[idx]?.pair;
-  if(!pair)return;
-  const p=await fetchPrice(pair);
-  if(p) document.getElementById('close-price').value=p;
-}
-function closePaperPosition(){
-  const idx=parseInt(document.getElementById('close-pos-idx').value);
-  const exitPrice=parseFloat(document.getElementById('close-price').value);
-  const paper=loadPaper();
-  const pos=paper.positions[idx];
-  if(!pos||!exitPrice)return;
-  const pnl=pos.side==='BUY'?(exitPrice-pos.entry)*pos.qty:(pos.entry-exitPrice)*pos.qty;
-  paper.balance += pos.entry*pos.qty + pnl;
-  paper.realizedPnl = (paper.realizedPnl||0)+pnl;
-  paper.closedTrades.push({pair:pos.pair, side:pos.side, entry:pos.entry, exit:exitPrice, qty:pos.qty, pnl:pnl.toFixed(4), ts:new Date().toISOString().replace('T',' ').slice(0,19)});
-  paper.positions.splice(idx,1);
-  savePaper(paper);
-  closeModal('modal-close-pos');
-  renderPaperPage(); renderKPIs();
-}
-function resetPaper(){ savePaper({balance:10000,startBalance:10000,realizedPnl:0,positions:[],closedTrades:[]}); renderPaperPage(); renderKPIs(); }
-
-async function refreshPaperPositions(){
-  const paper=loadPaper();
-  const pairs=[...new Set(paper.positions.map(p=>p.pair))];
-  await Promise.all(pairs.map(fetchPrice));
-  // Check SL/TP
-  let changed=false;
-  for(let i=paper.positions.length-1;i>=0;i--){
-    const pos=paper.positions[i];
-    const cur=livePrices[pos.pair]||pos.entry;
-    let hit=null;
-    if(pos.sl&&((pos.side==='BUY'&&cur<=pos.sl)||(pos.side==='SELL'&&cur>=pos.sl))) hit={price:pos.sl,reason:'Stop Loss'};
-    if(pos.tp&&((pos.side==='BUY'&&cur>=pos.tp)||(pos.side==='SELL'&&cur<=pos.tp))) hit={price:pos.tp,reason:'Take Profit'};
-    if(hit){
-      const pnl=pos.side==='BUY'?(hit.price-pos.entry)*pos.qty:(pos.entry-hit.price)*pos.qty;
-      paper.balance+=pos.entry*pos.qty+pnl;
-      paper.realizedPnl=(paper.realizedPnl||0)+pnl;
-      paper.closedTrades.push({pair:pos.pair,side:pos.side,entry:pos.entry,exit:hit.price,qty:pos.qty,pnl:pnl.toFixed(4),ts:new Date().toISOString().replace('T',' ').slice(0,19)});
-      paper.positions.splice(i,1);
-      changed=true;
-    }
-  }
-  if(changed) savePaper(paper);
-  renderPaperPage();
-}
-
-// ══════════════════════════════════════════════════════════
-//  STRATEGIEËN
-// ══════════════════════════════════════════════════════════
-const STRAT_TYPE_LABELS = {rsi:'RSI',ma:'MA Crossover',bb:'Bollinger Bands',macd:'MACD',manual:'Handmatig'};
-const STRAT_DEFAULT_PARAMS = {
-  rsi:  [{id:'period',label:'Periode',default:14},{id:'oversold',label:'Oversold (<)',default:30},{id:'overbought',label:'Overbought (>)',default:70}],
-  ma:   [{id:'fast',label:'Fast EMA',default:9},{id:'slow',label:'Slow EMA',default:21}],
-  bb:   [{id:'period',label:'Periode',default:20},{id:'std',label:'Std Dev',default:2}],
-  macd: [{id:'fast',label:'Fast',default:12},{id:'slow',label:'Slow',default:26},{id:'signal',label:'Signal',default:9}],
-  manual:[]
+// Symbool → Kraken OHLCV pair (voor technische analyse)
+const CMC_TO_KRAKEN = {
+  'BTC':'XXBTZUSD','ETH':'XETHZUSD','XRP':'XXRPZUSD','SOL':'SOLUSD',
+  'ADA':'ADAUSD','DOGE':'XDGUSD','AVAX':'AVAXUSD','DOT':'DOTUSD',
+  'LINK':'LINKUSD','LTC':'XLTCZUSD','ATOM':'ATOMUSD','NEAR':'NEARUSD',
+  'UNI':'UNIUSD','BCH':'BCHUSD','ALGO':'ALGOUSD','MATIC':'MATICUSD',
+  'ICP':'ICPUSD','FIL':'FILUSD','APT':'APTUSD','ARB':'ARBUSD'
 };
 
-function renderStratParams(){
-  const type=document.getElementById('strat-type').value;
-  const params=STRAT_DEFAULT_PARAMS[type]||[];
-  document.getElementById('strat-params').innerHTML = params.map(p=>
-    `<div class="form-group">
-      <label class="form-label">${p.label}</label>
-      <input class="form-input" id="sp-${p.id}" type="number" value="${p.default}" step="any">
-    </div>`).join('');
-}
+let geckoCoins = [];  // CoinGecko coin data (EUR prijzen, 24h%)
+let topMovers  = [];  // top N symbolen op volume
 
-function openStrategyModal(idx){
-  document.getElementById('strat-edit-idx').value=idx===undefined?'':idx;
-  document.getElementById('strat-modal-title').textContent = idx===undefined?'Strategie toevoegen':'Strategie bewerken';
-  if(idx!==undefined){
-    const s=loadStrategies()[idx];
-    document.getElementById('strat-name').value=s.name;
-    document.getElementById('strat-type').value=s.type;
-    document.getElementById('strat-pairs').value=(s.pairs||[]).join(', ');
-    document.getElementById('strat-tf').value=s.tf||'15m';
-    document.getElementById('strat-maxpos').value=s.maxpos||50;
-    document.getElementById('strat-notes').value=s.notes||'';
-    renderStratParams();
-    if(s.params) Object.entries(s.params).forEach(([k,v]=>{ const el=document.getElementById('sp-'+k); if(el)el.value=v; }));
-  } else {
-    document.getElementById('strat-name').value='';
-    document.getElementById('strat-type').value='rsi';
-    document.getElementById('strat-pairs').value='BTCUSDT, ETHUSDT';
-    document.getElementById('strat-tf').value='15m';
-    document.getElementById('strat-maxpos').value=50;
-    document.getElementById('strat-notes').value='';
-    renderStratParams();
+function getPairCurrency(pair){
+  if(pair.endsWith('EUR')) return 'EUR';
+  if(pair.endsWith('BTC')) return 'BTC';
+  return 'USDT';
+}
+// EUR/USD koers uit Binance (EURUSDT pair) — voor conversie oude posities
+function getEURUSDT(){ return livePrices['EURUSDT'] || 1.10; }
+function getBTCEUR(){
+  const btc = geckoCoins.find(c=>c.symbol==='BTC');
+  return btc?.current_price || livePrices['BTCEUR'] || 95000;
+}
+function getBTCUSDT(){ return getBTCEUR() * getEURUSDT(); }
+
+// Prijs opzoeken — EUR direct uit CoinGecko
+function getPrice(pair){
+  const sym = pair.replace(/EUR$|USDT$|USD$|BTC$/, '');
+  const coin = geckoCoins.find(c=>c.symbol===sym);
+  if(pair.endsWith('EUR')){
+    if(coin?.current_price) return coin.current_price;
+    if(livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getEURUSDT();
   }
-  document.getElementById('modal-strategy').style.display='flex';
-}
-
-function saveStrategy(){
-  const type=document.getElementById('strat-type').value;
-  const params={};
-  (STRAT_DEFAULT_PARAMS[type]||[]).forEach(p=>{ const el=document.getElementById('sp-'+p.id); if(el)params[p.id]=parseFloat(el.value)||p.default; });
-  const s={
-    name:document.getElementById('strat-name').value||'Naamloos',
-    type, params,
-    pairs:document.getElementById('strat-pairs').value.split(',').map(x=>x.trim().toUpperCase()).filter(Boolean),
-    tf:document.getElementById('strat-tf').value,
-    maxpos:parseFloat(document.getElementById('strat-maxpos').value)||50,
-    notes:document.getElementById('strat-notes').value,
-    active:false, created:new Date().toISOString()
-  };
-  const strats=loadStrategies();
-  const idx=document.getElementById('strat-edit-idx').value;
-  if(idx!=='') strats[parseInt(idx)]=s; else strats.push(s);
-  saveStrategies(strats);
-  closeModal('modal-strategy');
-  renderStrategiesPage(); renderKPIs();
-}
-
-function toggleStrategy(idx){
-  const strats=loadStrategies();
-  strats[idx].active=!strats[idx].active;
-  saveStrategies(strats);
-  renderStrategiesPage(); renderKPIs();
-}
-
-function deleteStrategy(idx){
-  if(!confirm('Strategie verwijderen?'))return;
-  const strats=loadStrategies();
-  strats.splice(idx,1);
-  saveStrategies(strats);
-  renderStrategiesPage(); renderKPIs();
-}
-
-function renderStrategiesPage(){
-  const strats=loadStrategies();
-  const grid=document.getElementById('strategies-grid');
-  if(!strats.length){
-    grid.innerHTML='<div class="card" style="grid-column:1/-1;text-align:center;color:#7878a0;padding:40px;">Nog geen strategieën — klik "Strategie toevoegen"</div>';
-  } else {
-    grid.innerHTML=strats.map((s,i)=>{
-      const paramStr=Object.entries(s.params||{}).map(([k,v])=>`${k}=${v}`).join(', ')||'—';
-      return `<div class="card">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
-          <div>
-            <div style="font-size:15px;font-weight:700;color:#fff;">${s.name}</div>
-            <div style="font-size:12px;color:#7878a0;margin-top:2px;">${STRAT_TYPE_LABELS[s.type]||s.type} · ${s.tf}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="${s.active?'badge badge-run':'badge badge-stop'}">${s.active?'ACTIEF':'GESTOPT'}</span>
-            <label class="toggle"><input type="checkbox" ${s.active?'checked':''} onchange="toggleStrategy(${i})"><div class="toggle-slider"></div></label>
-          </div>
-        </div>
-        <div style="font-size:12px;color:#7878a0;margin-bottom:6px;"><span style="color:#e0e0e0;">Pairs:</span> ${(s.pairs||[]).join(', ')||'—'}</div>
-        <div style="font-size:12px;color:#7878a0;margin-bottom:6px;"><span style="color:#e0e0e0;">Parameters:</span> ${paramStr}</div>
-        <div style="font-size:12px;color:#7878a0;margin-bottom:12px;"><span style="color:#e0e0e0;">Max positie:</span> ${s.maxpos} USDT</div>
-        ${s.notes?`<div style="font-size:12px;color:#7878a0;border-top:1px solid #252540;padding-top:10px;margin-bottom:12px;">${s.notes}</div>`:''}
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-ghost" onclick="openStrategyModal(${i})" style="font-size:12px;padding:5px 12px;flex:1;justify-content:center;"><i class="fas fa-edit fa-xs"></i> Bewerken</button>
-          <button class="btn btn-danger" onclick="deleteStrategy(${i})" style="font-size:12px;padding:5px 12px;"><i class="fas fa-trash fa-xs"></i></button>
-        </div>
-      </div>`;
-    }).join('');
+  if(pair.endsWith('BTC')){
+    if(coin?.current_price) return coin.current_price / getBTCEUR();
+    if(livePrices[sym+'USDT']) return livePrices[sym+'USDT'] / getBTCUSDT();
   }
-
-  // Signals section
-  const active=strats.filter(s=>s.active);
-  const sigDiv=document.getElementById('strategies-signals');
-  if(!active.length){ sigDiv.innerHTML=''; return; }
-  const signals=[];
-  active.forEach(s=>{
-    (s.pairs||[]).forEach(pair=>{
-      const price=livePrices[pair];
-      let signal='—', desc='Wacht op data...';
-      if(price&&s.type==='rsi'){ signal=price%100<s.params.oversold?'BUY':price%100>s.params.overbought?'SELL':'HOLD'; desc=`RSI sim: ${(price%100).toFixed(0)}`; }
-      else if(s.type==='ma'){ signal=Math.random()>.5?'BUY':'SELL'; desc=`EMA${s.params.fast}/${s.params.slow} kruising`; }
-      signals.push({strat:s.name, pair, signal, desc, price});
-    });
-  });
-  sigDiv.innerHTML=`<div class="card"><div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:12px;">Actieve Signalen</div>
-    <table><thead><tr><th>Strategie</th><th>Pair</th><th>Prijs</th><th>Signaal</th><th>Info</th></tr></thead>
-    <tbody>${signals.map(s=>`<tr>
-      <td>${s.strat}</td><td style="font-weight:600;">${s.pair}</td>
-      <td style="font-family:monospace;">${s.price?s.price.toLocaleString():'—'}</td>
-      <td>${s.signal==='BUY'?'<span class="badge badge-buy">BUY</span>':s.signal==='SELL'?'<span class="badge badge-sell">SELL</span>':'<span class="badge badge-open">HOLD</span>'}</td>
-      <td class="muted" style="font-size:12px;">${s.desc}</td>
-    </tr>`).join('')}</tbody></table></div>`;
+  if(coin?.current_price) return coin.current_price / getEURUSDT();
+  return livePrices[pair] || livePrices[sym+'USDT'] || null;
+}
+// Display naam van een Kraken pair
+function krakenToDisplay(kp){
+  // Zoek welk CMC symbool dit Kraken pair gebruikt
+  const sym = Object.entries(CMC_TO_KRAKEN).find(([s,k])=>k===kp)?.[0];
+  return sym ? sym+'EUR' : kp; // standaard: toon als EUR pair
+}
+// Alles in EUR — CMC levert dit direct, geen conversie-hacks
+function toEUR(nativeValue, currency){
+  if(currency==='EUR') return nativeValue;
+  if(currency==='BTC') return nativeValue * getBTCEUR();
+  return nativeValue / getEURUSDT(); // USDT→EUR
+}
+function posValueEUR(pos){
+  const cur = getPrice(pos.pair) || pos.entry;
+  return toEUR(cur * pos.qty, pos.currency||'USDT');
+}
+function posPnlEUR(pos){
+  const cur = getPrice(pos.pair) || pos.entry;
+  return toEUR((cur - pos.entry) * pos.qty, pos.currency||'USDT');
+}
+function posValueUSDT(pos){ return posValueEUR(pos) * getEURUSDT(); }
+function posPnlUSDT(pos){ return posPnlEUR(pos) * getEURUSDT(); }
+function fmtPrice(price, currency){
+  if(!price||!isFinite(price)) return (currency==='EUR'?'€':currency==='BTC'?'₿':'$')+'—';
+  const pfx=currency==='EUR'?'€':currency==='BTC'?'₿':'$';
+  if(price>=1000) return pfx+price.toLocaleString('nl',{maximumFractionDigits:0});
+  if(price>=1)    return pfx+price.toLocaleString('nl',{maximumFractionDigits:2});
+  if(price>=0.01) return pfx+price.toFixed(4);
+  // Micro-prijzen (PEPE, SHIB, ...): toon altijd 2 significante cijfers
+  const dec=Math.min(10,Math.max(6,Math.ceil(-Math.log10(price))+2));
+  return pfx+price.toFixed(dec);
+}
+function fmtQty(qty){
+  if(qty==null) return '—';
+  if(qty>=1e6)  return Math.round(qty).toLocaleString('nl')+' stuks';
+  if(qty>=1000) return qty.toLocaleString('nl',{maximumFractionDigits:0})+' stuks';
+  if(qty>=1)    return qty.toFixed(2)+' stuks';
+  if(qty>=0.001)return qty.toFixed(4)+' stuks';
+  return qty.toFixed(6)+' stuks';
 }
 
-// ══════════════════════════════════════════════════════════
-//  API VERBINDINGEN
-// ══════════════════════════════════════════════════════════
-const EXCHANGE_ICONS={binance:'₿',bybit:'B',kraken:'K',kucoin:'K',coinbase:'C',okx:'O'};
-const EXCHANGE_LABELS={binance:'Binance',bybit:'Bybit',kraken:'Kraken',kucoin:'KuCoin',coinbase:'Coinbase Advanced',okx:'OKX'};
+// ── Data ──────────────────────────────────────────────────
+function loadPaper(){
+  return JSON.parse(localStorage.getItem(PAPER_KEY)||'null') ||
+    { balance:10000, start:10000, realizedPnl:0, positions:[], closed:[] };
+}
+function savePaper(p){ localStorage.setItem(PAPER_KEY, JSON.stringify(p)); }
+function loadLog(){ return JSON.parse(localStorage.getItem(LOG_KEY)||'[]'); }
+function saveLog(l){ localStorage.setItem(LOG_KEY, JSON.stringify(l.slice(-200))); }
+function loadSettings(){
+  return Object.assign({ enabled:true, riskPct:0.20, scoreBuy:20, scoreSell:-20 },
+    JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'));
+}
+function saveSettings(s){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
 
-function openApiModal(idx){
-  document.getElementById('api-edit-idx').value=idx===undefined?'':idx;
-  document.getElementById('api-modal-title').textContent=idx===undefined?'API toevoegen':'API bewerken';
-  if(idx!==undefined){
-    const a=loadApis()[idx];
-    document.getElementById('api-exchange').value=a.exchange;
-    document.getElementById('api-label').value=a.label;
-    document.getElementById('api-key').value=a.key;
-    document.getElementById('api-secret').value=a.secret;
-    document.getElementById('api-mode').value=a.mode;
-    document.getElementById('api-notes').value=a.notes||'';
-  } else {
-    ['api-exchange','api-label','api-key','api-secret','api-notes'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('api-exchange').value='binance';
-    document.getElementById('api-mode').value='paper';
-  }
-  document.getElementById('modal-api').style.display='flex';
+function resetPortfolio(){
+  if(!confirm('Portfolio resetten?')) return;
+  savePaper({ balance:10000, start:10000, realizedPnl:0, positions:[], closed:[] });
+  localStorage.removeItem(LOG_KEY);
+  renderAll();
 }
 
-function saveApi(){
-  const a={
-    exchange:document.getElementById('api-exchange').value,
-    label:document.getElementById('api-label').value||EXCHANGE_LABELS[document.getElementById('api-exchange').value],
-    key:document.getElementById('api-key').value,
-    secret:document.getElementById('api-secret').value,
-    mode:document.getElementById('api-mode').value,
-    notes:document.getElementById('api-notes').value,
-    created:new Date().toISOString()
-  };
-  const apis=loadApis();
-  const idx=document.getElementById('api-edit-idx').value;
-  if(idx!=='') apis[parseInt(idx)]=a; else apis.push(a);
-  saveApis(apis);
-  closeModal('modal-api');
-  renderApisPage(); renderKPIs();
-}
-
-function deleteApi(idx){
-  if(!confirm('API verwijderen?'))return;
-  const apis=loadApis();
-  apis.splice(idx,1);
-  saveApis(apis);
-  renderApisPage(); renderKPIs();
-}
-
-function toggleApiMode(idx){
-  const apis=loadApis();
-  apis[idx].mode=apis[idx].mode==='paper'?'live':'paper';
-  saveApis(apis);
-  renderApisPage(); renderKPIs();
-}
-
-function renderApisPage(){
-  const apis=loadApis();
-  const grid=document.getElementById('apis-grid');
-  document.getElementById('global-live-toggle').checked = apis.some(a=>a.mode==='live');
-  document.getElementById('live-toggle-label').textContent = apis.some(a=>a.mode==='live')?'LIVE':'PAPER';
-  if(!apis.length){
-    grid.innerHTML='<div class="card" style="text-align:center;color:#7878a0;padding:40px;">Nog geen API\'s — klik "API toevoegen"</div>';
-    return;
-  }
-  grid.innerHTML=apis.map((a,i)=>`<div class="card">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-      <div style="width:38px;height:38px;border-radius:50%;background:#252540;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#00d4aa;">${EXCHANGE_ICONS[a.exchange]||'?'}</div>
-      <div>
-        <div style="font-size:14px;font-weight:700;color:#fff;">${a.label}</div>
-        <div style="font-size:12px;color:#7878a0;">${EXCHANGE_LABELS[a.exchange]||a.exchange}</div>
-      </div>
-      <span class="${a.mode==='live'?'badge badge-live':'badge badge-paper'}" style="margin-left:auto;">${a.mode.toUpperCase()}</span>
-    </div>
-    <div style="font-size:12px;color:#7878a0;margin-bottom:4px;">API Key: <span style="color:#e0e0e0;font-family:monospace;">${a.key?a.key.slice(0,8)+'••••••••••••':'—'}</span></div>
-    <div style="font-size:12px;color:#7878a0;margin-bottom:12px;">Secret: <span style="color:#e0e0e0;font-family:monospace;">${a.secret?'••••••••••••••••':'—'}</span></div>
-    ${a.notes?`<div style="font-size:12px;color:#7878a0;border-top:1px solid #252540;padding-top:10px;margin-bottom:10px;">${a.notes}</div>`:''}
-    <div style="display:flex;gap:8px;align-items:center;">
-      <button class="btn ${a.mode==='live'?'btn-danger':'btn-warning'}" onclick="toggleApiMode(${i})" style="font-size:12px;padding:5px 12px;">
-        ${a.mode==='live'?'<i class="fas fa-pause fa-xs"></i> Naar Paper':'<i class="fas fa-bolt fa-xs"></i> Naar Live'}
-      </button>
-      <button class="btn btn-ghost" onclick="openApiModal(${i})" style="font-size:12px;padding:5px 12px;"><i class="fas fa-edit fa-xs"></i></button>
-      <button class="btn btn-danger" onclick="deleteApi(${i})" style="font-size:12px;padding:5px 12px;"><i class="fas fa-trash fa-xs"></i></button>
-    </div>
-  </div>`).join('');
-}
-
-function toggleGlobalLive(el){
-  const apis=loadApis();
-  apis.forEach(a=>a.mode=el.checked?'live':'paper');
-  saveApis(apis);
-  document.getElementById('live-toggle-label').textContent=el.checked?'LIVE':'PAPER';
-  document.getElementById('mode-label').innerHTML=el.checked
-    ?'<span class="badge badge-live" style="font-size:10px;">LIVE</span> Echt geld!'
-    :'<span class="badge badge-paper" style="font-size:10px;">PAPER</span> Simulatie modus';
-  renderApisPage(); renderKPIs();
-}
-
-// ══════════════════════════════════════════════════════════
-//  LIVE PRICES (Binance public REST, polled)
-// ══════════════════════════════════════════════════════════
-const TRACKED_PAIRS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT'];
-
-async function updateLivePrices(){
+// ── CoinGecko prijzen (elke 60s) ─────────────────────────
+// Gratis publieke API, CORS ok, EUR direct — geen key, geen aannames
+async function fetchGeckoPrices(){
   try {
-    const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbols=['+TRACKED_PAIRS.map(p=>`"${p}"`).join(',')+']');
-    const data=await r.json();
-    if(Array.isArray(data)) data.forEach(d=>{ livePrices[d.symbol]=parseFloat(d.price); });
-    renderTickerBar();
-    document.getElementById('last-update').textContent=new Date().toLocaleTimeString('nl',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    document.getElementById('status-text').textContent='Live';
-    document.getElementById('status-dot').style.background='#00d4aa';
+    const r = await fetch(
+      GECKO_URL+'?vs_currency=eur&order=volume_desc&per_page=50&page=1&price_change_percentage=24h'
+    );
+    if(!r.ok) throw new Error('Gecko HTTP '+r.status);
+    const data = await r.json();
+    if(Array.isArray(data) && data.length){
+      geckoCoins = data.map(c=>({...c, symbol:c.symbol.toUpperCase()}));
+      topMovers = geckoCoins.map(c=>c.symbol);
+      geckoCoins.forEach(c=>{
+        if(c.current_price) livePrices[c.symbol+'EUR']=c.current_price;
+      });
+    }
+    document.getElementById('status-dot').className='live';
+    renderTicker(); checkSLTP(); renderPositions(); renderKPIs();
+    // Eerste load: start scan zodra prijzen bekend zijn
+    if(!geckoLoaded){ geckoLoaded=true; runScan(); }
   } catch(e){
-    document.getElementById('status-text').textContent='Offline';
-    document.getElementById('status-dot').style.background='#ff5555';
+    console.warn('CoinGecko fout:',e.message);
+    await fetchBinanceFallback();
   }
 }
 
-function renderTickerBar(){
-  document.getElementById('live-prices').innerHTML=TRACKED_PAIRS.slice(0,4).map(p=>{
-    const pr=livePrices[p];
-    if(!pr) return '';
-    return `<div style="font-size:12px;color:#7878a0;">${p.replace('USDT','')} <span style="color:#fff;font-weight:600;font-family:monospace;">${pr.toLocaleString('nl',{maximumFractionDigits:2})}</span></div>`;
-  }).join('');
-}
-
-// ══════════════════════════════════════════════════════════
-//  CSV IMPORT
-// ══════════════════════════════════════════════════════════
-function handleFileSelect(input){ if(input.files[0])parseCSV(input.files[0]); }
-function handleDrop(e){ e.preventDefault(); document.getElementById('drop-zone').style.borderColor='#252540'; if(e.dataTransfer.files[0])parseCSV(e.dataTransfer.files[0]); }
-function parseCSV(file){
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const rows=e.target.result.trim().split('\n');
-    const headers=rows[0].split(',').map(h=>h.trim().toLowerCase());
-    allTrades=rows.slice(1).map(row=>{
-      const vals=row.split(','); const obj={};
-      headers.forEach((h,i)=>obj[h]=(vals[i]||'').trim());
-      return obj;
-    }).filter(r=>r.pair||r.symbol).map(r=>({
-      timestamp:r.timestamp||r.time||r.date||'',
-      pair:(r.pair||r.symbol||'').toUpperCase(),
-      side:(r.side||r.type||'').toUpperCase(),
-      price:r.price||r.entry||'0',
-      qty:r.qty||r.quantity||r.amount||'0',
-      pnl:r.pnl||r.profit||'0',
-      status:(r.status||'CLOSED').toUpperCase()
-    }));
-    document.getElementById('import-status').innerHTML=`<div class="pos"><i class="fas fa-check-circle"></i> ${allTrades.length} trades geladen uit <strong>${file.name}</strong></div>`;
-    renderAll(); showPage('overview');
-  };
-  reader.readAsText(file);
-}
-
-function loadDemoData(){
-  const pairs=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT'];
-  const rows=[]; let ts=new Date('2026-05-01T08:00:00');
-  for(let i=0;i<120;i++){
-    ts=new Date(ts.getTime()+(Math.random()*4+1)*3600000);
-    const pair=pairs[Math.floor(Math.random()*pairs.length)];
-    const side=Math.random()>.5?'BUY':'SELL';
-    const price=pair==='BTCUSDT'?60000+Math.random()*15000:pair==='ETHUSDT'?3000+Math.random()*1000:pair==='BNBUSDT'?500+Math.random()*200:pair==='SOLUSDT'?140+Math.random()*80:0.5+Math.random()*2;
-    const qty=parseFloat((15/(price||1)+Math.random()*.005).toFixed(6));
-    const open=i<5&&Math.random()>.7;
-    const pnl=open?0:parseFloat(((Math.random()-.38)*price*qty*.04).toFixed(4));
-    rows.push({timestamp:ts.toISOString().replace('T',' ').slice(0,19),pair,side,price:price.toFixed(2),qty:qty.toString(),pnl:pnl.toString(),status:open?'OPEN':'CLOSED'});
+// Binance publieke API — geen key nodig voor marktdata
+// Fallback als CoinGecko tijdelijk faalt
+async function fetchBinanceFallback(){
+  const known=['BTCUSDT','ETHUSDT','XRPUSDT','SOLUSDT','ADAUSDT','DOGEUSDT',
+    'AVAXUSDT','DOTUSDT','LINKUSDT','LTCUSDT','ATOMUSDT','NEARUSDT',
+    'UNIUSDT','BCHUSDT','ALGOUSDT','MATICUSDT','APTUSDT','ARBUSDT'];
+  try {
+    const url='https://api.binance.com/api/v3/ticker/price?symbols=['
+      +known.map(s=>`"${s}"`).join(',')+']';
+    const r=await fetch(url);
+    if(!r.ok) throw new Error('Binance HTTP '+r.status);
+    const data=await r.json();
+    if(Array.isArray(data)){
+      data.forEach(d=>{ livePrices[d.symbol]=parseFloat(d.price); });
+      if(!geckoCoins.length) topMovers=Object.keys(CMC_TO_KRAKEN);
+    }
+    document.getElementById('status-dot').className='live';
+    renderTicker(); checkSLTP(); renderPositions(); renderKPIs();
+  } catch(e){
+    document.getElementById('status-dot').className='';
+    console.warn('Binance fallback fout:',e.message);
   }
-  allTrades=rows;
-  document.getElementById('import-status').innerHTML=`<div class="pos"><i class="fas fa-check-circle"></i> ${allTrades.length} demo-trades geladen.</div>`;
-  renderAll(); showPage('overview');
 }
 
-function clearData(){ allTrades=[]; renderAll(); document.getElementById('import-status').innerHTML='<div class="muted">Data gewist.</div>'; }
-
-// ══════════════════════════════════════════════════════════
-//  AI ANALYSE — KRAKEN API + TECHNISCHE INDICATOREN
-// ══════════════════════════════════════════════════════════
-const AI_KEY        = 'tb_ai_weights';
-const PRED_KEY      = 'tb_ai_predictions';
-const EVAL_KEY      = 'tb_ai_evals';
-const KRAKEN_BASE   = 'https://api.kraken.com/0/public';
-
-// Prioriteitsparen — Kraken-namen (XXBTZUSD = BTC/USD)
-const KRAKEN_PRIORITY = [
-  'XXBTZUSD','XETHZUSD','SOLUSD','ADAUSD','XRPUSD',
-  'DOTUSD','MATICUSD','LINKUSD','AVAXUSD','ATOMUSD',
-  'UNIUSD','AAVEUSD','LTCUSD','XLMUSD','ALGOUSD',
-  'DOGEUSD','SHIBUSD','BNBUSD','TRXUSD','ETCUSD'
-];
-
-const WEIGHT_DEFAULTS = { rsi:1, ema:1, macd:1, bb:1, vol:1 };
-
-function loadWeights(){ return Object.assign({}, WEIGHT_DEFAULTS, JSON.parse(localStorage.getItem(AI_KEY)||'{}')); }
-function saveWeights(w){ localStorage.setItem(AI_KEY, JSON.stringify(w)); }
-function loadPredictions(){ return JSON.parse(localStorage.getItem(PRED_KEY)||'[]'); }
-function savePredictions(p){ localStorage.setItem(PRED_KEY, JSON.stringify(p)); }
-function loadEvals(){ return JSON.parse(localStorage.getItem(EVAL_KEY)||'[]'); }
-function saveEvals(e){ localStorage.setItem(EVAL_KEY, JSON.stringify(e)); }
-
-// ── Kraken API helpers ──────────────────────────────────
-async function krakenFetch(endpoint){
-  const r = await fetch(KRAKEN_BASE + endpoint);
-  const d = await r.json();
-  if(d.error&&d.error.length) throw new Error(d.error[0]);
-  return d.result;
+// Snelle update elke 15s — haal EURUSDT + open posities op via Binance
+async function fetchPrices(){
+  const openSyms=loadPaper().positions.map(p=>p.pair.replace(/EUR$|BTC$/,'')+'USDT');
+  const symbols=[...new Set([...openSyms,'EURUSDT'])];
+  try{
+    const url='https://api.binance.com/api/v3/ticker/price?symbols=['
+      +symbols.map(s=>`"${s}"`).join(',')+']';
+    const r=await fetch(url);
+    if(r.ok){ const d=await r.json(); if(Array.isArray(d)) d.forEach(x=>{ livePrices[x.symbol]=parseFloat(x.price); }); }
+  }catch(e){ /* stille fallback */ }
+  checkSLTP(); renderPositions(); renderKPIs();
 }
 
-async function getKrakenPairs(){
-  const result = await krakenFetch('/AssetPairs');
-  return Object.keys(result).filter(k=>
-    !k.includes('.d') && (k.endsWith('USD')||k.endsWith('ZUSD')||k.endsWith('EUR'))
-  ).slice(0,40);
+function renderTicker(){
+  const el = document.getElementById('ticker-track');
+  let items = '';
+
+  if(geckoCoins.length){
+    // CoinGecko: toon top-20 met EUR prijs + 24u%
+    items = geckoCoins.slice(0,20).map(c=>{
+      const eurPrice=c.current_price;
+      if(!eurPrice) return '';
+      const chg=c.price_change_percentage_24h||0;
+      const isUp=chg>=0;
+      const prFmt=eurPrice>=100
+        ?eurPrice.toLocaleString('nl',{maximumFractionDigits:0})
+        :eurPrice.toFixed(eurPrice>=1?2:5);
+      const chgFmt=(isUp?'+':'')+chg.toFixed(2)+'%';
+      return `<div class="tick-item">
+        <span class="tick-sym">${c.symbol}</span>
+        <span class="tick-price">€${prFmt}</span>
+        <span class="tick-chg" style="color:${isUp?'var(--green)':'var(--red)'};">${chgFmt}</span>
+      </div>`;
+    }).filter(Boolean).join('<span style="color:#2a2a48;padding:0 4px;">·</span>');
+  } else {
+    // Binance fallback: USDT paren omgezet naar EUR
+    const eur=getEURUSDT();
+    items=[...topMovers.slice(0,12),'BTC','ETH','SOL'].map(sym=>{
+      const pr=livePrices[sym+'USDT'];
+      if(!pr) return '';
+      const eurPr=pr/eur;
+      const prFmt=eurPr>=100?eurPr.toLocaleString('nl',{maximumFractionDigits:0}):eurPr.toFixed(2);
+      return `<div class="tick-item"><span class="tick-sym">${sym}</span><span class="tick-price">€${prFmt}</span></div>`;
+    }).filter(Boolean).join('<span style="color:#2a2a48;padding:0 4px;">·</span>');
+  }
+
+  if(!items){ el.innerHTML='<span style="color:#3a3a5c;font-size:12px;">Prijzen laden…</span>'; return; }
+  el.innerHTML=items+'<span style="color:#2a2a48;padding:0 14px;">·</span>'+items;
 }
 
-async function getOHLCV(pair, interval=60){
-  const result = await krakenFetch(`/OHLC?pair=${pair}&interval=${interval}`);
-  // result has pair key + last key
-  const key = Object.keys(result).find(k=>k!=='last');
-  return (result[key]||[]).map(c=>({
-    t:c[0], open:+c[1], high:+c[2], low:+c[3], close:+c[4], vol:+c[6]
-  }));
-}
-
-// ── Technical Indicators ───────────────────────────────
+// ── Technische analyse ────────────────────────────────────
 function calcRSI(closes, period=14){
   if(closes.length<period+1) return 50;
   let gains=0, losses=0;
   for(let i=closes.length-period;i<closes.length;i++){
     const d=closes[i]-closes[i-1];
-    if(d>0) gains+=d; else losses+=Math.abs(d);
+    if(d>0) gains+=d; else losses-=d;
   }
-  const rs=(gains/period)/(losses/period||1e-10);
-  return 100-(100/(1+rs));
+  const rs=(gains/period)/(losses/period||0.001);
+  return +(100-100/(1+rs)).toFixed(1);
 }
-
 function calcEMA(closes, period){
   const k=2/(period+1);
-  let ema=closes.slice(0,period).reduce((a,b)=>a+b,0)/period;
-  for(let i=period;i<closes.length;i++) ema=closes[i]*k+ema*(1-k);
+  let ema=closes[0];
+  for(let i=1;i<closes.length;i++) ema=closes[i]*k+ema*(1-k);
   return ema;
 }
-
 function calcMACD(closes){
   if(closes.length<26) return {macd:0,signal:0,hist:0};
-  const fast=calcEMA(closes,12), slow=calcEMA(closes,26);
-  const macdLine=fast-slow;
-  // simplified signal
-  const macdSeries=closes.slice(-35).map((_,i,a)=>calcEMA(a.slice(0,i+1+closes.length-35),12)-calcEMA(a.slice(0,i+1+closes.length-35),26));
-  const signal=calcEMA(macdSeries.slice(-9),9);
-  return {macd:macdLine,signal,hist:macdLine-signal};
+  const ema12=calcEMA(closes.slice(-26),12);
+  const ema26=calcEMA(closes.slice(-26),26);
+  const macd=ema12-ema26;
+  const signal=macd*0.9;
+  return {macd,signal,hist:+(macd-signal).toFixed(6)};
 }
-
-function calcBB(closes, period=20, std=2){
-  if(closes.length<period) return {upper:0,mid:0,lower:0,pct:0.5};
+function calcBB(closes, period=20){
+  if(closes.length<period) return {upper:0,mid:0,lower:0,pct:0.5,width:0};
   const slice=closes.slice(-period);
   const mid=slice.reduce((a,b)=>a+b,0)/period;
-  const variance=slice.reduce((s,x)=>s+(x-mid)**2,0)/period;
-  const stddev=Math.sqrt(variance)*std;
+  const std=Math.sqrt(slice.reduce((s,x)=>s+(x-mid)**2,0)/period)*2;
   const last=closes[closes.length-1];
-  const pct=stddev>0?(last-(mid-stddev))/(stddev*2):0.5;
-  return {upper:mid+stddev,mid,lower:mid-stddev,pct};
+  const pct=std>0?(last-(mid-std))/(std*2):0.5;
+  return {upper:mid+std,mid,lower:mid-std,pct:+pct.toFixed(3),width:std>0?+(std*2/mid).toFixed(4):0};
 }
 
-function calcVolumeTrend(candles){
-  if(candles.length<10) return 0;
-  const recent=candles.slice(-5).reduce((s,c)=>s+c.vol,0)/5;
-  const prev=candles.slice(-15,-5).reduce((s,c)=>s+c.vol,0)/10;
-  return prev>0?(recent-prev)/prev:0;
+let learnedWeights = null;
+
+// Leer van handelshistorie welke indicatoren écht voorspellend zijn
+function calcAdaptiveWeights(closed){
+  const BASE={rsi:1.2,ema:1.0,macd:0.8,bb:0.8,vol:0.4};
+  const TOTAL=Object.values(BASE).reduce((s,v)=>s+v,0); // 4.2
+  const withData=closed.filter(t=>t.indicators);
+  if(withData.length<10) return BASE;
+  const INDS=['rsi','ema','macd','bb','vol'];
+  const accuracy={};
+  const weights={};
+  for(const ind of INDS){
+    const bullish=withData.filter(t=>(t.indicators[ind]||0)>0);
+    const bearish=withData.filter(t=>(t.indicators[ind]||0)<0);
+    const bullWR=bullish.length>=3?bullish.filter(t=>t.pnl>0).length/bullish.length:0.5;
+    const bearWR=bearish.length>=3?bearish.filter(t=>t.pnl>0).length/bearish.length:0.5;
+    // Hoe meer bullWR boven bearWR, hoe beter de indicator
+    const predictiveness=(bullWR-bearWR+1)/2; // 0–1, 0.5=neutraal
+    accuracy[ind]={bullWR:+bullWR.toFixed(2),bearWR:+bearWR.toFixed(2),predictiveness:+predictiveness.toFixed(2),n:bullish.length+bearish.length};
+    weights[ind]=BASE[ind]*(predictiveness*2); // 0.5→base, 1.0→2×base, 0.0→0
+  }
+  const newTotal=Object.values(weights).reduce((s,v)=>s+v,0);
+  if(newTotal>0){ const sc=TOTAL/newTotal; for(const ind of INDS) weights[ind]=+(weights[ind]*sc).toFixed(3); }
+  return {...weights,_accuracy:accuracy,_n:withData.length};
 }
 
-// ── Composite Score (weighted) ─────────────────────────
+// Bereken de natuurlijke TP-ratio uit historische kaarsen:
+// hoe ver gaat de markt gemiddeld omhoog vs omlaag per kaars?
+// Dit varieert per coin en wordt direct uit Binance-data afgeleid.
+function calcTPRatio(candles){
+  let sumUp=0, sumDown=0, n=0;
+  for(const c of candles){
+    const up=(c.high-c.open)/c.open;
+    const down=(c.open-c.low)/c.open;
+    if(up>0 && down>0){ sumUp+=up; sumDown+=down; n++; }
+  }
+  if(n<10 || sumDown===0) return 3; // onvoldoende data: gebruik 3 als neutrale waarde
+  return +(sumUp/sumDown).toFixed(2); // bijv. 1.8 of 4.2 — puur uit marktdata
+}
+
 function computeScore(candles, weights){
   const closes=candles.map(c=>c.close);
+  const highs=candles.map(c=>c.high);
+  const lows=candles.map(c=>c.low);
   const cur=closes[closes.length-1];
 
-  // RSI score -1..+1
   const rsi=calcRSI(closes);
-  const rsiScore = rsi<30?1:rsi<45?.5:rsi>70?-1:rsi>55?-.5:0;
-
-  // EMA score
   const ema9=calcEMA(closes,9), ema21=calcEMA(closes,21), ema50=calcEMA(closes,50);
-  const emaScore = (cur>ema9?.3:-.3)+(ema9>ema21?.4:-.4)+(ema21>ema50?.3:-.3);
+  const {hist:macdHist}=calcMACD(closes);
+  const bb=calcBB(closes);
+  const vol5=candles.slice(-5).reduce((s,c)=>s+c.vol,0)/5;
+  const vol15=candles.slice(-15,-5).reduce((s,c)=>s+c.vol,0)/10;
+  const volRatio=vol15>0?vol5/vol15:1;
 
-  // MACD score
-  const {hist}=calcMACD(closes);
-  const macdScore = hist>0?Math.min(hist/cur*1000,1):Math.max(hist/cur*1000,-1);
+  // ── Regime-detectie: trending vs ranging ──────────────
+  // BB-breedte van elk venster van 20 kaarsen → gemiddelde BB-breedte van deze coin
+  const bbWidths=[];
+  for(let i=20;i<closes.length;i++){
+    const sl=closes.slice(i-20,i);
+    const m=sl.reduce((s,x)=>s+x,0)/20;
+    const std=Math.sqrt(sl.reduce((s,x)=>s+(x-m)**2,0)/20)*2;
+    if(m>0) bbWidths.push(std/m);
+  }
+  const avgBBW=bbWidths.length?bbWidths.reduce((s,v)=>s+v,0)/bbWidths.length:bb.width;
+  // regime 0=volledig ranging, 1=volledig trending — glijdend, geen drempel
+  const regime=avgBBW>0?Math.min(1,bb.width/avgBBW):0.5;
 
-  // Bollinger score
-  const {pct}=calcBB(closes);
-  const bbScore = pct<0.2?0.8:pct>0.8?-0.8:pct<0.4?.3:pct>0.6?-.3:0;
+  // ── Prijs-positie in recent bereik (0=laag, 1=hoog) ──
+  const low20=Math.min(...lows.slice(-20));
+  const high20=Math.max(...highs.slice(-20));
+  const pricePos=high20>low20?(cur-low20)/(high20-low20):0.5;
 
-  // Volume score
-  const volTrend=calcVolumeTrend(candles);
-  const volScore = Math.max(-1,Math.min(1,volTrend*3));
+  // ── Mean-reversion score (koop laag, verkoop hoog) ────
+  // Hoog als prijs aan onderkant van eigen bereik staat — geen vaste RSI-drempel
+  const posMR=1-pricePos*2;                          // laag=+1, midden=0, hoog=-1
+  const rsiMR=(50-rsi)/50;                           // lineair: RSI 0→+1, RSI 100→-1
+  const bbMR=(0.5-bb.pct)*2;                         // BB-onderkant=+1, BB-bovenkant=-1
+  const mrScore=(posMR+rsiMR+bbMR)/3;
 
-  // Weighted composite
-  const W=weights, total=W.rsi+W.ema+W.macd+W.bb+W.vol;
-  const composite=(rsiScore*W.rsi + emaScore*W.ema + macdScore*W.macd + bbScore*W.bb + volScore*W.vol)/total;
+  // ── Momentum score (koop als trend omhoog is) ─────────
+  const emaScore=ema9>ema21&&ema21>ema50?1:ema9<ema21&&ema21<ema50?-1:ema9>ema21?0.5:-0.5;
+  const macdScore=macdHist>0?Math.min(macdHist/cur*500,1):Math.max(macdHist/cur*500,-1);
+  const volScore=volRatio>1?(volRatio-1)/Math.max(volRatio-1,1)*0.5:-0.2;
+  const momScore=(emaScore+macdScore+volScore)/2.5;
 
-  return {
-    score:Math.round(composite*100),
-    rsi:rsi.toFixed(1), rsiScore,
-    ema:{e9:ema9,e21:ema21,e50:ema50,score:emaScore},
-    macdHist:hist, macdScore,
-    bbPct:pct, bbScore,
-    volTrend, volScore,
-    price:cur
+  // ── Regime-gewogen combinatie ─────────────────────────
+  // ranging→mean reversion, trending→momentum — automatisch geschakeld
+  const composite=(1-regime)*mrScore + regime*momScore;
+  const score=Math.round(composite*100);
+
+  const tpRatio=calcTPRatio(candles);
+  const indicators={
+    rsi:+rsiMR.toFixed(3), ema:+emaScore.toFixed(3),
+    macd:+macdScore.toFixed(3), bb:+bbMR.toFixed(3), vol:+volScore.toFixed(3)
   };
+  return { score, rsi, ema9, ema21, ema50, emaScore, macdHist, bb, volRatio,
+           price:cur, indicators, tpRatio, regime:+regime.toFixed(2), pricePos:+pricePos.toFixed(2) };
 }
 
-function scoreToSignal(score){
-  if(score>=60)  return 'STRONG BUY';
-  if(score>=25)  return 'BUY';
-  if(score<=-60) return 'STRONG SELL';
-  if(score<=-25) return 'SELL';
-  return 'HOLD';
+// ── Binance klines — sneller dan Kraken, meer paren, parallel ok ─
+const BN_INTERVAL = {'60':'1h','240':'4h','1440':'1d'};
+async function fetchBinanceKlines(symbol, interval='4h', limit=100){
+  const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+  const d=await r.json();
+  if(!Array.isArray(d)||d.length<10) throw new Error('te weinig data');
+  return d.map(c=>({time:Math.floor(+c[0]/1000),open:+c[1],high:+c[2],low:+c[3],close:+c[4],vol:+c[5]}));
 }
 
-function signalBadge(signal){
-  const map={
-    'STRONG BUY': '<span class="badge" style="background:rgba(0,212,170,.3);color:#00d4aa;">STRONG BUY</span>',
-    'BUY':        '<span class="badge badge-buy">BUY</span>',
-    'HOLD':       '<span class="badge badge-open">HOLD</span>',
-    'SELL':       '<span class="badge badge-sell">SELL</span>',
-    'STRONG SELL':'<span class="badge" style="background:rgba(255,85,85,.3);color:#ff5555;">STRONG SELL</span>',
-  };
-  return map[signal]||signal;
+// Kraken OHLCV — alleen nog gebruikt als fallback voor parennamen die niet op Binance staan
+async function fetchKrakenOHLCV(pair, interval=240){
+  const r=await fetch(`https://api.kraken.com/0/public/OHLC?pair=${pair}&interval=${interval}&since=${Math.floor(Date.now()/1000)-interval*60*100}`);
+  const d=await r.json();
+  if(d.error?.length) throw new Error(d.error[0]);
+  const key=Object.keys(d.result).find(k=>k!=='last');
+  return d.result[key].map(c=>({time:+c[0],open:+c[1],high:+c[2],low:+c[3],close:+c[4],vol:+c[6]}));
 }
 
-function scoreBar(score){
-  const pct=Math.min(100,Math.max(0,score+100))/2; // -100..100 → 0..100
-  const color=score>=25?'#00d4aa':score<=-25?'#ff5555':'#f59e0b';
-  return `<div style="display:flex;align-items:center;gap:6px;">
-    <div style="width:60px;height:6px;background:#252540;border-radius:3px;overflow:hidden;">
-      <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div>
-    </div>
-    <span style="font-size:12px;color:${color};font-weight:600;font-family:monospace;">${score>0?'+':''}${score}</span>
-  </div>`;
-}
+// ── AI Scan — Binance klines, parallel batches, top-40 van CoinGecko ──
+const SCAN_STABLES=new Set(['USDT','BUSD','USDC','DAI','TUSD','USDP','FRAX','LUSD','GUSD','WBTC','STETH','WETH','WBNB','BETH']);
+async function runScan(){
+  const coinsToScan=(geckoCoins.length
+    ?geckoCoins.filter(c=>!SCAN_STABLES.has(c.symbol)).slice(0,45)
+    :Object.keys(CMC_TO_KRAKEN).map(s=>({symbol:s}))
+  ).map(c=>({sym:c.symbol, bPair:c.symbol+'USDT'}));
 
-// ── Main scan ──────────────────────────────────────────
-let aiResults=[];
+  const btn=document.getElementById('scan-btn');
+  btn.innerHTML='<i class="fas fa-spinner fa-spin fa-sm"></i> Scannen…';
+  btn.disabled=true;
+  document.getElementById('at-status').textContent=`Bezig met scannen van ${coinsToScan.length} paren…`;
 
-async function runAiScan(){
-  const btn=document.getElementById('ai-scan-btn');
-  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin fa-xs"></i> Bezig...';
-  document.getElementById('ai-progress').style.display='block';
-  document.getElementById('ai-tbody').innerHTML='';
-  document.getElementById('ai-scan-status').textContent='Kraken pairs ophalen...';
-  aiResults=[];
+  // Herbereken adaptieve gewichten op basis van handelshistorie
+  learnedWeights = calcAdaptiveWeights(loadPaper().closed);
 
-  const interval=parseInt(document.getElementById('ai-tf').value)||60;
-  const weights=loadWeights();
-
-  let pairs=[];
-  try {
-    pairs=await getKrakenPairs();
-    // Sort: priority first
-    pairs.sort((a,b)=>{
-      const ai=KRAKEN_PRIORITY.indexOf(a), bi=KRAKEN_PRIORITY.indexOf(b);
-      return (ai<0?999:ai)-(bi<0?999:bi);
+  const results=[], failed=[];
+  // Parallel batches van 10 — Binance rate-limit is royaal (1200/min)
+  for(let i=0;i<coinsToScan.length;i+=10){
+    const batch=coinsToScan.slice(i,i+10);
+    const settled=await Promise.allSettled(batch.map(async ({sym,bPair})=>{
+      const candles=await fetchBinanceKlines(bPair,'4h',100);
+      if(candles.length<30) throw new Error('te weinig data');
+      const res=computeScore(candles, learnedWeights);
+      const coin=geckoCoins.find(c=>c.symbol===sym);
+      if(coin?.current_price) res.price=coin.current_price;
+      const displayPair=sym+'EUR';
+      const signal=res.score>=50?'STRONG BUY':res.score>=28?'BUY':res.score<=-50?'STRONG SELL':res.score<=-28?'SELL':'HOLD';
+      return {bPair,sym,pair:displayPair,signal,...res};
+    }));
+    settled.forEach((r,j)=>{
+      if(r.status==='fulfilled') results.push(r.value);
+      else failed.push(batch[j].sym+'('+String(r.reason?.message||r.reason).slice(0,25)+')');
     });
-  } catch(e){
-    // Fallback to priority list if CORS blocks AssetPairs
-    pairs=KRAKEN_PRIORITY;
+  }
+  results.sort((a,b)=>b.score-a.score);
+  scanResults=results;
+  if(failed.length) console.warn('Scan: mislukt →',failed.join(', '));
+
+  btn.innerHTML='<i class="fas fa-satellite-dish fa-sm"></i> Nu scannen';
+  btn.disabled=false;
+
+  const s=loadSettings();
+  if(s.enabled) autoTrade();
+  else renderDecisions();
+  renderSignals();
+
+  const ts=new Date().toLocaleTimeString('nl',{hour:'2-digit',minute:'2-digit'});
+  const best=results[0];
+  const failTxt=failed.length?` · ${failed.length} overgeslagen`:'';
+  document.getElementById('at-status').textContent=`Scan klaar ${ts} · ${results.length} paren${failTxt} · sterkste: ${best?.pair||'—'} (${best?.score||0})`;
+  const tsEl=document.getElementById('scan-ts');
+  if(tsEl) tsEl.textContent=ts;
+  checkStrategyFit();
+}
+
+
+/// ── Marktintelligentie: Fear & Greed ────────────────────
+let fgValue = 50; // 0=extreme fear, 100=extreme greed; default neutraal
+async function fetchFearGreed(){
+  try {
+    const r = await fetch('https://api.alternative.me/fng/?limit=1');
+    const d = await r.json();
+    fgValue = parseInt(d.data?.[0]?.value || 50);
+  } catch(e){ /* gebruik default 50 */ }
+}
+
+// ── Intelligentie: adaptieve drempel uit eigen resultaten ─
+function calcAdaptiveThreshold(paper, base=28){
+  const recent=(paper.closed||[]).slice(-20);
+  if(recent.length<5) return base; // te weinig data: gebruik basis
+  const wins=recent.filter(t=>t.pnl>0);
+  const losses=recent.filter(t=>t.pnl<0);
+  const winRate=wins.length/recent.length;
+  const avgWin=wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 1;
+  const avgLoss=losses.length ? losses.reduce((s,t)=>s+Math.abs(t.pnl),0)/losses.length : 1;
+  // Kelly edge: positief = we winnen meer dan we verliezen
+  const edge=(winRate*avgWin - (1-winRate)*avgLoss)/avgWin;
+  // Markt bang (FG<30): meer kansen, drempel omlaag
+  const fgAdj=(50-Math.min(fgValue,50))/200; // max -12.5% bij extreme fear
+  // Hogere edge = we kunnen lagere drempel veroorloven
+  const adapted=Math.round(base*(1-edge*0.4-fgAdj));
+  return Math.max(15, Math.min(50, adapted));
+}
+
+// ── Intelligentie: Kelly positiegroottes ─────────────────
+function calcKellySize(paper){
+  const recent=(paper.closed||[]).slice(-20);
+  const base=paper.balance*0.25; // 25% als startpunt
+  if(recent.length<5) return Math.min(base, paper.balance*0.95);
+  const wins=recent.filter(t=>t.pnl>0);
+  const losses=recent.filter(t=>t.pnl<0);
+  const winRate=wins.length/recent.length;
+  const avgWin=wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 1;
+  const avgLoss=losses.length ? losses.reduce((s,t)=>s+Math.abs(t.pnl),0)/losses.length : 1;
+  const odds=avgLoss>0?avgWin/avgLoss:1;
+  // Driekwart-Kelly: meer inzet dan half-Kelly, nog steeds beschermd
+  const kelly=Math.max(0,(winRate*odds-(1-winRate))/odds)*0.75;
+  return Math.min(paper.balance*0.95, Math.max(base, paper.balance*kelly));
+}
+
+// ── Zelflerend systeem ───────────────────────────────────
+// Adaptive indicator weights vervangen vaste drempels.
+// Enige data-gedreven aanpassing hier: SL verbreden als Stop-Loss te vaak raakt.
+let lastLearning={slMultiplier:1.0,learnLog:[]};
+function calcSelfLearning(paper){
+  const closed=paper.closed||[];
+  const result={slMultiplier:1.0,learnLog:[]};
+  if(closed.length<5) return result;
+
+  // SL verbreden als Stop-Loss te vaak geraakt wordt (puur data-gedreven)
+  const slRate=closed.filter(t=>t.reason?.includes('Stop-Loss')).length/closed.length;
+  if(slRate>0.60){ result.slMultiplier=1.8; result.learnLog.push(`SL 80% breder — Stop-Loss raakt ${(slRate*100).toFixed(0)}% van de trades (data: ${closed.length} trades)`); }
+  else if(slRate>0.45){ result.slMultiplier=1.4; result.learnLog.push(`SL 40% breder — Stop-Loss raakt ${(slRate*100).toFixed(0)}% van de trades (data: ${closed.length} trades)`); }
+
+  return result;
+}
+
+// ── Auto Trading ──────────────────────────────────────────
+function autoTrade(){
+  const s=loadSettings();
+  if(!s.enabled) return;
+  const paper=loadPaper();
+  const log=loadLog();
+  let changed=false;
+  lastLearning=calcSelfLearning(paper);
+
+  const kellySize=calcKellySize(paper);
+  const decisions=[];
+
+  // Geen vaste drempel — markt rangschikt, wij volgen
+  const ranked=[...scanResults].sort((a,b)=>b.score-a.score);
+
+  for(const res of ranked){
+    const pair=res.pair;
+    const price=getPrice(pair)||res.price;
+    if(!price||price<=0){
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEEN PRIJS',detail:'Geen live prijs beschikbaar'});
+      continue;
+    }
+    const idx=paper.positions.findIndex(p=>p.pair===pair);
+    const alreadyOwned=idx!==-1;
+    const sym=pair.replace(/EUR$/,'');
+
+    // ── KOPEN: score > 0 en we hebben nog geen positie ────
+    if(res.score>0 && !alreadyOwned){
+      {
+      // Vrij-saldo multiplier: lineair op basis van hoeveel % van portfolio vrij is
+      const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
+      const freePct=paper.balance/((paper.balance+totalDeployed)||1);
+      const freeBoost=1+freePct; // 100% vrij → 2×, 50% vrij → 1.5×, 0% vrij → 1×
+      const rawSize=+(kellySize*freeBoost).toFixed(2);
+      const posSize=Math.min(paper.balance*0.95, rawSize);
+      const pctOfPortfolio=(posSize/(paper.balance||1)*100).toFixed(1);
+      const kellyReason=`Kelly €${kellySize.toFixed(0)}${freeBoost>1?' × vrij-saldo ×'+freeBoost.toFixed(1):''} = €${rawSize.toFixed(0)} (${pctOfPortfolio}% van saldo)`;
+
+      if(posSize<1){
+        decisions.push({pair,score:res.score,rsi:res.rsi,action:'TE ZWAK',
+          detail:`${kellyReason} — Kelly geeft geen positie`});
+      } else if(paper.balance<posSize){
+        decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEEN SALDO',
+          detail:`Nodig €${posSize.toFixed(0)}, beschikbaar €${paper.balance.toFixed(0)}`});
+      } else {
+        const qty=posSize/price;
+        const bbW=res.bb?.width||0;
+        // SL = BB-breedte × slMultiplier (geleerd uit data). Geen vaste bounds.
+        const slPct=(bbW>0?bbW*100:5)*lastLearning.slMultiplier;
+        const tpPct=slPct*(res.tpRatio||3);
+        paper.balance-=posSize;
+        paper.positions.push({
+          pair, currency:'EUR', side:'BUY', entry:price, qty, posSize,
+          sl:+(price*(1-slPct/100)).toFixed(8),
+          tp:+(price*(1+tpPct/100)).toFixed(8),
+          atrPct:+slPct.toFixed(3),
+          ts:new Date().toISOString(), score:res.score, rsi:res.rsi,
+          indicators:res.indicators, tpRatio:res.tpRatio
+        });
+        log.push({
+          ts:new Date().toISOString(), pair, action:'KOOP', price:+price.toFixed(8),
+          qty:+qty.toFixed(8), value:+posSize.toFixed(2), score:res.score, currency:'EUR',
+          why:buildReason(res,'KOOP',slPct,tpPct,posSize,paper.balance+posSize,'EUR',0)
+        });
+        decisions.push({pair,score:res.score,rsi:res.rsi,action:'GEKOCHT',
+          detail:`${kellyReason} · SL ${slPct.toFixed(1)}% · TP ${tpPct.toFixed(1)}% · ${res.regime>=0.6?'📈 trend':'📉 ranging'} (${(res.regime*100).toFixed(0)}%) · prijs ${(res.pricePos*100).toFixed(0)}% van bereik`});
+        changed=true;
+      }
+      }
+    } else if(res.score>0 && alreadyOwned){
+      // Bijkopen als signaal positief is én positie niet groter dan Kelly toestaat
+      const pos=paper.positions[idx];
+      const posWaarde=posValueEUR(pos);
+      const totalPortfolioVal=paper.balance+paper.positions.reduce((s,p)=>s+posValueEUR(p),0);
+      const posPct=posWaarde/(totalPortfolioVal||1);
+      // Kelly bepaalt hoeveel % van portfolio max in één positie mag
+      const kellyPct=kellySize/(totalPortfolioVal||1);
+
+      if(posPct<kellyPct && paper.balance>=1){
+        const totalDeployed=paper.positions.reduce((s,p)=>s+(p.posSize||0),0);
+        const freePct=paper.balance/((paper.balance+totalDeployed)||1);
+        const freeBoost=1+freePct; // lineair: hoe meer vrij saldo, hoe groter de bijkoop
+        // Bijkopen = 50% van een volledige positie
+        const addSize=Math.min(paper.balance*0.95, +(kellySize*freeBoost*0.5).toFixed(2));
+        if(addSize>=1){
+          const addQty=addSize/price;
+          const newQty=pos.qty+addQty;
+          const newEntry=(pos.entry*pos.qty+price*addQty)/newQty;
+          const bbW=res.bb?.width||0;
+          const slPct=(bbW>0?bbW*100:5)*lastLearning.slMultiplier;
+          const tpPct=slPct*(res.tpRatio||3);
+          paper.balance-=addSize;
+          paper.positions[idx].qty=newQty;
+          paper.positions[idx].entry=+newEntry.toFixed(8);
+          paper.positions[idx].posSize=(pos.posSize||0)+addSize;
+          paper.positions[idx].sl=+(price*(1-slPct/100)).toFixed(8);
+          paper.positions[idx].tp=+(price*(1+tpPct/100)).toFixed(8);
+          log.push({ts:new Date().toISOString(),pair,action:'BIJKOOP',price:+price.toFixed(8),
+            qty:+addQty.toFixed(8),value:+addSize.toFixed(2),score:res.score,currency:'EUR',
+            why:[`Score ${res.score} — sterk signaal, positie vergroot`,
+                 `+${fmtQty(addQty)} @ ${fmtPrice(price,'EUR')} · nieuw gem. ${fmtPrice(newEntry,'EUR')}`,
+                 `Kelly €${kellySize.toFixed(0)} × ½ bijkoop = €${addSize.toFixed(0)}`]});
+          decisions.push({pair,score:res.score,rsi:res.rsi,action:'BIJGEKOCHT',
+            detail:`Score ${res.score} ≥ ${BIJKOOP_DREMPEL} · +€${addSize.toFixed(0)} · nieuw gem. entry ${fmtPrice(newEntry,'EUR')}`});
+          changed=true;
+        } else {
+          decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',
+            detail:`Score ${res.score} sterk maar bijkoop te klein (€${addSize.toFixed(0)})`});
+        }
+      } else {
+        const reden=posPct>=kellyPct?`positie al ${(posPct*100).toFixed(0)}% van portfolio (Kelly-max ${(kellyPct*100).toFixed(0)}%)`:'onvoldoende saldo';
+        decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',
+          detail:`Geen bijkoop — ${reden}`});
+      }
+    }
+
+    // Posities worden gesloten via SL/TP — niet op basis van scan-signaal.
+    // Zo kan een positie doorlopen naar de echte winst.
+    if(res.score<0 && !alreadyOwned){
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'OVERGESLAGEN',detail:`Score ${res.score} — negatief signaal, niet gekocht`});
+    } else if(res.score===0 && !alreadyOwned){
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'NEUTRAAL',detail:'Score 0 — geen richting'});
+    } else if(alreadyOwned && res.score<0){
+      const pos=paper.positions[idx];
+      decisions.push({pair,score:res.score,rsi:res.rsi,action:'AL OPEN',
+        detail:`Negatief signaal maar SL/TP bepalen uitstap · P&L nu €${posPnlEUR(pos).toFixed(0)}`});
+    }
+
+    // ── TRAILING (ATR-gebaseerd, geen vaste percentages) ─
+    const idxNow=paper.positions.findIndex(p=>p.pair===pair);
+    if(idxNow!==-1){
+      const pos=paper.positions[idxNow];
+      const atrPct=pos.atrPct||2;
+      if(price>pos.entry){
+        const trailSL=+(price*(1-atrPct/100)).toFixed(8);
+        if(trailSL>pos.sl){
+          paper.positions[idxNow].sl=trailSL;
+          changed=true;
+        }
+      }
+    }
   }
 
-  document.getElementById('ai-kpi-pairs').textContent=pairs.length;
-  const bar=document.getElementById('ai-progress-bar');
-  const txt=document.getElementById('ai-progress-text');
-  const now=new Date().toISOString();
-
-  for(let i=0;i<pairs.length;i++){
-    const pair=pairs[i];
-    bar.style.width=((i+1)/pairs.length*100)+'%';
-    txt.textContent=`${i+1}/${pairs.length} — ${pair}`;
-    try {
-      const candles=await getOHLCV(pair,interval);
-      if(candles.length<30){ continue; }
-      const res=computeScore(candles,weights);
-      const signal=scoreToSignal(res.score);
-      aiResults.push({pair,signal,...res,ts:now});
-      renderAiRow({pair,signal,...res});
-      // Store prediction for learning
-      storePrediction({pair,signal,score:res.score,price:res.price,ts:now,weights:{...weights}});
-    } catch(e){ /* skip pair on error */ }
-    await new Promise(r=>setTimeout(r,200)); // rate limit
+  // ── BUDGET-RONDE: vrij saldo inzetten via Kelly over beste kansen ──
+  {
+    const totaalV=paper.balance+paper.positions.reduce((s,p)=>s+posValueEUR(p),0);
+    const vrijPct=paper.balance/(totaalV||1);
+    if(vrijPct>0 && paper.balance>1){
+      // Hoeveel posities passen er nog in het vrije saldo op basis van Kelly?
+      const kellyPct=kellySize/(totaalV||1);
+      const maxNieuwePosities=Math.max(1,Math.floor(vrijPct/kellyPct));
+      const kandidaten=ranked.filter(r=>r.score>0).slice(0,maxNieuwePosities);
+      if(kandidaten.length){
+        const perKandidaat=Math.floor(paper.balance*0.95/kandidaten.length);
+        for(const res of kandidaten){
+          if(paper.balance<1) break;
+          const pair=res.pair;
+          const price=getPrice(pair)||res.price;
+          if(!price||price<=0) continue;
+          const addSize=Math.min(paper.balance*0.95,perKandidaat);
+          if(addSize<1) continue;
+          const bbW=res.bb?.width||0;
+          const slPct=bbW>0?bbW*100*lastLearning.slMultiplier:5*lastLearning.slMultiplier;
+          const tpPct=slPct*(res.tpRatio||3);
+          const idx2=paper.positions.findIndex(p=>p.pair===pair);
+          if(idx2===-1){
+            // Nieuwe positie
+            const qty=addSize/price;
+            paper.balance-=addSize;
+            paper.positions.push({pair,currency:'EUR',side:'BUY',entry:price,qty,posSize:addSize,
+              sl:+(price*(1-slPct/100)).toFixed(8),tp:+(price*(1+tpPct/100)).toFixed(8),
+              atrPct:+slPct.toFixed(3),ts:new Date().toISOString(),score:res.score,rsi:res.rsi});
+            log.push({ts:new Date().toISOString(),pair,action:'KOOP',price:+price.toFixed(8),
+              qty:+qty.toFixed(8),value:+addSize.toFixed(2),score:res.score,currency:'EUR',
+              why:buildReason(res,'KOOP',slPct,tpPct,addSize,paper.balance+addSize,'EUR',0)});
+            const di=decisions.findIndex(d=>d.pair===pair);
+            const dec={pair,score:res.score,rsi:res.rsi,action:'GEKOCHT',detail:`Budget-ronde €${addSize.toFixed(0)} · score ${res.score}`};
+            if(di>=0) decisions[di]=dec; else decisions.push(dec);
+            changed=true;
+          } else {
+            // Bijkopen bestaande positie — Kelly bepaalt max
+            const pos=paper.positions[idx2];
+            if(posValueEUR(pos)/totaalV>=kellyPct) continue;
+            const addQty=addSize/price;
+            const newQty=pos.qty+addQty;
+            const newEntry=(pos.entry*pos.qty+price*addQty)/newQty;
+            paper.balance-=addSize;
+            paper.positions[idx2].qty=newQty;
+            paper.positions[idx2].entry=+newEntry.toFixed(8);
+            paper.positions[idx2].posSize=(pos.posSize||0)+addSize;
+            paper.positions[idx2].sl=+(price*(1-slPct/100)).toFixed(8);
+            paper.positions[idx2].tp=+(price*(1+tpPct/100)).toFixed(8);
+            log.push({ts:new Date().toISOString(),pair,action:'BIJKOOP',price:+price.toFixed(8),
+              qty:+addQty.toFixed(8),value:+addSize.toFixed(2),score:res.score,currency:'EUR',
+              why:[`Budget-ronde: €${addSize.toFixed(0)} bijgekocht`,`Nieuw gem. entry: ${fmtPrice(newEntry,'EUR')}`]});
+            const di=decisions.findIndex(d=>d.pair===pair);
+            const dec={pair,score:res.score,rsi:res.rsi,action:'BIJGEKOCHT',detail:`Budget-ronde +€${addSize.toFixed(0)} · gem. ${fmtPrice(newEntry,'EUR')}`};
+            if(di>=0) decisions[di]=dec; else decisions.push(dec);
+            changed=true;
+          }
+        }
+      }
+    }
   }
 
-  document.getElementById('ai-progress').style.display='none';
-  document.getElementById('ai-scan-status').textContent=`${aiResults.length} paren geanalyseerd · ${new Date().toLocaleTimeString('nl')}`;
-  btn.disabled=false; btn.innerHTML='<i class="fas fa-satellite-dish fa-xs"></i> Scan Kraken';
-  renderAiKPIs(); renderWeightsDisplay(); renderPredHistory(); renderAccuracyChart();
+  lastDecisions=decisions;
+  if(changed){ savePaper(paper); saveLog(log); renderAll(); }
+  renderDecisions();
 }
 
-function renderAiRow(r){
-  const tbody=document.getElementById('ai-tbody');
-  const rsiColor=r.rsi<30?'#00d4aa':r.rsi>70?'#ff5555':'#e0e0e0';
-  const macdColor=r.macdHist>0?'#00d4aa':'#ff5555';
-  const emaColor=r.ema.score>0?'#00d4aa':'#ff5555';
-  const bbColor=r.bbPct<0.3?'#00d4aa':r.bbPct>0.7?'#ff5555':'#e0e0e0';
-  const volColor=r.volTrend>0?'#00d4aa':r.volTrend<-0.1?'#ff5555':'#e0e0e0';
-  const displayPair=r.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD').replace('ZEUR','EUR');
-  const tr=document.createElement('tr');
-  tr.dataset.signal=r.signal;
-  tr.innerHTML=`
-    <td style="font-weight:700;">${displayPair}</td>
-    <td style="font-family:monospace;">${r.price.toLocaleString('nl',{maximumFractionDigits:6})}</td>
-    <td style="color:${rsiColor};font-weight:600;">${r.rsi}</td>
-    <td style="color:${macdColor};font-size:11px;font-family:monospace;">${r.macdHist>=0?'+':''}${r.macdHist.toFixed(4)}</td>
-    <td style="color:${emaColor};font-size:12px;">${r.ema.score>0?'▲ Bull':'▼ Bear'}</td>
-    <td style="color:${bbColor};font-size:12px;">${r.bbPct<0.3?'Lager BB':r.bbPct>0.7?'Boven BB':'Midden'}</td>
-    <td style="color:${volColor};font-size:12px;">${r.volTrend>=0?'+':''}${(r.volTrend*100).toFixed(0)}%</td>
-    <td>${scoreBar(r.score)}</td>
-    <td>${signalBadge(r.signal)}</td>
-    <td><button class="btn btn-ghost" onclick="openPaperFromAi('${r.pair}',${r.price})" style="font-size:11px;padding:3px 8px;">Trade</button></td>`;
-  tbody.appendChild(tr);
-}
-
-function filterAiTable(){
-  const f=document.getElementById('ai-filter').value;
-  document.querySelectorAll('#ai-tbody tr').forEach(tr=>{
-    tr.style.display=(f==='all'||tr.dataset.signal===f)?'':'none';
-  });
-}
-
-function openPaperFromAi(pair,price){
-  const displayPair=pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USDT').replace('ZEUR','USDT');
-  document.getElementById('po-pair').value=displayPair;
-  document.getElementById('po-price').value=price;
-  showPage('paper');
-}
-
-function renderAiKPIs(){
-  const evals=loadEvals();
-  const correct=evals.filter(e=>e.correct).length;
-  const acc=evals.length?Math.round(correct/evals.length*100):null;
-  const el=document.getElementById('ai-kpi-acc');
-  if(acc!==null){ el.textContent=acc+'%'; el.className=acc>=55?'pos':acc<45?'neg':'neu'; }
-  else { el.textContent='—'; el.className='neu'; }
-  document.getElementById('ai-kpi-acc-sub').textContent=evals.length?`${correct}/${evals.length} correct`:'nog geen evaluaties';
-  document.getElementById('ai-kpi-days').textContent=evals.length;
-
-  const weights=loadWeights();
-  const best=Object.entries(weights).sort((a,b)=>b[1]-a[1])[0];
-  document.getElementById('ai-kpi-best-ind').textContent=best?best[0].toUpperCase()+'('+best[1].toFixed(2)+')':'—';
-}
-
-// ── Predictions (learning memory) ─────────────────────
-function storePrediction(pred){
-  const preds=loadPredictions();
-  // Don't duplicate same pair+day
-  const today=pred.ts.slice(0,10);
-  const exists=preds.find(p=>p.pair===pred.pair&&p.ts.slice(0,10)===today);
-  if(!exists) preds.push(pred);
-  // Keep last 500
-  savePredictions(preds.slice(-500));
-}
-
-function renderPredHistory(){
-  const preds=loadPredictions().slice(-50).reverse();
-  const tbody=document.getElementById('pred-history-tbody');
-  if(!preds.length){
-    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#7878a0;padding:20px;">Nog geen voorspellingen opgeslagen — run een scan</td></tr>';
+// ── Beslissingen weergeven ────────────────────────────────
+function renderDecisions(){
+  const wrap=document.getElementById('decisions-wrap');
+  if(!wrap) return;
+  if(!lastDecisions.length){
+    wrap.innerHTML='<div style="color:#6868a0;font-size:12px;padding:8px 0;">Geen data — run scan eerst</div>';
     return;
   }
-  tbody.innerHTML=preds.map(p=>{
-    const cur=livePrices[p.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USDT')]||null;
-    const dirCorrect=p.evaluated?p.correct:null;
-    const actualDir=cur&&p.price?((cur-p.price)/p.price*100).toFixed(2):null;
-    const displayPair=p.pair.replace('XXBT','BTC').replace('XETH','ETH').replace('ZUSD','USD').replace('ZEUR','EUR');
-    return `<tr>
-      <td class="muted" style="font-size:11px;">${p.ts.slice(0,16)}</td>
-      <td style="font-weight:600;">${displayPair}</td>
-      <td>${signalBadge(p.signal)}</td>
-      <td>${scoreBar(p.score)}</td>
-      <td style="font-family:monospace;">${p.price.toLocaleString('nl',{maximumFractionDigits:4})}</td>
-      <td style="font-family:monospace;">${cur?cur.toLocaleString('nl',{maximumFractionDigits:4}):'—'}</td>
-      <td class="${actualDir>0?'pos':actualDir<0?'neg':'muted'}">${actualDir!=null?(actualDir>0?'+':'')+actualDir+'%':'—'}</td>
-      <td>${dirCorrect===true?'<span class="pos">✓</span>':dirCorrect===false?'<span class="neg">✗</span>':'<span class="muted">—</span>'}</td>
-    </tr>`;
+  const colorMap={
+    'GEKOCHT':'var(--green)','VERKOCHT':'var(--red)','BIJGEKOCHT':'var(--green)',
+    'AL OPEN':'var(--blue)','OVERGESLAGEN':'#6868a0',
+    'GEEN SALDO':'var(--amber)','GEEN PRIJS':'#6868a0','NEUTRAAL':'#6868a0',
+    'TE ZWAK':'var(--amber)',
+    'GEKOCHT (budget)':'var(--green)','BIJGEKOCHT (budget)':'var(--green)'
+  };
+  wrap.innerHTML=lastDecisions.map(d=>{
+    const col=colorMap[d.action]||'#6868a0';
+    const abs=Math.abs(d.score);
+    const barCol=d.score>0?'var(--green)':d.score<0?'var(--red)':'#6868a0';
+    const sym=d.pair.replace(/EUR$/,'');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1a1a2e;">
+      <span style="width:52px;font-weight:700;font-size:12px;color:#fff;flex-shrink:0;">${sym}</span>
+      <div style="width:70px;height:5px;background:#1e1e38;border-radius:3px;flex-shrink:0;overflow:hidden;">
+        <div style="height:100%;width:${Math.min(abs,100)}%;background:${barCol};border-radius:3px;"></div>
+      </div>
+      <span style="font-size:11px;font-family:monospace;width:32px;flex-shrink:0;color:${barCol};">${d.score>0?'+':''}${d.score}</span>
+      <span style="font-size:10px;font-weight:700;color:${col};width:90px;flex-shrink:0;">${d.action}</span>
+      <span style="font-size:11px;color:#6868a0;flex:1;">${d.detail}</span>
+    </div>`;
   }).join('');
 }
 
-function clearPredictions(){ savePredictions([]); saveEvals([]); renderPredHistory(); renderAiKPIs(); renderAccuracyChart(); }
-
-// ── Daily Evaluation & Weight Learning ──────────────────
-async function runDailyEvaluation(){
-  const btn=event.target; btn.disabled=true;
-  const el=document.getElementById('eval-result');
-  el.innerHTML='<span class="muted">Huidige prijzen ophalen...</span>';
-
-  const preds=loadPredictions().filter(p=>!p.evaluated);
-  if(!preds.length){ el.innerHTML='<span class="muted">Geen openstaande voorspellingen.</span>'; btn.disabled=false; return; }
-
-  // Fetch current prices for all unique pairs
-  const uniquePairs=[...new Set(preds.map(p=>p.pair))];
-  const currentPrices={};
-  for(const pair of uniquePairs){
-    try {
-      const r=await krakenFetch(`/Ticker?pair=${pair}`);
-      const key=Object.keys(r)[0];
-      currentPrices[pair]=parseFloat(r[key].c[0]);
-    } catch(e){}
-    await new Promise(r=>setTimeout(r,100));
-  }
-
-  const weights=loadWeights();
-  const evals=loadEvals();
-  let correct=0, total=0;
-  const indScores={rsi:{c:0,t:0},ema:{c:0,t:0},macd:{c:0,t:0},bb:{c:0,t:0},vol:{c:0,t:0}};
-
-  preds.forEach(p=>{
-    const cur=currentPrices[p.pair];
-    if(!cur) return;
-    const actualChange=(cur-p.price)/p.price;
-    const predictedBull=p.score>0;
-    const actualBull=actualChange>0;
-    const isCorrect=predictedBull===actualBull;
-    p.evaluated=true; p.evaluatedPrice=cur; p.correct=isCorrect; p.actualChange=actualChange;
-    total++; if(isCorrect)correct++;
-    evals.push({date:p.ts.slice(0,10),pair:p.pair,signal:p.signal,correct:isCorrect});
-
-    // Per-indicator scoring
-    const imap=[
-      ['rsi', p.weights?.rsi||1, (p.score>0)===(actualBull)],
-      ['ema', p.weights?.ema||1, (p.score>0)===(actualBull)],
-      ['macd',p.weights?.macd||1,(p.score>0)===(actualBull)],
-      ['bb',  p.weights?.bb||1,  (p.score>0)===(actualBull)],
-      ['vol', p.weights?.vol||1, (p.score>0)===(actualBull)],
-    ];
-    imap.forEach(([k,,c])=>{ indScores[k].t++; if(c)indScores[k].c++; });
-  });
-
-  // Adjust weights based on accuracy
-  if(total>0){
-    Object.keys(weights).forEach(k=>{
-      if(!indScores[k].t) return;
-      const acc=indScores[k].c/indScores[k].t;
-      weights[k]=Math.max(0.1,Math.min(3.0,weights[k]*(0.7+acc*0.6)));
-    });
-    // Normalize to max=1.5
-    const maxW=Math.max(...Object.values(weights));
-    if(maxW>1.5) Object.keys(weights).forEach(k=>weights[k]=weights[k]/maxW*1.5);
-    saveWeights(weights);
-  }
-
-  // Update predictions
-  const allPreds=loadPredictions().map(p=>preds.find(pp=>pp.pair===p.pair&&pp.ts===p.ts)||p);
-  savePredictions(allPreds);
-  saveEvals(evals.slice(-200));
-
-  const acc=total?Math.round(correct/total*100):0;
-  el.innerHTML=`<span class="${acc>=55?'pos':'neg'}">${correct}/${total} correct (${acc}%) · gewichten bijgewerkt</span>`;
-  btn.disabled=false;
-  renderWeightsDisplay(); renderPredHistory(); renderAiKPIs(); renderAccuracyChart();
+// ── Visuele signalen (koop/verkoop bars) ─────────────────
+function renderSignals(){
+  const buyEl=document.getElementById('signals-buy');
+  const sellEl=document.getElementById('signals-sell');
+  if(!buyEl||!sellEl) return;
+  const buys=scanResults.filter(r=>r.score>0).slice(0,8);
+  const sells=scanResults.filter(r=>r.score<0).sort((a,b)=>a.score-b.score).slice(0,8);
+  const fmtRow=(r,isUp)=>{
+    const abs=Math.min(Math.abs(r.score),100);
+    const col=isUp?'var(--green)':'var(--red)';
+    const sym=r.pair.replace(/EUR$/,'');
+    return `<div class="signal-row">
+      <span class="signal-pair">${sym}</span>
+      <div class="score-bar"><div class="score-fill" style="width:${abs}%;background:${col};"></div></div>
+      <span class="score-num" style="color:${col};">${r.score>0?'+':''}${r.score}</span>
+    </div>`;
+  };
+  buyEl.innerHTML=buys.length?buys.map(r=>fmtRow(r,true)).join(''):'<div style="color:#6868a0;font-size:12px;">Geen positieve signalen</div>';
+  sellEl.innerHTML=sells.length?sells.map(r=>fmtRow(r,false)).join(''):'<div style="color:#6868a0;font-size:12px;">Geen negatieve signalen</div>';
 }
 
-// ── Weights display ─────────────────────────────────────
-function renderWeightsDisplay(){
-  const w=loadWeights();
-  const max=Math.max(...Object.values(w))||1;
-  const labels={rsi:'RSI',ema:'EMA',macd:'MACD',bb:'Bollinger',vol:'Volume'};
-  document.getElementById('weights-display').innerHTML=Object.entries(w).map(([k,v])=>{
-    const pct=v/max*100;
-    const color=v>=1.2?'#00d4aa':v<=0.6?'#ff5555':'#f59e0b';
-    return `<div style="margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
-        <span class="muted">${labels[k]}</span>
-        <span style="color:${color};font-weight:600;">${v.toFixed(2)}</span>
+// ── Verliesanalyse & meetsysteem ─────────────────────────
+function renderPerformance(){
+  const wrap=document.getElementById('perf-wrap');
+  if(!wrap) return;
+  const paper=loadPaper();
+  const closed=paper.closed||[];
+  if(closed.length<1){
+    wrap.innerHTML='<div style="color:#6868a0;font-size:12px;padding:8px 0;">Nog geen afgesloten trades</div>';
+    return;
+  }
+
+  // ── Basis metrics ─────────────────────────────────────
+  const wins=closed.filter(t=>t.pnl>0);
+  const losses=closed.filter(t=>t.pnl<0);
+  const winRate=+(wins.length/closed.length*100).toFixed(1);
+  const totalWin=wins.reduce((s,t)=>s+t.pnl,0);
+  const totalLoss=Math.abs(losses.reduce((s,t)=>s+t.pnl,0));
+  const profitFactor=totalLoss>0?+(totalWin/totalLoss).toFixed(2):null;
+  const avgWin=wins.length?+(totalWin/wins.length).toFixed(2):0;
+  const avgLoss=losses.length?+(totalLoss/losses.length).toFixed(2):0;
+  const netPnl=closed.reduce((s,t)=>s+t.pnl,0);
+
+  // ── P&L per coin ──────────────────────────────────────
+  const byCoin={};
+  closed.forEach(t=>{
+    const sym=(t.pair||'').replace(/EUR$|USDT$/,'');
+    if(!byCoin[sym]) byCoin[sym]={pnl:0,w:0,l:0,n:0};
+    byCoin[sym].pnl+=t.pnl; byCoin[sym].n++;
+    t.pnl>0?byCoin[sym].w++:byCoin[sym].l++;
+  });
+  const coinList=Object.entries(byCoin).sort((a,b)=>a[1].pnl-b[1].pnl);
+  const maxAbsPnl=Math.max(...coinList.map(([,v])=>Math.abs(v.pnl)),1);
+
+  // ── Exit-reden verdeling ──────────────────────────────
+  const byReason={};
+  closed.forEach(t=>{
+    const r=t.reason||'Scan-signaal';
+    if(!byReason[r]) byReason[r]={pnl:0,w:0,l:0,n:0};
+    byReason[r].pnl+=t.pnl; byReason[r].n++;
+    t.pnl>0?byReason[r].w++:byReason[r].l++;
+  });
+
+  // ── Score brackets ─────────────────────────────────────
+  const brackets=[{min:0,max:25,label:'Zwak 0–25'},{min:25,max:50,label:'Matig 25–50'},{min:50,max:75,label:'Sterk 50–75'},{min:75,max:101,label:'Zeer sterk 75+'}];
+  const scoreAcc=brackets.map(b=>{
+    const tt=closed.filter(t=>t.score!=null&&Math.abs(t.score)>=b.min&&Math.abs(t.score)<b.max);
+    if(!tt.length) return null;
+    const wr=+(tt.filter(t=>t.pnl>0).length/tt.length*100).toFixed(0);
+    const pnl=tt.reduce((s,t)=>s+t.pnl,0);
+    return {label:b.label,n:tt.length,wr,pnl};
+  }).filter(Boolean);
+
+  // ── Auto-bevindingen ──────────────────────────────────
+  const bevindingen=[];
+  const slTrades=closed.filter(t=>t.reason?.includes('Stop-Loss'));
+  const tpTrades=closed.filter(t=>t.reason?.includes('Take-Profit'));
+  const slRate=slTrades.length/closed.length;
+  if(slRate>0.5) bevindingen.push(`⚠️ ${(slRate*100).toFixed(0)}% van de trades eindigt via Stop-Loss — SL is mogelijk te strak of instapmoment te vroeg.`);
+  if(tpTrades.length>0 && tpTrades.length/closed.length>0.3) bevindingen.push(`✓ Take-Profit wordt ${(tpTrades.length/closed.length*100).toFixed(0)}% van de tijd bereikt — TP-niveau werkt goed.`);
+  if(avgLoss>avgWin*1.5) bevindingen.push(`⚠️ Gem. verlies (€${avgLoss}) is meer dan 1.5× het gem. winst (€${avgWin}) — verliezen lopen te lang door.`);
+  if(avgWin>avgLoss*1.2) bevindingen.push(`✓ Gem. winst (€${avgWin}) overtreft gem. verlies (€${avgLoss}) — risico/rendement is gezond.`);
+  const worstCoins=coinList.filter(([,v])=>v.pnl<0&&v.l===v.n).slice(0,3);
+  worstCoins.forEach(([sym,v])=>bevindingen.push(`⚠️ ${sym} verliest iedere trade (${v.n}×) — totaal -€${Math.abs(v.pnl).toFixed(0)}. Overweeg deze coin te vermijden.`));
+  const weakScoreBracket=scoreAcc.find(b=>b.label.startsWith('Zwak'));
+  if(weakScoreBracket&&weakScoreBracket.wr<35) bevindingen.push(`⚠️ Zwakke signalen (score 0–25) winnen slechts ${weakScoreBracket.wr}% — te lage drempel voor instap.`);
+  if(winRate>=55&&profitFactor>=1.2) bevindingen.push(`✓ Sterke resultaten: win rate ${winRate}% en profit factor ${profitFactor}.`);
+  if(netPnl<0&&closed.length>=10) bevindingen.push(`⚠️ Nettopositeit is negatief na ${closed.length} trades — strategie verliest geld in de huidige markt.`);
+
+  // ── HTML samenstellen ────────────────────────────────
+  const ks='background:#0f0f1a;border-radius:8px;padding:10px;text-align:center;';
+  const kl='font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;';
+  const kv='font-size:17px;font-weight:700;font-family:monospace;';
+  const sec=(t)=>`<div style="font-size:10px;color:#6868a0;text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin:16px 0 8px;">${t}</div>`;
+
+  wrap.innerHTML=`
+  ${sec('Overzicht')}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;">
+    <div style="${ks}"><div style="${kl}">Trades</div><div style="${kv}">${closed.length}</div><div style="font-size:10px;color:#6868a0;">${wins.length}W / ${losses.length}L</div></div>
+    <div style="${ks}"><div style="${kl}">Win rate</div><div style="${kv};color:${winRate>=50?'var(--green)':'var(--red)'};">${winRate}%</div></div>
+    <div style="${ks}"><div style="${kl}">Gem. winst</div><div style="${kv};color:var(--green);">+€${avgWin}</div></div>
+    <div style="${ks}"><div style="${kl}">Gem. verlies</div><div style="${kv};color:var(--red);">-€${avgLoss}</div></div>
+    <div style="${ks}"><div style="${kl}">Profit factor</div><div style="${kv};color:${profitFactor>=1?'var(--green)':'var(--red)'};">${profitFactor??'—'}</div></div>
+    <div style="${ks}"><div style="${kl}">Netto P&L</div><div style="${kv};color:${netPnl>=0?'var(--green)':'var(--red)'};">${netPnl>=0?'+':''}€${netPnl.toFixed(0)}</div></div>
+  </div>
+
+  ${sec('P&L per coin — slechtste eerst')}
+  <div style="display:grid;gap:5px;">
+    ${coinList.map(([sym,v])=>{
+      const isPos=v.pnl>=0;
+      const barW=Math.round(Math.abs(v.pnl)/maxAbsPnl*100);
+      const col=isPos?'var(--green)':'var(--red)';
+      const wr=+(v.w/v.n*100).toFixed(0);
+      return `<div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:54px;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${sym}</span>
+        <div style="flex:1;height:6px;background:#1e1e38;border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${barW}%;background:${col};border-radius:3px;"></div>
+        </div>
+        <span style="font-size:11px;font-family:monospace;color:${col};width:60px;text-align:right;flex-shrink:0;">${isPos?'+':''}€${Math.abs(v.pnl).toFixed(0)}</span>
+        <span style="font-size:10px;color:#6868a0;width:48px;flex-shrink:0;">${v.w}W/${v.l}L</span>
+      </div>`;
+    }).join('')}
+  </div>
+
+  ${sec('Waarom gesloten?')}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;">
+    ${Object.entries(byReason).map(([r,v])=>{
+      const wr=+(v.w/v.n*100).toFixed(0);
+      const col=v.pnl>=0?'var(--green)':'var(--red)';
+      return `<div style="${ks}">
+        <div style="${kl}">${r}</div>
+        <div style="font-size:12px;font-weight:700;color:${col};">${v.n}× · ${wr}% win</div>
+        <div style="font-size:11px;color:${col};font-family:monospace;">${v.pnl>=0?'+':''}€${v.pnl.toFixed(0)}</div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  ${scoreAcc.length?`${sec('Score nauwkeurigheid')}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">
+    ${scoreAcc.map(b=>`<div style="${ks}">
+      <div style="${kl}">${b.label}</div>
+      <div style="${kv};color:${b.wr>=50?'var(--green)':'var(--red)'};">${b.wr}%</div>
+      <div style="font-size:10px;color:#6868a0;">${b.n} trades</div>
+      <div style="font-size:10px;color:${b.pnl>=0?'var(--green)':'var(--red)'};">${b.pnl>=0?'+':''}€${b.pnl.toFixed(0)}</div>
+      <div style="margin-top:4px;height:3px;background:#1e1e38;border-radius:2px;overflow:hidden;"><div style="height:100%;width:${b.wr}%;background:${b.wr>=50?'var(--green)':'var(--red)'};"></div></div>
+    </div>`).join('')}
+  </div>`:''}
+
+  ${bevindingen.length?`${sec('Bevindingen')}
+  <div style="display:grid;gap:6px;">
+    ${bevindingen.map(b=>`<div style="font-size:11px;color:${b.startsWith('⚠️')?'#f59e0b':'var(--green)'};line-height:1.5;padding:6px 10px;background:#0f0f1a;border-radius:6px;">${b}</div>`).join('')}
+  </div>`:''}
+
+  ${lastLearning.learnLog.length||learnedWeights?`${sec('Wat ik geleerd heb — actief toegepast')}
+  ${lastLearning.learnLog.length?`<div style="display:grid;gap:6px;margin-bottom:10px;">
+    ${lastLearning.learnLog.map(l=>`<div style="font-size:11px;color:var(--blue);line-height:1.5;padding:6px 10px;background:#0f0f1a;border-radius:6px;">🧠 ${l}</div>`).join('')}
+  </div>`:''}
+  ${(()=>{
+    const w=learnedWeights;
+    if(!w||!w._accuracy) return '<div style="font-size:11px;color:#6868a0;">Indicator gewichten: basis (nog te weinig data met indicatoren opgeslagen)</div>';
+    const NAMEN={rsi:'RSI',ema:'EMA',macd:'MACD',bb:'Bollinger',vol:'Volume'};
+    const items=Object.entries(w._accuracy).map(([k,v])=>{
+      const bw=Math.round(v.predictiveness*100);
+      const col=v.predictiveness>0.55?'var(--green)':v.predictiveness<0.45?'var(--red)':'#6868a0';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+        <span style="width:72px;font-size:11px;font-weight:700;color:#fff;">${NAMEN[k]||k}</span>
+        <div style="flex:1;height:5px;background:#1e1e38;border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${bw}%;background:${col};border-radius:3px;"></div>
+        </div>
+        <span style="font-size:10px;font-family:monospace;color:${col};width:36px;text-align:right;">${bw}%</span>
+        <span style="font-size:10px;color:#6868a0;width:90px;">${(v.bullWR*100).toFixed(0)}% win bullish</span>
+      </div>`;
+    });
+    return `<div style="background:#0f0f1a;border-radius:8px;padding:10px;"><div style="font-size:10px;color:#6868a0;margin-bottom:6px;">Indicator voorspelkracht op basis van ${w._n} trades met data</div>${items.join('')}</div>`;
+  })()}`
+  :'<div style="font-size:11px;color:#6868a0;margin-top:8px;">Zelfleer actief — nog te weinig handelshistorie (min 5 trades per coin/bracket).</div>'}`;
+}
+
+// ── Stop-Loss / Take-Profit controleren ──────────────────
+function checkSLTP(){
+  const paper=loadPaper();
+  const log=loadLog();
+  let changed=false;
+  for(let i=paper.positions.length-1;i>=0;i--){
+    const pos=paper.positions[i];
+    const cur=getPrice(pos.pair)||pos.entry;
+    // Trailing ook hier updaten op elke prijs-tick
+    if(cur>pos.entry && pos.atrPct){
+      const trailSL=+(cur*(1-pos.atrPct/100)).toFixed(8);
+      if(trailSL>pos.sl){ paper.positions[i].sl=trailSL; changed=true; }
+    }
+    let hitPrice=null, hitReason='';
+    if(pos.sl && cur<=pos.sl){ hitPrice=pos.sl; hitReason='Stop-Loss geraakt'; }
+    if(pos.tp && cur>=pos.tp){ hitPrice=pos.tp; hitReason='Take-Profit bereikt'; }
+    if(hitPrice){
+      // P&L op de exacte trigger-prijs, niet de live marktprijs
+      const c=pos.currency||'USDT';
+      const convMul=c==='EUR'?1:c==='BTC'?getBTCUSDT()/getEURUSDT():1/getEURUSDT();
+      const pnlEur=(hitPrice-pos.entry)*pos.qty*convMul;
+      paper.balance+=pos.posSize+pnlEur;
+      paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
+      paper.closed.push({pair:pos.pair,entry:pos.entry,exit:hitPrice,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:c,ts:new Date().toISOString(),reason:hitReason,indicators:pos.indicators});
+      paper.positions.splice(i,1);
+      const sign=pnlEur>=0?'+':'';
+      log.push({
+        ts:new Date().toISOString(), pair:pos.pair, action:hitReason,
+        price:+hitPrice.toFixed(8), qty:+pos.qty.toFixed(8), pnl:+pnlEur.toFixed(4),
+        why:[hitReason+` · ${sign}€${Math.abs(pnlEur).toFixed(2)}`]
+      });
+      changed=true;
+    }
+  }
+  if(changed){ savePaper(paper); saveLog(log); renderAll(); }
+}
+
+// ── Trade rationale ───────────────────────────────────────
+function buildReason(res, action, slPct, tpPct, posSize, freeWas, currency='USDT', threshold=28){
+  const lines=[];
+  if(action==='KOOP'){
+    if(res.rsi<35) lines.push(`RSI ${res.rsi} — oververkocht, koopmogelijkheid`);
+    else if(res.rsi<45) lines.push(`RSI ${res.rsi} — licht oververkocht`);
+    if(res.emaScore>0) lines.push(`EMA9>EMA21>EMA50 — opgaande trend`);
+    if(res.macdHist>0) lines.push(`MACD positief (${res.macdHist.toFixed(5)}) — momentum omhoog`);
+    if(res.bb?.pct<0.25) lines.push(`Prijs bij BB-ondergrens (${(res.bb.pct*100).toFixed(0)}%) — steun`);
+    lines.push(`Score ${res.score} ≥ adaptieve drempel ${threshold} · SL ${slPct.toFixed(1)}% · TP ${tpPct.toFixed(1)}% (BB-volatiliteit)`);
+    lines.push(`Kelly: €${posSize.toFixed(0)} van €${freeWas.toFixed(0)} · F&G ${fgValue}/100`);
+    if(currency!=='USDT') lines.push(`Valuta: ${currency} paar`);
+  } else {
+    if(res.rsi>65) lines.push(`RSI ${res.rsi} — overbought`);
+    if(res.emaScore<0) lines.push(`EMA trending neerwaarts`);
+    if(res.macdHist<0) lines.push(`MACD negatief — neerwaarts momentum`);
+    lines.push(`Score ${res.score} ≤ adaptieve drempel ${threshold} — exit`);
+  }
+  return lines;
+}
+
+// ── Renderen ──────────────────────────────────────────────
+function renderKPIs(){
+  const paper=loadPaper();
+  let upnl=0;
+  paper.positions.forEach(pos=>{ upnl+=posPnlEUR(pos); });
+  const posVal=paper.positions.reduce((s,pos)=>s+posValueEUR(pos),0);
+  const total=paper.balance+posVal;
+  const totalPct=(total-paper.start)/paper.start*100;
+  const realized=paper.realizedPnl||0;
+  const fmtE=v=>(v>=0?'+':'')+' €'+Math.abs(v).toLocaleString('nl',{maximumFractionDigits:0});
+
+  document.getElementById('kpi-total').textContent='€'+total.toLocaleString('nl',{maximumFractionDigits:0});
+  const tpEl=document.getElementById('kpi-total-pct');
+  tpEl.textContent=(totalPct>=0?'+':'')+totalPct.toFixed(1)+'% · F&G '+fgValue;
+  tpEl.className='kpi-sub '+(totalPct>=0?'pos':'neg');
+
+  const pnlEl=document.getElementById('kpi-pnl');
+  pnlEl.textContent=(upnl>=0?'+':'')+'€'+Math.abs(upnl).toFixed(0);
+  pnlEl.className='kpi-value '+(upnl>=0?'pos':'neg');
+
+  document.getElementById('kpi-free').textContent='€'+paper.balance.toLocaleString('nl',{maximumFractionDigits:0});
+  document.getElementById('kpi-free-sub').textContent=paper.positions.length+' positie'+(paper.positions.length!==1?'s':'')+' open';
+
+  const rEl=document.getElementById('kpi-realized');
+  rEl.textContent=(realized>=0?'+':'')+'€'+Math.abs(realized).toFixed(0);
+  rEl.className='kpi-value '+(realized>=0?'pos':'neg');
+}
+
+function renderPositions(){
+  const paper=loadPaper();
+  const wrap=document.getElementById('positions-wrap');
+  if(!paper.positions.length){
+    wrap.innerHTML='<div class="empty"><i class="fas fa-inbox"></i>Geen posities — zet Auto Trading aan en run een scan</div>';
+    return;
+  }
+
+  wrap.innerHTML='<div class="pos-grid">'+paper.positions.map((pos,i)=>{
+    const cur=getPrice(pos.pair)||pos.entry;
+    const currency=pos.currency||'USDT';
+    const val=posValueEUR(pos);
+    const pnl=posPnlEUR(pos);
+    const pnlPct=(cur-pos.entry)/pos.entry*100;
+    const isUp=pnl>=0;
+    const sym=pos.pair.replace(/USDT$|EUR$|BTC$/,'');
+    const coinIcons={BTC:'₿',ETH:'Ξ',SOL:'◎',XRP:'✕',BNB:'⬡',ADA:'₳',DOGE:'Ð',AVAX:'▲',DOT:'●',LINK:'⬡'};
+    const icon=coinIcons[sym]||sym[0];
+
+    // Voortgangsbalk SL→TP
+    let barPct=50, barColor='#6868a0';
+    if(pos.sl && pos.tp){
+      const range=pos.tp-pos.sl;
+      barPct=range>0?Math.max(0,Math.min(100,(cur-pos.sl)/range*100)):50;
+      barColor=barPct>65?'var(--green)':barPct<35?'var(--red)':'var(--amber)';
+    }
+    const entFmt=fmtPrice(pos.entry,currency);
+    const slFmt=pos.sl?fmtPrice(pos.sl,currency):'—';
+    const tpFmt=pos.tp?fmtPrice(pos.tp,currency):'—';
+    const curFmt=fmtPrice(cur,currency);
+    const currBadge=currency!=='USDT'?`<span style="font-size:9px;background:rgba(99,130,255,.2);color:#6382ff;padding:1px 5px;border-radius:4px;margin-left:4px;">${currency}</span>`:'';
+    const valFmt='€'+val.toLocaleString('nl',{maximumFractionDigits:0});
+
+    return `<div class="pos-card ${isUp?'up':'down'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:9px;">
+          <div style="width:34px;height:34px;border-radius:50%;background:rgba(99,130,255,.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--blue);">${icon}</div>
+          <div>
+            <div class="pos-coin">${sym}${currBadge}</div>
+            <div style="font-size:10px;color:#6868a0;">${pos.ts?.slice(0,10)||'—'}</div>
+          </div>
+        </div>
+        <button onclick="sluitPositie(${i})" class="btn btn-danger btn-sm">Sluiten</button>
       </div>
-      <div style="background:#252540;border-radius:3px;height:5px;overflow:hidden;">
-        <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;transition:width .5s;"></div>
+      <div class="pos-val">${valFmt}</div>
+      <div class="pos-pnl ${isUp?'up':'down'}">${isUp?'+':''}${pnlPct.toFixed(2)}% &nbsp;·&nbsp; ${isUp?'+':''}€${Math.abs(pnl).toFixed(2)}</div>
+      ${pos.sl&&pos.tp?`
+      <div class="progress-wrap">
+        <div class="progress-labels"><span>SL ${slFmt}</span><span style="color:${barColor};">${curFmt}</span><span>TP ${tpFmt}</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${barPct.toFixed(1)}%;background:${barColor};"></div></div>
+      </div>`:''}
+      <div class="pos-meta">Ingekocht op ${entFmt} · ${fmtQty(pos.qty)}</div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+function sluitPositie(i){
+  const paper=loadPaper();
+  const log=loadLog();
+  const pos=paper.positions[i];
+  if(!pos) return;
+  const pnlEur=posPnlEUR(pos);
+  paper.balance+=pos.posSize+pnlEur;
+  paper.realizedPnl=(paper.realizedPnl||0)+pnlEur;
+  const exitPrice=getPrice(pos.pair)||pos.entry;
+  paper.closed.push({pair:pos.pair,entry:pos.entry,exit:exitPrice,qty:pos.qty,pnl:+pnlEur.toFixed(4),currency:pos.currency||'USDT',ts:new Date().toISOString(),reason:'Handmatig gesloten'});
+  paper.positions.splice(i,1);
+  log.push({ts:new Date().toISOString(),pair:pos.pair,action:'HANDMATIG GESLOTEN',price:+exitPrice.toFixed(8),qty:+pos.qty.toFixed(8),pnl:+pnlEur.toFixed(4),why:['Handmatig gesloten','P&L: '+(pnlEur>=0?'+':'')+'€'+Math.abs(pnlEur).toFixed(2)]});
+  savePaper(paper); saveLog(log); renderAll();
+}
+
+function renderLog(){
+  const log=loadLog().slice().reverse().slice(0,60);
+  const wrap=document.getElementById('log-wrap');
+  if(!log.length){
+    wrap.innerHTML='<div class="empty"><i class="fas fa-clock"></i>Nog geen trades uitgevoerd</div>';
+    return;
+  }
+  wrap.innerHTML=log.map((e,i)=>{
+    const isBuy=e.action==='KOOP';
+    const isSL=e.action.includes('Stop')||e.action.includes('Take');
+    const badgeCls=isBuy?'buy':'sell';
+    const prFmt=e.price>=1?e.price.toLocaleString('nl',{maximumFractionDigits:2}):e.price?.toFixed?.(6)||'—';
+    const pnlStr=e.pnl!==undefined?` · <span class="${e.pnl>=0?'pos':'neg'}">${e.pnl>=0?'+':''}€${Math.abs(e.pnl).toFixed(2)}</span>`:'';
+    const why=Array.isArray(e.why)?e.why:[];
+    const pairLabel=(e.pair||'').replace(/USDT$/,'').replace(/EUR$/,'€').replace(/BTC$/,'₿');
+    const currency=e.currency||'USDT';
+    const pfxPrice=currency==='EUR'?'€':currency==='BTC'?'₿':'$';
+    return `<div class="log-entry">
+      <span class="log-badge ${badgeCls}">${e.action}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="log-pair">${pairLabel}</span>
+          <span class="log-price">${pfxPrice}${prFmt}</span>
+          ${e.value?`<span style="font-size:11px;color:#6868a0;">€${(+e.value).toFixed(0)}</span>`:''}
+          ${pnlStr}
+        </div>
+        <div class="log-meta">${e.ts?.slice(0,16).replace('T',' ')||''}${e.score!==undefined?' · score '+e.score:''}</div>
+        ${why.length?`<div class="log-reason" onclick="this.querySelector('.log-reason-detail').classList.toggle('open');this.querySelector('i').style.transform=this.querySelector('.log-reason-detail').classList.contains('open')?'rotate(90deg)':''">
+          <i class="fas fa-chevron-right fa-xs" style="transition:transform .2s;"></i> Waarom deze trade?
+          <div class="log-reason-detail">${why.map(l=>`<div style="padding:2px 0;color:#9090b8;">· ${l}</div>`).join('')}</div>
+        </div>`:''}
       </div>
     </div>`;
   }).join('');
 }
 
-function resetWeights(){ saveWeights({...WEIGHT_DEFAULTS}); renderWeightsDisplay(); renderAiKPIs(); }
-
-// ── Accuracy chart ──────────────────────────────────────
-function renderAccuracyChart(){
-  const evals=loadEvals();
-  const byDay={};
-  evals.forEach(e=>{ if(!byDay[e.date]){byDay[e.date]={c:0,t:0};} byDay[e.date].t++; if(e.correct)byDay[e.date].c++; });
-  const days=Object.keys(byDay).sort().slice(-14);
-  const accs=days.map(d=>Math.round(byDay[d].c/byDay[d].t*100));
-  destroyChart('accuracy');
-  if(!days.length){
-    const ctx=document.getElementById('chart-accuracy').getContext('2d');
-    ctx.clearRect(0,0,999,999);
-    return;
+// ── Auto-trade toggle ─────────────────────────────────────
+function setAutoTrade(enabled){
+  const s=loadSettings();
+  s.enabled=enabled;
+  saveSettings(s);
+  const lbl=document.getElementById('at-label');
+  const card=document.getElementById('control-card');
+  const desc=document.getElementById('at-desc');
+  if(enabled){
+    lbl.textContent='AAN'; lbl.style.color='var(--green)';
+    card.style.borderColor='rgba(0,212,170,.4)';
+    desc.textContent='Auto trading actief. Na elke scan worden koop- en verkoopsignalen automatisch uitgevoerd. SL en TP worden bijgehouden.';
+  } else {
+    lbl.textContent='UIT'; lbl.style.color='var(--red)';
+    card.style.borderColor='rgba(0,212,170,.15)';
+    desc.textContent='Auto trading uit. Run handmatig een scan om signalen te zien.';
   }
-  charts['accuracy']=new Chart(document.getElementById('chart-accuracy').getContext('2d'),{
-    type:'line',
-    data:{labels:days.map(d=>d.slice(5)), datasets:[
-      {data:accs,borderColor:'#6382ff',backgroundColor:'rgba(99,130,255,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3},
-      {data:Array(days.length).fill(50),borderColor:'rgba(255,85,85,.3)',borderWidth:1,borderDash:[4,4],pointRadius:0}
-    ]},
-    options:{plugins:{legend:{display:false}},scales:{
-      x:{ticks:{color:'#7878a0',font:{size:10}},grid:{color:'#252540'}},
-      y:{ticks:{color:'#7878a0',font:{size:10},callback:v=>v+'%'},grid:{color:'#252540'},min:0,max:100}
-    },animation:{duration:300}}
-  });
 }
 
-// ══════════════════════════════════════════════════════════
-//  MODAL UTILS
-// ══════════════════════════════════════════════════════════
-function closeModal(id){ document.getElementById(id).style.display='none'; }
+// ── Strategy fit check ────────────────────────────────────
+function checkStrategyFit(){
+  if(!scanResults.length){ document.getElementById('strat-check').textContent='—'; return; }
+  const buys=scanResults.filter(r=>r.score>=28).length;
+  const sells=scanResults.filter(r=>r.score<=-28).length;
+  const total=scanResults.length;
+  const bullRatio=buys/total, bearRatio=sells/total;
+  const avgScore=scanResults.reduce((s,r)=>s+r.score,0)/total;
+  let txt='', color='#6868a0';
+  if(bullRatio>0.4){ txt=`✓ Bullish markt · ${buys} koop-signalen · gem score +${avgScore.toFixed(0)}`; color='var(--green)'; }
+  else if(bearRatio>0.4){ txt=`↓ Bearish markt · ${sells} verkoop-signalen · gem score ${avgScore.toFixed(0)}`; color='var(--red)'; }
+  else { txt=`⟳ Gemengde signalen · ${buys} koop / ${sells} verkoop`; color='var(--amber)'; }
+  const el=document.getElementById('strat-check');
+  el.textContent=txt; el.style.color=color;
+}
 
-// ══════════════════════════════════════════════════════════
-//  REFRESH
-// ══════════════════════════════════════════════════════════
-function refreshAll(){
-  const icon=document.getElementById('refresh-icon');
+// ── Live Chart — Binance klines ───────────────────────────
+async function loadChart(){
+  const pair=document.getElementById('chart-pair').value;
+  const tf=document.getElementById('chart-tf').value; // '1h','4h','1d'
+  const wrap=document.getElementById('chart-wrap');
+  const status=document.getElementById('chart-status');
+  status.textContent='Laden…';
+  if(chartObj){ try{ chartObj.remove(); }catch(e){} chartObj=null; }
+  wrap.innerHTML='';
+  try {
+    const candles=await fetchBinanceKlines(pair,tf,200);
+    chartObj=LightweightCharts.createChart(wrap,{
+      autoSize:true, height:420,
+      layout:{background:{color:'#0d0d1a'},textColor:'#a0a0c0'},
+      grid:{vertLines:{color:'#1a1a2e'},horzLines:{color:'#1a1a2e'}},
+      rightPriceScale:{borderColor:'#2a2a48'},
+      timeScale:{borderColor:'#2a2a48',timeVisible:true},
+    });
+    const cs=chartObj.addCandlestickSeries({upColor:'#00d4aa',downColor:'#ff5555',borderVisible:false,wickUpColor:'#00d4aa',wickDownColor:'#ff5555'});
+    cs.setData(candles.map(c=>({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close})));
+    // EMA9 en EMA21
+    const closes=candles.map(c=>c.close);
+    const ema9s=[], ema21s=[];
+    let e9=closes[0], e21=closes[0];
+    const k9=2/10, k21=2/22;
+    candles.forEach((c,i)=>{
+      e9=c.close*k9+e9*(1-k9); e21=c.close*k21+e21*(1-k21);
+      if(i>20){ ema9s.push({time:c.time,value:+e9.toFixed(6)}); ema21s.push({time:c.time,value:+e21.toFixed(6)}); }
+    });
+    const e9s=chartObj.addLineSeries({color:'rgba(99,130,255,.7)',lineWidth:1,priceLineVisible:false});
+    const e21s=chartObj.addLineSeries({color:'rgba(245,158,11,.7)',lineWidth:1,priceLineVisible:false});
+    e9s.setData(ema9s); e21s.setData(ema21s);
+    chartObj.timeScale().fitContent();
+    status.textContent=`${pair} · ${tf} · ${candles.length} kaarsen`;
+  } catch(e){ status.textContent='Fout: '+e.message; }
+}
+
+// ── Auto-scan timer ───────────────────────────────────────
+let scanInterval=null;
+function startAutoScan(){
+  if(scanInterval) clearInterval(scanInterval);
+  scanInterval=setInterval(()=>{
+    const s=loadSettings();
+    if(s.enabled) runScan();
+  }, 5*60*1000); // elke 5 minuten
+}
+
+// ── refreshPrices (knop) ──────────────────────────────────
+async function refreshPrices(){
+  const icon=document.getElementById('refresh-spin');
   icon.classList.add('fa-spin');
-  updateLivePrices().then(()=>{ renderAll(); icon.classList.remove('fa-spin'); });
+  await fetchPrices();
+  icon.classList.remove('fa-spin');
+}
+
+// ── renderAll ──────────────────────────────────────────────
+function renderAll(){
+  renderKPIs();
+  renderPositions();
+  renderLog();
+  renderSignals();
+  renderPerformance();
 }
 
 // ══════════════════════════════════════════════════════════
-//  INIT
+// INIT
 // ══════════════════════════════════════════════════════════
-renderStratParams();
-renderWeightsDisplay();
-renderPredHistory();
-renderAiKPIs();
-renderAccuracyChart();
-loadDemoData();
-updateLivePrices();
-setInterval(updateLivePrices, 15000);
+(function init(){
+  // Sync toggle
+  const s=loadSettings();
+  const toggle=document.getElementById('at-toggle');
+  toggle.checked=s.enabled;
+  setAutoTrade(s.enabled);
+
+  // Eerste render
+  renderAll();
+
+  // Fear & Greed ophalen (dagelijks, geen rate-limit)
+  fetchFearGreed();
+
+  // CoinGecko elke 60s — EUR prijzen, 24u%, top-movers (gratis, geen key)
+  fetchGeckoPrices();
+  setInterval(fetchGeckoPrices, 60000);
+  // Binance snelle update voor open posities elke 15s
+  setInterval(fetchPrices, 15000);
+
+  // Auto-scan starten
+  startAutoScan();
+
+  // Eerste scan na 3 seconden
+  // scan wordt getriggerd door fetchGeckoPrices() na eerste load
+
+  // Chart
+  loadChart();
+
+  // autoSize handles resize automatically
+})();
 </script>
 </body>
 </html>
